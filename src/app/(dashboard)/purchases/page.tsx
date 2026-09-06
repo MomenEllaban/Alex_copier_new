@@ -105,6 +105,7 @@ export default function PurchasesPage() {
   const [form, setForm] = useState({ companyId: "", supplierId: "", notes: "", status: "CONFIRMED" });
   const [itemRows, setItemRows] = useState<ItemRow[]>([{ productId: "", quantity: "", unitPrice: "" }]);
   const [priceHistory, setPriceHistory] = useState<Record<string, PriceHistory>>({});
+  const [priceHistoryLoading, setPriceHistoryLoading] = useState<Record<string, boolean>>({});
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 15;
   const [icPage, setIcPage] = useState(1);
@@ -211,6 +212,11 @@ export default function PurchasesPage() {
     if (!companyId) return;
     const missing = productIds.filter((id) => id && !priceHistory[id]);
     if (missing.length === 0) return;
+    setPriceHistoryLoading((prev) => {
+      const next = { ...prev };
+      for (const id of missing) next[id] = true;
+      return next;
+    });
     fetch("/api/products/price-history", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -220,7 +226,14 @@ export default function PurchasesPage() {
       .then((data) => {
         if (data?.prices) setPriceHistory((prev) => ({ ...prev, ...data.prices }));
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        setPriceHistoryLoading((prev) => {
+          const next = { ...prev };
+          for (const id of missing) next[id] = false;
+          return next;
+        });
+      });
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -363,8 +376,8 @@ export default function PurchasesPage() {
         <button onClick={() => setShowForm(true)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"><Plus size={16} />{t("purchases.addOrder")}</button>
       </div>
 
-      <FormModal open={showForm} onClose={() => { setShowForm(false); setEditingId(null); }} title={editingId ? "تعديل فاتورة شراء" : t("purchases.addOrder")}>
-        <form onSubmit={handleCreate} className="space-y-4">
+      <FormModal open={showForm} onClose={() => { setShowForm(false); setEditingId(null); }} title={editingId ? "تعديل فاتورة شراء" : t("purchases.addOrder")} wide>
+        <form onSubmit={handleCreate} className="space-y-5">
           <div className="flex items-center justify-between rounded-xl border border-purple-200 bg-purple-50 px-4 py-3 text-purple-700">
             <span className="text-sm font-bold">{editingId ? "تعديل فاتورة شراء" : t("purchases.addOrder")}</span>
             <span className="text-xs opacity-80">{editingId ? "تعديل" : "إضافة جديدة"}</span>
@@ -413,29 +426,51 @@ export default function PurchasesPage() {
             <label className="block text-sm font-medium text-slate-700">{t("common.notes")}</label>
             <textarea placeholder={t("common.notes")} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className={inputClass} rows={2} />
           </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <h3 className="font-medium text-sm text-slate-700">{t("purchases.items")}</h3>
+          <div className="rounded-xl border border-gray-200 bg-slate-50 p-4">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-700">{t("purchases.items")}</h3>
               <button type="button" onClick={addRow} className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800"><Plus size={16} />{t("purchases.addRow")}</button>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-3">
               {itemRows.map((row, idx) => {
                 const ph = row.productId ? priceHistory[row.productId] : undefined;
+                const phLoading = row.productId ? Boolean(priceHistoryLoading[row.productId]) : false;
+                const lastPurchase = ph?.lastPurchasePrice != null ? ph.lastPurchasePrice.toLocaleString() : null;
                 return (
-                <div key={idx} className="grid gap-2 rounded-lg border border-gray-200 bg-slate-50 p-3 sm:grid-cols-[1fr_100px_120px_auto]">
-                  <div className="min-w-0">
-                    <select value={row.productId} onChange={(e) => updateRow(idx, "productId", e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                      <option value="">{t("purchases.selectProduct")}</option>
-                      {products.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
-                    </select>
-                    {ph?.lastPurchasePrice != null && (
-                      <div className="mt-1 text-[11px] text-slate-500">آخر شراء: {ph.lastPurchasePrice.toLocaleString()}</div>
+                  <div key={idx} className="rounded-lg border border-gray-200 bg-white p-4">
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_130px_160px_auto]">
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("sales.product")}</label>
+                        <select value={row.productId} onChange={(e) => updateRow(idx, "productId", e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                          <option value="">{t("purchases.selectProduct")}</option>
+                          {products.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("purchases.quantity")}</label>
+                        <input type="number" placeholder={t("purchases.quantity")} value={row.quantity} onChange={(e) => updateRow(idx, "quantity", e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" min="1" />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("purchases.unitPrice")}</label>
+                        <input type="number" placeholder={t("purchases.unitPrice")} value={row.unitPrice} onChange={(e) => updateRow(idx, "unitPrice", e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" step="0.01" />
+                      </div>
+                      {itemRows.length > 1 && <button type="button" onClick={() => removeRow(idx)} className="mt-7 inline-flex h-11 w-11 items-center justify-center self-start rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100">×</button>}
+                    </div>
+                    {row.productId && (
+                      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg bg-blue-50/60 px-3 py-2">
+                        <span className="text-sm text-slate-700"><span className="font-semibold">{t("sales.unitPrice")}:</span> {row.unitPrice ? Number(row.unitPrice).toLocaleString() : "—"}</span>
+                        {phLoading && (
+                          <span className="text-sm text-slate-400">جاري تحميل آخر سعر شراء...</span>
+                        )}
+                        {!phLoading && ph && lastPurchase && (
+                          <span className="text-sm font-semibold text-blue-700">آخر شراء: {lastPurchase}</span>
+                        )}
+                        {!phLoading && ph && !lastPurchase && (
+                          <span className="text-sm text-slate-400">لا يوجد سجل شراء لهذا المنتج</span>
+                        )}
+                      </div>
                     )}
                   </div>
-                  <input type="number" placeholder={t("purchases.quantity")} value={row.quantity} onChange={(e) => updateRow(idx, "quantity", e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" min="1" />
-                  <input type="number" placeholder={t("purchases.unitPrice")} value={row.unitPrice} onChange={(e) => updateRow(idx, "unitPrice", e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" step="0.01" />
-                  {itemRows.length > 1 && (<button type="button" onClick={() => removeRow(idx)} className="rounded-lg border border-red-200 bg-red-50 px-2 text-red-600 transition hover:bg-red-100">×</button>)}
-                </div>
                 );
               })}
             </div>
@@ -751,8 +786,8 @@ export default function PurchasesPage() {
       )}
 
       {showIcForm && editingIc && (
-        <FormModal open={showIcForm} onClose={() => { setShowIcForm(false); setEditingIc(null); }} title="تعديل فاتورة داخلية">
-          <form onSubmit={handleInterSave} className="space-y-4">
+        <FormModal open={showIcForm} onClose={() => { setShowIcForm(false); setEditingIc(null); }} title="تعديل فاتورة داخلية" wide>
+          <form onSubmit={handleInterSave} className="space-y-5">
             <div className="flex items-center justify-between rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-indigo-700">
               <span className="text-sm font-bold">تعديل فاتورة داخلية</span>
               <span className="text-xs opacity-80">تعديل</span>
@@ -828,18 +863,37 @@ export default function PurchasesPage() {
                 <h3 className="text-sm font-medium text-slate-700">{t("purchases.items")}</h3>
                 <button type="button" onClick={() => setInterRows([...interRows, { productId: "", quantity: "", internalPrice: "", customerPrice: "", costPrice: "" }])} className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800"><Plus size={16} />{t("purchases.addRow")}</button>
               </div>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {interRows.map((row, idx) => (
-                  <div key={idx} className="grid gap-2 rounded-lg border border-gray-200 bg-slate-50 p-3 sm:grid-cols-[1fr_90px_120px_120px_120px_auto]">
-                    <select value={row.productId} onChange={(e) => updateInterRow(idx, "productId", e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                      <option value="">{t("purchases.selectProduct")}</option>
-                      {products.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
-                    </select>
-                    <input type="number" placeholder={t("purchases.quantity")} value={row.quantity} onChange={(e) => updateInterRow(idx, "quantity", e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    <input type="number" placeholder="سعر داخلي" value={row.internalPrice} onChange={(e) => updateInterRow(idx, "internalPrice", e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    <input type="number" placeholder={t("purchases.customerPrice")} value={row.customerPrice} onChange={(e) => updateInterRow(idx, "customerPrice", e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    <input type="number" placeholder={t("purchases.costPrice")} value={row.costPrice} onChange={(e) => updateInterRow(idx, "costPrice", e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    <button type="button" onClick={() => { if (interRows.length > 1) setInterRows(interRows.filter((_, i) => i !== idx)); }} className="inline-flex items-center justify-center rounded-lg border border-red-200 bg-red-50 p-2 text-red-600 hover:bg-red-100"><Trash2 size={15} /></button>
+                  <div key={idx} className="rounded-lg border border-gray-200 bg-white p-4">
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.3fr_100px_140px_140px_140px_auto]">
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("sales.product")}</label>
+                        <select value={row.productId} onChange={(e) => updateInterRow(idx, "productId", e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                          <option value="">{t("purchases.selectProduct")}</option>
+                          {products.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("purchases.quantity")}</label>
+                        <input type="number" placeholder={t("purchases.quantity")} value={row.quantity} onChange={(e) => updateInterRow(idx, "quantity", e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-slate-700">سعر داخلي</label>
+                        <input type="number" placeholder="سعر داخلي" value={row.internalPrice} onChange={(e) => updateInterRow(idx, "internalPrice", e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("purchases.customerPrice")}</label>
+                        <input type="number" placeholder={t("purchases.customerPrice")} value={row.customerPrice} onChange={(e) => updateInterRow(idx, "customerPrice", e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("purchases.costPrice")}</label>
+                        <input type="number" placeholder={t("purchases.costPrice")} value={row.costPrice} onChange={(e) => updateInterRow(idx, "costPrice", e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      </div>
+                      {interRows.length > 1 && (
+                        <button type="button" onClick={() => setInterRows(interRows.filter((_, i) => i !== idx))} className="mt-7 inline-flex h-11 w-11 items-center justify-center self-start rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100"><Trash2 size={16} /></button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>

@@ -175,6 +175,7 @@ export default function SalesPage() {
   const [form, setForm] = useState({ companyId: "", customerId: "", engineerId: "", categoryId: "", orderType: "MACHINE_SALE", paymentMethod: "CASH", isTaxInvoice: false, discount: "", discountType: "FIXED", taxRate: "0", notes: "", paidAmount: "" });
   const [itemRows, setItemRows] = useState<ItemRow[]>([{ productId: "", quantity: "", unitPrice: "", discount: "", priceTier: "newCustomer" }]);
   const [priceHistory, setPriceHistory] = useState<Record<string, PriceHistory>>({});
+  const [priceHistoryLoading, setPriceHistoryLoading] = useState<Record<string, boolean>>({});
   const [showInterForm, setShowInterForm] = useState(false);
   const [interForm, setInterForm] = useState({ fromCompanyId: "", toCompanyId: "", customerId: "", categoryId: "", orderType: "SPARE_PART_SALE", paymentMethod: "CREDIT", internalPaymentMethod: "CREDIT", paidAmount: "", internalPaidAmount: "", isTaxInvoice: false, taxRate: "0", discount: "", notes: "" });
   const [interRows, setInterRows] = useState<InterItemRow[]>([{ productId: "", quantity: "", internalPrice: "", customerPrice: "", costPrice: "" }]);
@@ -304,6 +305,11 @@ export default function SalesPage() {
     if (!companyId) return;
     const missing = productIds.filter((id) => id && !priceHistory[id]);
     if (missing.length === 0) return;
+    setPriceHistoryLoading((prev) => {
+      const next = { ...prev };
+      for (const id of missing) next[id] = true;
+      return next;
+    });
     fetch("/api/products/price-history", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -313,7 +319,14 @@ export default function SalesPage() {
       .then((data) => {
         if (data?.prices) setPriceHistory((prev) => ({ ...prev, ...data.prices }));
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        setPriceHistoryLoading((prev) => {
+          const next = { ...prev };
+          for (const id of missing) next[id] = false;
+          return next;
+        });
+      });
   };
 
   const openEdit = (order: SalesOrder) => {
@@ -669,49 +682,69 @@ export default function SalesPage() {
 
           <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">{t("common.notes")}</label><textarea placeholder={t("common.notes")} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" rows={2} /></div>
 
-          <div className="rounded-lg border border-gray-200 bg-slate-50 p-4">
-            <div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold text-slate-700">{t("sales.items")}</h3><button type="button" onClick={() => setItemRows([...itemRows, { productId: "", quantity: "", unitPrice: "", discount: "", priceTier: "newCustomer" }])} className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800"><Plus size={16} />{t("purchases.addRow")}</button></div>
+          <div className="rounded-xl border border-gray-200 bg-slate-50 p-4">
+            <div className="mb-4 flex items-center justify-between"><h3 className="text-sm font-semibold text-slate-700">{t("sales.items")}</h3><button type="button" onClick={() => setItemRows([...itemRows, { productId: "", quantity: "", unitPrice: "", discount: "", priceTier: "newCustomer" }])} className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800"><Plus size={16} />{t("purchases.addRow")}</button></div>
             <div className="space-y-3">{itemRows.map((row, index) => {
               const selectedProduct = products.find((product) => product.id === row.productId);
               const availableQty = row.productId ? inventoryByProduct[row.productId] ?? 0 : 0;
               const rowPrice = selectedProduct ? getProductTierPrice(selectedProduct, row.priceTier || "newCustomer") : 0;
               const ph = row.productId ? priceHistory[row.productId] : undefined;
+              const phLoading = row.productId ? Boolean(priceHistoryLoading[row.productId]) : false;
               const lastSaleTierLabel = ph?.lastSaleTier && PRICE_TIER_LABELS[ph.lastSaleTier] ? PRICE_TIER_LABELS[ph.lastSaleTier] : null;
               return (
                 <div key={index}>
-                  <div className="grid gap-2 rounded-lg border border-gray-200 bg-white p-3 sm:grid-cols-[1.2fr_120px_130px_130px_120px_auto]">
-                    <div>
-                      <label className="mb-1 block text-[11px] font-medium text-gray-500">{t("sales.product")}</label>
-                      <select value={row.productId} onChange={(e) => updateItemRow(index, { productId: e.target.value, priceTier: row.priceTier || "newCustomer" })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                        <option value="">{t("purchases.selectProduct")}</option>
-                        {companyProducts(form.companyId).map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
-                      </select>
-                      {selectedProduct && (
-                        <div className="mt-1 text-[11px] text-slate-500">
-                          السعر: {rowPrice.toLocaleString()} · المتاح: {availableQty}
-                          {ph?.lastSalePrice != null && (
-                            <span> · آخر بيع: {ph.lastSalePrice.toLocaleString()}{lastSaleTierLabel ? ` (${lastSaleTierLabel})` : ""}</span>
-                          )}
-                        </div>
-                      )}
+                  <div className="rounded-lg border border-gray-200 bg-white p-4">
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr_1fr_1fr_auto]">
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("sales.product")}</label>
+                        <select value={row.productId} onChange={(e) => updateItemRow(index, { productId: e.target.value, priceTier: row.priceTier || "newCustomer" })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                          <option value="">{t("purchases.selectProduct")}</option>
+                          {companyProducts(form.companyId).map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
+                        </select>
+                        {selectedProduct && (
+                          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-slate-500">
+                            <span>المتاح: <span className="font-semibold text-slate-700">{availableQty}</span></span>
+                            {ph?.lastSalePrice != null && lastSaleTierLabel && (
+                              <span>آخر بيع: <span className="font-semibold text-slate-700">{ph.lastSalePrice.toLocaleString()}</span> · <span className="font-medium text-blue-600">{lastSaleTierLabel}</span></span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-slate-700">شريحة السعر</label>
+                        <select value={row.priceTier} onChange={(e) => updateItemRow(index, { priceTier: e.target.value, unitPrice: String(getProductTierPrice(selectedProduct || undefined, e.target.value)) })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="legacyCustomer">عميل قديم</option><option value="newCustomer">عميل جديد</option><option value="jumlaMachines">شركة جملة آلات</option><option value="jumlaParts">شركة جملة قطع غيار</option><option value="sectori">شركة قطاعي</option><option value="engineer">مهندس</option></select>
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("sales.qty")}</label>
+                        <input type="number" min="1" required value={row.quantity} onChange={(e) => updateItemRow(index, { quantity: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("sales.unitPrice")}</label>
+                        <input type="number" min="0" step="0.01" required value={row.unitPrice} onChange={(e) => updateItemRow(index, { unitPrice: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("sales.discount")}</label>
+                        <input type="number" min="0" step="0.01" value={row.discount} onChange={(e) => updateItemRow(index, { discount: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                      </div>
+                      {itemRows.length > 1 && <button type="button" onClick={() => setItemRows(itemRows.filter((_, i) => i !== index))} className="mt-7 inline-flex h-11 w-11 items-center justify-center self-start rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100">×</button>}
                     </div>
-                    <div>
-                      <label className="mb-1 block text-[11px] font-medium text-gray-500">شريحة السعر</label>
-                      <select value={row.priceTier} onChange={(e) => updateItemRow(index, { priceTier: e.target.value, unitPrice: String(getProductTierPrice(selectedProduct || undefined, e.target.value)) })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="legacyCustomer">عميل قديم</option><option value="newCustomer">عميل جديد</option><option value="jumlaMachines">شركة جملة آلات</option><option value="jumlaParts">شركة جملة قطع غيار</option><option value="sectori">شركة قطاعي</option><option value="engineer">مهندس</option></select>
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-[11px] font-medium text-gray-500">{t("sales.qty")}</label>
-                      <input type="number" min="1" required value={row.quantity} onChange={(e) => updateItemRow(index, { quantity: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-[11px] font-medium text-gray-500">{t("sales.unitPrice")}</label>
-                      <input type="number" min="0" step="0.01" required value={row.unitPrice} onChange={(e) => updateItemRow(index, { unitPrice: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-[11px] font-medium text-gray-500">{t("sales.discount")}</label>
-                      <input type="number" min="0" step="0.01" value={row.discount} onChange={(e) => updateItemRow(index, { discount: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                    </div>
-                    {itemRows.length > 1 && <button type="button" onClick={() => setItemRows(itemRows.filter((_, i) => i !== index))} className="rounded-lg border border-red-200 bg-red-50 px-2 text-red-600 transition hover:bg-red-100 self-end">×</button>}
+                    {selectedProduct && (
+                      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg bg-blue-50/60 px-3 py-2">
+                        <span className="text-sm text-slate-700"><span className="font-semibold">السعر الحالي ({PRICE_TIER_LABELS[row.priceTier] || "—"}):</span> {rowPrice.toLocaleString()}</span>
+                        {phLoading && (
+                          <span className="text-sm text-slate-400">جاري تحميل آخر سعر...</span>
+                        )}
+                        {!phLoading && ph?.lastSalePrice != null && (
+                          <span className="text-sm font-semibold text-indigo-700">آخر بيع: {ph.lastSalePrice.toLocaleString()}{lastSaleTierLabel ? ` (${lastSaleTierLabel})` : ""}</span>
+                        )}
+                        {!phLoading && ph?.lastPurchasePrice != null && (
+                          <span className="text-sm font-semibold text-emerald-700">آخر شراء: {ph.lastPurchasePrice.toLocaleString()}</span>
+                        )}
+                        {!phLoading && ph && ph.lastSalePrice == null && ph.lastPurchasePrice == null && (
+                          <span className="text-sm text-slate-400">لا يوجد سجل أسعار سابق</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                   
                   {formMode === "tradeIn" && row.tradeIn && (
