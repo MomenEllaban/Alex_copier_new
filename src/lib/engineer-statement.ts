@@ -43,7 +43,10 @@ export interface EngineerStatement {
   generatedAt: string;
 }
 
-const FINALIZED_SALE_STATUSES: SalesOrderStatus[] = ["CONFIRMED", "DELIVERED"];
+// Sales are saved by default as DRAFT and already count as real money movement
+// (the form has no confirm step), so drafts must appear in the engineer's
+// statement just like confirmed ones. Cancelled orders stay excluded.
+const FINALIZED_SALE_STATUSES: SalesOrderStatus[] = ["CONFIRMED", "DELIVERED", "DRAFT"];
 const OPEN_REQUEST_STATUSES = ["NEW", "ASSIGNED", "VISITED", "REASSIGNED"];
 const RESOLVED_REQUEST_STATUSES = ["RESOLVED", "CLOSED"];
 

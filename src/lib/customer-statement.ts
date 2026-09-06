@@ -96,7 +96,9 @@ export async function buildCustomerStatement(customerId: string): Promise<Custom
   const drafts: Draft[] = [];
 
   for (const o of salesOrders) {
-    const statusNote = o.status === "DRAFT" ? " (مسودة)" : "";
+    // Every saved invoice already moved the customer's debt at creation
+    // (the sales form has no confirm step), so DRAFT orders are counted as
+    // real movements too. Only cancelled orders are excluded.
     const cash = o.paymentMethod === "CASH";
     const debit = o.total;
     const credit = cash ? o.total : 0;
@@ -105,13 +107,13 @@ export async function buildCustomerStatement(customerId: string): Promise<Custom
       type: "SALE",
       date: o.createdAt.toISOString(),
       ref: o.id,
-      description: o.notes ? `${o.notes}${statusNote}` : statusNote.trim() || o.notes,
+      description: o.notes,
       debit,
       credit,
       amount: debit - credit,
       balance: 0,
       sort: o.createdAt.getTime(),
-      finalized: o.status !== "DRAFT",
+      finalized: o.status !== "CANCELLED",
     });
   }
   for (const p of payments) {
@@ -175,8 +177,10 @@ export async function buildCustomerStatement(customerId: string): Promise<Custom
   // remainingDebt:
   //   openingBalance + Σ finalized movements = remainingDebt
   //
-  // Non-finalized rows (DRAFT invoices, INITIAL settlements) are shown for full
-  // visibility but do not move the balance since they are not confirmed.
+  // Every saved invoice is already reflected in remainingDebt (the sales form
+  // has no confirm step), so all invoices are finalized; CANCELLED orders and
+  // INITIAL settlements are the only non-finalized rows (kept for visibility
+  // but they do not move the balance).
   //
   // Summary stats are anchored to the authoritative values too so they stay
   // consistent with the dashboard and each other (billed - paid = remaining).

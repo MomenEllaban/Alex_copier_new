@@ -177,6 +177,36 @@ describe("customer-statement", () => {
     expect(s?.closingBalance).toBe(0);
   });
 
+  it("counts DRAFT invoices as real movements with no مسودة note", async () => {
+    // Every saved invoice already moved the customer's debt at creation, so a
+    // "DRAFT" sale must count toward the balance and read as a normal invoice.
+    seed({
+      findUnique: customer({ totalDebt: 8000, remainingDebt: 8000 }),
+      sales: [sale("so-1", 8000, { status: "DRAFT", notes: "لاتريبة" })],
+    });
+
+    const s = await buildCustomerStatement("cust-1");
+    expect(s?.rows[0].amount).toBe(8000);
+    expect(s?.rows[0].description).toBe("لاتريبة");
+    expect(s?.rows[0].description).not.toContain("مسودة");
+    expect(s?.openingBalance).toBe(0);
+    expect(s?.closingBalance).toBe(8000);
+  });
+
+  it("excludes CANCELLED sales from the balance", async () => {
+    seed({
+      findUnique: customer({ totalDebt: 8000, remainingDebt: 8000 }),
+      sales: [sale("so-1", 8000, { status: "CANCELLED" })],
+    });
+
+    const s = await buildCustomerStatement("cust-1");
+    expect(s?.rows[0].amount).toBe(8000);
+    // The cancelled row is only shown for visibility; it does not move the balance.
+    expect(s?.rows[0].balance).toBe(8000);
+    expect(s?.openingBalance).toBe(8000);
+    expect(s?.closingBalance).toBe(8000);
+  });
+
   it("exposes under-account money via creditBalance when closing is negative", async () => {
     seed({
       findUnique: customer({ totalDebt: 10000, remainingDebt: -500 }),
