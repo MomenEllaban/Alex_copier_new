@@ -244,16 +244,19 @@ export async function POST(request: Request) {
       }
 
       // تصريف المخزون من مستودع شركة الوجهة (نفس الوحدات المُستلمة داخليًا)
+      // ملاحظة: الرصيد الهدف زاد للتو بحركة INTER_COMPANY_IN، لكن الحارس صارم:
+      // لا يُسمح بالمرور الصامت أو خصم جزئي — أي نقص يعيد العملية كاملة (rollback).
       for (const item of items as InterItem[]) {
         const tgt = await tx.warehouseInventory.findUnique({
           where: { warehouseId_productId: { warehouseId: targetWarehouse.id, productId: item.productId } },
         });
-        if (tgt && tgt.quantity >= item.quantity) {
-          await tx.warehouseInventory.update({
-            where: { warehouseId_productId: { warehouseId: targetWarehouse.id, productId: item.productId } },
-            data: { quantity: tgt.quantity - item.quantity },
-          });
+        if (!tgt || tgt.quantity < item.quantity) {
+          throw new Error(`INSUFFICIENT_STOCK:${item.productId}`);
         }
+        await tx.warehouseInventory.update({
+          where: { warehouseId_productId: { warehouseId: targetWarehouse.id, productId: item.productId } },
+          data: { quantity: tgt.quantity - item.quantity },
+        });
         await tx.stockMovement.create({
           data: {
             warehouseId: targetWarehouse.id,

@@ -129,53 +129,57 @@ export async function POST(request: Request) {
       return numeric;
     })();
 
-    const product = await prisma.product.create({
-      data: {
-        name,
-        description: optionalText(body.description),
-        productType,
-        companyId,
-        sku: optionalText(body.sku),
-        gs1Code: optionalText(body.gs1Code),
-        egsCode: optionalText(body.egsCode),
-        isActive: body.isActive !== false,
-        pricingTiers: pricingTiers && Object.values(pricingTiers).some((value) => value !== null && value !== undefined) ? pricingTiers : undefined,
-        ...prices.values,
-      },
-      include: { company: true },
-    });
-
-    if (quantityValue !== null) {
-      const warehouse = await prisma.warehouse.findFirst({
-        where: { companyId, isMain: true },
-        orderBy: { createdAt: "asc" },
-      });
-      const targetWarehouse =
-        warehouse ??
-        (await prisma.warehouse.create({
-          data: {
-            companyId,
-            name: "المستودع الرئيسي",
-            isMain: true,
-          },
-        }));
-
-      await prisma.warehouseInventory.upsert({
-        where: { warehouseId_productId: { warehouseId: targetWarehouse.id, productId: product.id } },
-        update: { quantity: quantityValue },
-        create: { warehouseId: targetWarehouse.id, productId: product.id, quantity: quantityValue },
-      });
-
-      await prisma.stockMovement.create({
+    const product = await prisma.$transaction(async (tx) => {
+      const created = await tx.product.create({
         data: {
-          warehouseId: targetWarehouse.id,
-          productId: product.id,
-          quantity: quantityValue,
-          movementType: "PURCHASE_IN",
-          notes: "إدخال أولي من صفحة المنتجات",
+          name,
+          description: optionalText(body.description),
+          productType,
+          companyId,
+          sku: optionalText(body.sku),
+          gs1Code: optionalText(body.gs1Code),
+          egsCode: optionalText(body.egsCode),
+          isActive: body.isActive !== false,
+          pricingTiers: pricingTiers && Object.values(pricingTiers).some((value) => value !== null && value !== undefined) ? pricingTiers : undefined,
+          ...prices.values,
         },
+        include: { company: true },
       });
-    }
+
+      if (quantityValue !== null) {
+        const warehouse = await tx.warehouse.findFirst({
+          where: { companyId, isMain: true },
+          orderBy: { createdAt: "asc" },
+        });
+        const targetWarehouse =
+          warehouse ??
+          (await tx.warehouse.create({
+            data: {
+              companyId,
+              name: "المستودع الرئيسي",
+              isMain: true,
+            },
+          }));
+
+        await tx.warehouseInventory.upsert({
+          where: { warehouseId_productId: { warehouseId: targetWarehouse.id, productId: created.id } },
+          update: { quantity: quantityValue },
+          create: { warehouseId: targetWarehouse.id, productId: created.id, quantity: quantityValue },
+        });
+
+        await tx.stockMovement.create({
+          data: {
+            warehouseId: targetWarehouse.id,
+            productId: created.id,
+            quantity: quantityValue,
+            movementType: "PURCHASE_IN",
+            notes: "إدخال أولي من صفحة المنتجات",
+          },
+        });
+      }
+
+      return created;
+    });
 
     return NextResponse.json(product, { status: 201 });
   } catch (error) {

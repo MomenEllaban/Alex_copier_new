@@ -135,6 +135,12 @@ export async function POST(request: Request) {
       where: { companyId, isMain: true },
       select: { id: true },
     });
+    if (!warehouse) {
+      return NextResponse.json(
+        { error: "لا يوجد مستودع رئيسي لهذه الشركة — لا يمكن إنشاء الفاتورة دون خصم من المخزون", code: "NO_MAIN_WAREHOUSE" },
+        { status: 400 }
+      );
+    }
 
     const salesOrder = await prisma.$transaction(async (tx) => {
       if (warehouse) {

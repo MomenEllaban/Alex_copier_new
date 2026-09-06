@@ -199,13 +199,18 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
           where: { warehouseId_productId: { warehouseId: m.warehouseId, productId: m.productId } },
         });
         const base = inv?.quantity ?? 0;
-        const newQty = m.movementType === "SALE_OUT" || m.movementType === "INTER_COMPANY_IN" ? base + m.quantity : base - m.quantity;
+        const addsBack = m.movementType === "SALE_OUT" || m.movementType === "INTER_COMPANY_IN";
+        const newQty = addsBack ? base + m.quantity : base - m.quantity;
+        if (newQty < 0) {
+          // عكس حركة خصم لا يجب أن يُسقط الرصيد تحت الصفر — يُرفض وقد تُرجَّع العملية كلها.
+          throw new Error(`INSUFFICIENT_STOCK:${m.productId}`);
+        }
         if (inv) {
           await tx.warehouseInventory.update({
             where: { warehouseId_productId: { warehouseId: m.warehouseId, productId: m.productId } },
             data: { quantity: newQty },
           });
-        } else if (m.movementType === "SALE_OUT" || m.movementType === "INTER_COMPANY_IN") {
+        } else if (addsBack) {
           await tx.warehouseInventory.create({
             data: { warehouseId: m.warehouseId, productId: m.productId, quantity: m.quantity },
           });
@@ -331,16 +336,19 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       }
 
       // تصريف المخزون من شركة الوجهة للعميل
+      // ملاحظة: الرصيد الهدف زاد للتو بحركة INTER_COMPANY_IN، لكن الحارس صارم:
+      // لا يُسمح بالمرور الصامت أو خصم جزئي — أي نقص يعيد العملية كاملة (rollback).
       for (const item of items as InterItem[]) {
         const tgt = await tx.warehouseInventory.findUnique({
           where: { warehouseId_productId: { warehouseId: targetWarehouse.id, productId: item.productId } },
         });
-        if (tgt && tgt.quantity >= item.quantity) {
-          await tx.warehouseInventory.update({
-            where: { warehouseId_productId: { warehouseId: targetWarehouse.id, productId: item.productId } },
-            data: { quantity: tgt.quantity - item.quantity },
-          });
+        if (!tgt || tgt.quantity < item.quantity) {
+          throw new Error(`INSUFFICIENT_STOCK:${item.productId}`);
         }
+        await tx.warehouseInventory.update({
+          where: { warehouseId_productId: { warehouseId: targetWarehouse.id, productId: item.productId } },
+          data: { quantity: tgt.quantity - item.quantity },
+        });
         await tx.stockMovement.create({
           data: {
             warehouseId: targetWarehouse.id,
@@ -486,6 +494,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     }
     if (error instanceof Error && error.message === "WAREHOUSE_NOT_FOUND") {
       return NextResponse.json({ error: "المستودع الرئيسي غير موجود لإحدى الشركتين", code: "WAREHOUSE_NOT_FOUND" }, { status: 400 });
+    }
+    if (error instanceof Error && error.message.startsWith("INSUFFICIENT_STOCK")) {
+      return NextResponse.json({ error: "الكمية المتاحة في المخزون لا تكفي لهذه الحركة", code: "INSUFFICIENT_STOCK" }, { status: 409 });
     }
     const msg = error instanceof Error ? (error.message || error.name || String(error)) : "Failed to update intercompany sale";
     return NextResponse.json({ error: msg, detail: error instanceof Error ? error.stack : undefined }, { status: traceError("[sales/intercompany:PUT] update failed", error) });

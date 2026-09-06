@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
+import { findOrCreateMainWarehouse, receivePurchaseIntoStock } from "@/lib/stock-movement-helper";
 import { traceError } from "@/lib/prisma-errors";
 
 export async function GET() {
@@ -91,6 +92,9 @@ export async function POST(request: Request) {
     if (companyId && !company) {
       return NextResponse.json({ error: "الشركة غير موجودة", code: "COMPANY_NOT_FOUND" }, { status: 400 });
     }
+    if (!companyId && data.status === "RECEIVED") {
+      return NextResponse.json({ error: "الشركة مطلوبة عند استلام أمر الشراء", code: "COMPANY_REQUIRED_FOR_RECEIVE" }, { status: 400 });
+    }
     if (supplierId && !supplier) {
       return NextResponse.json({ error: "المورد غير موجود", code: "SUPPLIER_NOT_FOUND" }, { status: 400 });
     }
@@ -105,27 +109,44 @@ export async function POST(request: Request) {
       }
     }
 
-    const purchaseOrder = await prisma.purchaseOrder.create({
-      data: {
-        ...data,
-        total,
-        ...(items && {
-          items: {
-            create: items.map((item: { productId: string; quantity: number; unitPrice: number }) => ({
-              productId: item.productId,
-              quantity: item.quantity,
-              unitPrice: item.unitPrice,
-            })),
-          },
-        }),
-      },
-      include: {
-        supplier: true,
-        items: {
-          include: { product: true },
+    const purchaseOrder = await prisma.$transaction(async (tx) => {
+      const created = await tx.purchaseOrder.create({
+        data: {
+          ...data,
+          total,
+          ...(items && {
+            items: {
+              create: items.map((item: { productId: string; quantity: number; unitPrice: number }) => ({
+                productId: item.productId,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+              })),
+            },
+          }),
         },
-        invoices: true,
-      },
+        include: {
+          supplier: true,
+          items: {
+            include: { product: true },
+          },
+          invoices: true,
+        },
+      });
+
+      // استلام فوري عند الإنشاء: أدخل البضاعة للمخزون مرتبطة بأمر الشراء الحقيقي.
+      if (created.status === "RECEIVED") {
+        const warehouse = await findOrCreateMainWarehouse(tx, created.companyId);
+        await receivePurchaseIntoStock(tx, {
+          purchaseOrderId: created.id,
+          warehouseId: warehouse.id,
+          items: (created.items as unknown as { productId: string; quantity: number }[]).map((it) => ({
+            productId: it.productId,
+            quantity: it.quantity,
+          })),
+        });
+      }
+
+      return created;
     });
 
     return NextResponse.json(purchaseOrder, { status: 201 });

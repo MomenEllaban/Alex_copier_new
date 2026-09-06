@@ -155,6 +155,12 @@ export async function PUT(
       where: { companyId, isMain: true },
       select: { id: true },
     });
+    if (!warehouse) {
+      return NextResponse.json(
+        { error: "لا يوجد مستودع رئيسي لهذه الشركة — لا يمكن تعديل الفاتورة دون خصم من المخزون", code: "NO_MAIN_WAREHOUSE" },
+        { status: 400 }
+      );
+    }
 
     const updated = await prisma.$transaction(async (tx) => {
       // 1) Reverse stock from the ORIGINAL order using recorded movements
@@ -167,10 +173,16 @@ export async function PUT(
             create: { warehouseId: movement.warehouseId, productId: movement.productId, quantity: movement.quantity },
           });
         } else if (movement.movementType === "PURCHASE_IN") {
-          await tx.warehouseInventory.upsert({
+          const inv = await tx.warehouseInventory.findUnique({
             where: { warehouseId_productId: { warehouseId: movement.warehouseId, productId: movement.productId } },
-            update: { quantity: { decrement: movement.quantity } },
-            create: { warehouseId: movement.warehouseId, productId: movement.productId, quantity: 0 },
+          });
+          const available = inv?.quantity ?? 0;
+          if (!inv || available < movement.quantity) {
+            throw new Error(`INSUFFICIENT_STOCK:${movement.productId}`);
+          }
+          await tx.warehouseInventory.update({
+            where: { warehouseId_productId: { warehouseId: movement.warehouseId, productId: movement.productId } },
+            data: { quantity: available - movement.quantity },
           });
         }
       }
@@ -510,11 +522,17 @@ export async function DELETE(
             create: { warehouseId: movement.warehouseId, productId: movement.productId, quantity: movement.quantity },
           });
         } else if (movement.movementType === "PURCHASE_IN") {
-          // Reverse trade-in: decrement warehouse inventory
-          await tx.warehouseInventory.upsert({
+          // Reverse trade-in: decrement warehouse inventory (guarded: never negative)
+          const inv = await tx.warehouseInventory.findUnique({
             where: { warehouseId_productId: { warehouseId: movement.warehouseId, productId: movement.productId } },
-            update: { quantity: { decrement: movement.quantity } },
-            create: { warehouseId: movement.warehouseId, productId: movement.productId, quantity: 0 },
+          });
+          const available = inv?.quantity ?? 0;
+          if (!inv || available < movement.quantity) {
+            throw new Error(`INSUFFICIENT_STOCK:${movement.productId}`);
+          }
+          await tx.warehouseInventory.update({
+            where: { warehouseId_productId: { warehouseId: movement.warehouseId, productId: movement.productId } },
+            data: { quantity: available - movement.quantity },
           });
         }
       }
@@ -528,6 +546,9 @@ export async function DELETE(
 
     return NextResponse.json({ message: "Sales order deleted" });
   } catch (error) {
+    if (error instanceof Error && error.message.startsWith("INSUFFICIENT_STOCK")) {
+      return NextResponse.json({ error: "الكمية المتاحة في المخزون لا تكفي للعكس — لا يُسمح برصيد سالب", code: "INSUFFICIENT_STOCK" }, { status: 409 });
+    }
     console.error("Failed to delete sales order:", error);
     return NextResponse.json({ error: "Failed to delete sales order" }, { status: 500 });
   }

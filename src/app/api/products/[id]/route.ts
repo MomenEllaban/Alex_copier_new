@@ -133,43 +133,47 @@ export async function PUT(
       return NextResponse.json({ error: "لا توجد بيانات للتحديث", code: "NO_CHANGES" }, { status: 400 });
     }
 
-    const product = await prisma.product.update({
-      where: { id },
-      data,
-      include: { company: true },
-    });
-
-    if (quantityValue !== null) {
-      const warehouse = await prisma.warehouse.findFirst({
-        where: { companyId: product.companyId, isMain: true },
-        orderBy: { createdAt: "asc" },
+    const product = await prisma.$transaction(async (tx) => {
+      const updated = await tx.product.update({
+        where: { id },
+        data,
+        include: { company: true },
       });
-      const targetWarehouse =
-        warehouse ??
-        (await prisma.warehouse.create({
+
+      if (quantityValue !== null) {
+        const warehouse = await tx.warehouse.findFirst({
+          where: { companyId: updated.companyId, isMain: true },
+          orderBy: { createdAt: "asc" },
+        });
+        const targetWarehouse =
+          warehouse ??
+          (await tx.warehouse.create({
+            data: {
+              companyId: updated.companyId,
+              name: "المستودع الرئيسي",
+              isMain: true,
+            },
+          }));
+
+        await tx.warehouseInventory.upsert({
+          where: { warehouseId_productId: { warehouseId: targetWarehouse.id, productId: updated.id } },
+          update: { quantity: quantityValue },
+          create: { warehouseId: targetWarehouse.id, productId: updated.id, quantity: quantityValue },
+        });
+
+        await tx.stockMovement.create({
           data: {
-            companyId: product.companyId,
-            name: "المستودع الرئيسي",
-            isMain: true,
+            warehouseId: targetWarehouse.id,
+            productId: updated.id,
+            quantity: quantityValue,
+            movementType: "ADJUSTMENT",
+            notes: "تحديث الكمية من صفحة المنتجات",
           },
-        }));
+        });
+      }
 
-      await prisma.warehouseInventory.upsert({
-        where: { warehouseId_productId: { warehouseId: targetWarehouse.id, productId: product.id } },
-        update: { quantity: quantityValue },
-        create: { warehouseId: targetWarehouse.id, productId: product.id, quantity: quantityValue },
-      });
-
-      await prisma.stockMovement.create({
-        data: {
-          warehouseId: targetWarehouse.id,
-          productId: product.id,
-          quantity: quantityValue,
-          movementType: "ADJUSTMENT",
-          notes: "تحديث الكمية من صفحة المنتجات",
-        },
-      });
-    }
+      return updated;
+    });
 
     return NextResponse.json(product);
   } catch (error) {

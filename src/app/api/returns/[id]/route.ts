@@ -64,11 +64,25 @@ export async function PUT(
             // Sale returns added stock on approval -> removing them takes it back out.
             // Purchase returns removed stock on approval -> rejecting restores it.
             const delta = existing.type === "PURCHASE_RETURN" ? existing.quantity : -existing.quantity;
-            await tx.warehouseInventory.upsert({
-              where: { warehouseId_productId: { warehouseId: existing.warehouseId, productId: existing.productId } },
-              update: { quantity: { increment: delta } },
-              create: { warehouseId: existing.warehouseId, productId: existing.productId, quantity: Math.max(0, delta) },
-            });
+            if (delta < 0) {
+              const inv = await tx.warehouseInventory.findUnique({
+                where: { warehouseId_productId: { warehouseId: existing.warehouseId, productId: existing.productId } },
+              });
+              const available = inv?.quantity ?? 0;
+              if (!inv || available < existing.quantity) {
+                throw new Error("INSUFFICIENT_STOCK");
+              }
+              await tx.warehouseInventory.update({
+                where: { warehouseId_productId: { warehouseId: existing.warehouseId, productId: existing.productId } },
+                data: { quantity: available - existing.quantity },
+              });
+            } else {
+              await tx.warehouseInventory.upsert({
+                where: { warehouseId_productId: { warehouseId: existing.warehouseId, productId: existing.productId } },
+                update: { quantity: { increment: delta } },
+                create: { warehouseId: existing.warehouseId, productId: existing.productId, quantity: delta },
+              });
+            }
 
             await tx.stockMovement.create({
               data: {
@@ -150,10 +164,16 @@ export async function PUT(
 
         if (warehouse && existing.type === "PURCHASE_RETURN") {
           await prisma.$transaction(async (tx) => {
-            await tx.warehouseInventory.upsert({
+            const inv = await tx.warehouseInventory.findUnique({
               where: { warehouseId_productId: { warehouseId: warehouse.id, productId: existing.productId } },
-              update: { quantity: { decrement: existing.quantity } },
-              create: { warehouseId: warehouse.id, productId: existing.productId, quantity: 0 },
+            });
+            const available = inv?.quantity ?? 0;
+            if (!inv || available < existing.quantity) {
+              throw new Error("INSUFFICIENT_STOCK");
+            }
+            await tx.warehouseInventory.update({
+              where: { warehouseId_productId: { warehouseId: warehouse.id, productId: existing.productId } },
+              data: { quantity: available - existing.quantity },
             });
 
             await tx.stockMovement.create({
@@ -219,6 +239,9 @@ export async function PUT(
 
     return NextResponse.json(updated);
   } catch (error: unknown) {
+    if (error instanceof Error && error.message === "INSUFFICIENT_STOCK") {
+      return NextResponse.json({ error: "الكمية المتاحة لا تكفي لهذه العملية — لا يُسمح برصيد سالب", code: "INSUFFICIENT_STOCK" }, { status: 409 });
+    }
     if (error && typeof error === "object" && "code" in error && error.code === "P2025") {
       return NextResponse.json({ error: "Return not found" }, { status: 404 });
     }
@@ -249,11 +272,25 @@ export async function DELETE(
           // Sale returns added stock -> removing takes it out; purchase returns removed
           // stock -> deleting restores it.
           const delta = existing.type === "PURCHASE_RETURN" ? existing.quantity : -existing.quantity;
-          await tx.warehouseInventory.upsert({
-            where: { warehouseId_productId: { warehouseId: existing.warehouseId, productId: existing.productId } },
-            update: { quantity: { increment: delta } },
-            create: { warehouseId: existing.warehouseId, productId: existing.productId, quantity: Math.max(0, delta) },
-          });
+          if (delta < 0) {
+            const inv = await tx.warehouseInventory.findUnique({
+              where: { warehouseId_productId: { warehouseId: existing.warehouseId, productId: existing.productId } },
+            });
+            const available = inv?.quantity ?? 0;
+            if (!inv || available < existing.quantity) {
+              throw new Error("INSUFFICIENT_STOCK");
+            }
+            await tx.warehouseInventory.update({
+              where: { warehouseId_productId: { warehouseId: existing.warehouseId, productId: existing.productId } },
+              data: { quantity: available - existing.quantity },
+            });
+          } else {
+            await tx.warehouseInventory.upsert({
+              where: { warehouseId_productId: { warehouseId: existing.warehouseId, productId: existing.productId } },
+              update: { quantity: { increment: delta } },
+              create: { warehouseId: existing.warehouseId, productId: existing.productId, quantity: delta },
+            });
+          }
 
           await tx.stockMovement.create({
             data: {
@@ -306,6 +343,9 @@ export async function DELETE(
 
     return NextResponse.json({ message: "Return deleted" });
   } catch (error: unknown) {
+    if (error instanceof Error && error.message === "INSUFFICIENT_STOCK") {
+      return NextResponse.json({ error: "الكمية المتاحة لا تكفي لهذه العملية — لا يُسمح برصيد سالب", code: "INSUFFICIENT_STOCK" }, { status: 409 });
+    }
     if (error && typeof error === "object" && "code" in error && error.code === "P2025") {
       return NextResponse.json({ error: "Return not found" }, { status: 404 });
     }

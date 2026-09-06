@@ -306,11 +306,17 @@ export async function POST(request: Request) {
           },
         });
 
-        // Goods go back out of the warehouse to the supplier.
-        await tx.warehouseInventory.upsert({
+        // Goods go back out of the warehouse to the supplier (guarded: never negative).
+        const inv = await tx.warehouseInventory.findUnique({
           where: { warehouseId_productId: { warehouseId: warehouse.id, productId: purchaseItem.productId } },
-          update: { quantity: { decrement: normalizedQty } },
-          create: { warehouseId: warehouse.id, productId: purchaseItem.productId, quantity: 0 },
+        });
+        const available = inv?.quantity ?? 0;
+        if (!inv || available < normalizedQty) {
+          throw new Error("INSUFFICIENT_STOCK");
+        }
+        await tx.warehouseInventory.update({
+          where: { warehouseId_productId: { warehouseId: warehouse.id, productId: purchaseItem.productId } },
+          data: { quantity: available - normalizedQty },
         });
 
         await tx.stockMovement.create({
@@ -365,6 +371,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ error: "نوع المرتجع غير صالح", code: "INVALID_RETURN_TYPE" }, { status: 400 });
   } catch (error) {
+    if (error instanceof Error && error.message === "INSUFFICIENT_STOCK") {
+      return NextResponse.json({ error: "الكمية المتاحة في المخزون لا تكفي لهذا المرتجع — لا يُسمح برصيد سالب", code: "INSUFFICIENT_STOCK" }, { status: 409 });
+    }
     return NextResponse.json({ error: "Failed to create return transaction" }, { status: traceError("[returns:POST] create failed", error) });
   }
 }
