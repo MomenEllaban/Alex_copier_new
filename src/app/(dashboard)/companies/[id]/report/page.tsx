@@ -164,10 +164,10 @@ const statusBadge = (status: string) => {
     RECEIVED: "تم الاستلام",
     CANCELLED: "ملغي",
     PARTIAL: "جزئي",
-    CREDIT: "آجل",
-    INSTALLMENT: "أقساط",
-    CASH: "نقدي",
-    MIXED: "مختلط",
+    CREDIT: "أجل",
+    INSTALLMENT: "أجل",
+    CASH: "كاش",
+    MIXED: "أجل",
   };
   return (
     <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}>
@@ -178,10 +178,10 @@ const statusBadge = (status: string) => {
 
 const paymentMethodLabel = (method: string) => {
   const map: Record<string, string> = {
-    CASH: "نقدي",
-    CREDIT: "آجل",
-    INSTALLMENT: "أقساط",
-    MIXED: "مختلط",
+    CASH: "كاش",
+    CREDIT: "أجل",
+    INSTALLMENT: "أجل",
+    MIXED: "أجل",
   };
   return map[method] ?? method;
 };

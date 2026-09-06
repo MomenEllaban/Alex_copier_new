@@ -24,8 +24,8 @@ import { notifyDataChanged } from "@/lib/data-events";
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   CASH: "نقدي",
   CREDIT: "آجل",
-  INSTALLMENT: "أقساط",
-  MIXED: "مختلط",
+  INSTALLMENT: "أجل",
+  MIXED: "أجل",
 };
 
 const PAYMENT_STATUS_LABELS: Record<string, string> = {
@@ -650,7 +650,7 @@ export default function SalesPage() {
             <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">المهندس (اختياري)</label><select value={form.engineerId} onChange={(e) => setForm({ ...form, engineerId: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="">المهندس (اختياري)</option>{engineers.map((engineer) => (<option key={engineer.id} value={engineer.id}>{engineer.name}</option>))}</select></div>
             <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">نوع الطلب</label><select value={form.orderType} onChange={(e) => setForm({ ...form, orderType: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="MACHINE_SALE">{ORDER_TYPE_LABELS.MACHINE_SALE}</option><option value="SPARE_PART_SALE">{ORDER_TYPE_LABELS.SPARE_PART_SALE}</option></select></div>
             <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">{t("sales.category")}</label><select value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="">{t("sales.noCategory")}</option>{salesCategories.filter((c) => !form.companyId || c.companyId === form.companyId).map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}</select></div>
-            <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">طريقة الدفع</label><select value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="CASH">{PAYMENT_METHOD_LABELS.CASH}</option><option value="CREDIT">{PAYMENT_METHOD_LABELS.CREDIT}</option><option value="INSTALLMENT">{PAYMENT_METHOD_LABELS.INSTALLMENT}</option><option value="MIXED">{PAYMENT_METHOD_LABELS.MIXED}</option></select></div>
+            <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">طريقة الدفع</label><select value={form.paymentMethod === "CREDIT" ? "CREDIT" : form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="CASH">{PAYMENT_METHOD_LABELS.CASH}</option><option value="CREDIT">{PAYMENT_METHOD_LABELS.CREDIT}</option></select></div>
             {form.paymentMethod !== "CASH" && (
               <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">المبلغ المدفوع نقداً (ج.م) <span className="text-xs font-normal text-gray-400">— يُخصم رصيد تحت الحساب تلقائياً أولاً</span></label><input type="number" min="0" step="0.01" placeholder="0.00" value={form.paidAmount} onChange={(e) => setForm({ ...form, paidAmount: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
             )}
@@ -845,19 +845,16 @@ export default function SalesPage() {
             </div>
             <div className="space-y-1.5">
               <label className="block text-sm font-medium text-slate-700">{t("sales.interCompanyPayment")} ({t("sales.toCompany")})</label>
-              <select value={interForm.internalPaymentMethod} onChange={(e) => setInterForm({ ...interForm, internalPaymentMethod: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <select value={interForm.internalPaymentMethod === "CASH" ? "CASH" : "CREDIT"} onChange={(e) => setInterForm({ ...interForm, internalPaymentMethod: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="CREDIT">{PAYMENT_METHOD_LABELS.CREDIT}</option>
                 <option value="CASH">{PAYMENT_METHOD_LABELS.CASH}</option>
-                <option value="MIXED">{PAYMENT_METHOD_LABELS.MIXED}</option>
               </select>
             </div>
             <div className="space-y-1.5">
               <label className="block text-sm font-medium text-slate-700">{t("sales.paymentMethod")} ({t("sales.customer")})</label>
-              <select value={interForm.paymentMethod} onChange={(e) => setInterForm({ ...interForm, paymentMethod: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <select value={interForm.paymentMethod === "CASH" ? "CASH" : "CREDIT"} onChange={(e) => setInterForm({ ...interForm, paymentMethod: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="CASH">{PAYMENT_METHOD_LABELS.CASH}</option>
                 <option value="CREDIT">{PAYMENT_METHOD_LABELS.CREDIT}</option>
-                <option value="INSTALLMENT">{PAYMENT_METHOD_LABELS.INSTALLMENT}</option>
-                <option value="MIXED">{PAYMENT_METHOD_LABELS.MIXED}</option>
               </select>
             </div>
             <div className="space-y-1.5">

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
 import { notifySettlementPendingVerification } from "@/lib/notifications";
+import { sanitizePaymentMethod } from "@/lib/payment-method";
 import { traceError } from "@/lib/prisma-errors";
 
 export async function GET() {
@@ -42,8 +43,9 @@ export async function POST(request: Request) {
     if (!body.companyId || !body.reason || String(body.reason).trim() === "") {
       return NextResponse.json({ error: "الشركة والسبب مطلوبان", code: "SETTLEMENT_FIELDS_REQUIRED" }, { status: 400 });
     }
-    if (!["CASH", "CREDIT", "INSTALLMENT", "MIXED"].includes(body.paymentMethod)) {
-      return NextResponse.json({ error: "طريقة الدفع غير صالحة", code: "PAYMENT_METHOD_INVALID" }, { status: 400 });
+    const paymentMethod = sanitizePaymentMethod(body.paymentMethod);
+    if (!paymentMethod) {
+      return NextResponse.json({ error: "طريقة الدفع غير صالحة (كاش أو أجل فقط)", code: "PAYMENT_METHOD_INVALID" }, { status: 400 });
     }
 
     const direction = body.direction === "SUBTRACTION" ? "SUBTRACTION" : "ADDITION";
@@ -84,7 +86,7 @@ export async function POST(request: Request) {
         customerId: body.customerId || null,
         engineerId: body.engineerId || null,
         amount,
-        paymentMethod: body.paymentMethod,
+        paymentMethod,
         reason: body.reason,
         direction,
         status: "INITIAL",

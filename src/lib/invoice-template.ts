@@ -109,10 +109,10 @@ function getTheme(data: InvoiceData): InvoiceTheme {
 }
 
 const PAYMENT_METHOD_AR: Record<string, string> = {
-  CASH: "نقدي",
-  CREDIT: "آجل",
-  INSTALLMENT: "أقساط",
-  MIXED: "مختلط",
+  CASH: "كاش",
+  CREDIT: "أجل",
+  INSTALLMENT: "أجل",
+  MIXED: "أجل",
 };
 
 const PAYMENT_STATUS_AR: Record<string, string> = {

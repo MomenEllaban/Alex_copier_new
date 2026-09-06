@@ -63,7 +63,7 @@ export async function PUT(
     const VALID_CONTRACT_TYPES = ["MAINTENANCE_ONLY", "MAINTENANCE_AND_PARTS", "MAINTENANCE_AND_PRINTING", "RENTAL"];
     const VALID_CONTRACT_STATUSES = ["ACTIVE", "EXPIRED", "TERMINATED", "SUSPENDED"];
     const VALID_BILLING_CYCLES = ["MONTHLY", "HALF_YEARLY", "QUARTERLY", "YEARLY"];
-    const VALID_PAYMENT_METHODS = ["CASH", "CREDIT", "INSTALLMENT", "MIXED"];
+    const VALID_PAYMENT_METHODS = ["CASH", "CREDIT"];
 
     if (contractType !== undefined && !VALID_CONTRACT_TYPES.includes(contractType)) {
       return NextResponse.json({ error: "نوع العقد غير صالح", code: "INVALID_CONTRACT_TYPE" }, { status: 400 });

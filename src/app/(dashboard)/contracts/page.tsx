@@ -43,10 +43,12 @@ const BILLING_LABELS: Record<string, string> = {
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   CASH: "كاش",
-  CREDIT: "آجل",
-  INSTALLMENT: "تقسيط",
-  MIXED: "مزيج",
+  CREDIT: "أجل",
+  INSTALLMENT: "أجل",
+  MIXED: "أجل",
 };
+
+const PAYMENT_METHOD_OPTIONS = ["CASH", "CREDIT"] as const;
 
 const contractTypeColors: Record<string, string> = {
   MAINTENANCE_ONLY: "bg-blue-100 text-blue-800",
@@ -334,8 +336,8 @@ export default function ContractsPage() {
               </div>
               <div className="space-y-1.5">
                 <label className="block text-sm font-medium text-slate-700">نوع الدفع</label>
-                <select value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  {Object.entries(PAYMENT_METHOD_LABELS).map(([key, label]) => (<option key={key} value={key}>{label}</option>))}
+                <select value={form.paymentMethod === "CASH" ? "CASH" : "CREDIT"} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                  {PAYMENT_METHOD_OPTIONS.map((key) => (<option key={key} value={key}>{PAYMENT_METHOD_LABELS[key]}</option>))}
                 </select>
               </div>
             </div>

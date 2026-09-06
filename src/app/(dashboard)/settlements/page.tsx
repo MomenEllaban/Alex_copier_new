@@ -33,7 +33,7 @@ interface Settlement {
   engineer: Engineer | null; collector: User; verifier: User | null;
 }
 
-const PAYMENT_METHOD_LABELS: Record<string, string> = { CASH: "نقدي", CREDIT: "آجل", INSTALLMENT: "أقساط", MIXED: "مختلط" };
+const PAYMENT_METHOD_LABELS: Record<string, string> = { CASH: "كاش", CREDIT: "أجل", INSTALLMENT: "أجل", MIXED: "أجل" };
 const STATUS_LABELS: Record<string, string> = { INITIAL: "أولي", VERIFIED: "تم التحقق" };
 const DIRECTION_LABELS: Record<string, string> = { ADDITION: "إضافة (+)", SUBTRACTION: "طرح (−)" };
 
@@ -239,11 +239,9 @@ export default function SettlementsPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">{t("settlements.paymentMethod")}</label>
-            <select value={form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })} className={INPUT}>
+            <select value={form.paymentMethod === "CASH" ? "CASH" : "CREDIT"} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })} className={INPUT}>
               <option value="CASH">{PAYMENT_METHOD_LABELS.CASH}</option>
               <option value="CREDIT">{PAYMENT_METHOD_LABELS.CREDIT}</option>
-              <option value="INSTALLMENT">{PAYMENT_METHOD_LABELS.INSTALLMENT}</option>
-              <option value="MIXED">{PAYMENT_METHOD_LABELS.MIXED}</option>
             </select>
           </div>
           <div>

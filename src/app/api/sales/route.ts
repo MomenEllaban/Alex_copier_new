@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
 import { recalculatePaymentStatus } from "@/lib/payment-status";
 import { computeCreditSplit, creditUsedNote } from "@/lib/customer-credit";
+import { sanitizePaymentMethod } from "@/lib/payment-method";
 import { traceError } from "@/lib/prisma-errors";
 
 export async function GET() {
@@ -73,7 +74,10 @@ export async function POST(request: Request) {
     const companyId = String(raw.companyId).trim();
     const customerId = String(raw.customerId).trim();
     const orderType = String(raw.orderType).trim() as "MACHINE_SALE" | "SPARE_PART_SALE";
-    const paymentMethod = String(raw.paymentMethod).trim() as "CASH" | "CREDIT" | "INSTALLMENT" | "MIXED";
+    const paymentMethod = sanitizePaymentMethod(raw.paymentMethod);
+    if (!paymentMethod) {
+      return NextResponse.json({ error: "طريقة الدفع غير صالحة (كاش أو أجل فقط)", code: "INVALID_PAYMENT_METHOD" }, { status: 400 });
+    }
     const notes = raw.notes ? String(raw.notes) : null;
     const discountVal = Math.max(0, Number(raw.discount) || 0);
     const discountType = (raw.discountType === "PERCENTAGE" ? "PERCENTAGE" : "FIXED") as "FIXED" | "PERCENTAGE";

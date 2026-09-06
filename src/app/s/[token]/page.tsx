@@ -13,7 +13,8 @@ interface StatementRow {
   date: string;
   ref: string | null;
   description: string | null;
-  amount: number;
+  debit: number;
+  credit: number;
   balance: number;
 }
 
@@ -41,11 +42,15 @@ export default function StatementPage({ params }: { params: Promise<{ token: str
   const { t, locale, dir } = useI18n();
   const [data, setData] = useState<Statement | null>(null);
   const [status, setStatus] = useState<"loading" | "loaded" | "error">("loading");
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    params.then((p) => {
-      fetch(`/api/public/statement/${encodeURIComponent(p.token)}`)
+    let token: string | null = null;
+
+    const fetchStatement = () => {
+      if (!token) return;
+      fetch(`/api/public/statement/${encodeURIComponent(token)}`)
         .then((res) => {
           if (!res.ok) throw new Error("not found");
           return res.json();
@@ -53,14 +58,30 @@ export default function StatementPage({ params }: { params: Promise<{ token: str
         .then((json) => {
           if (cancelled) return;
           setData(json as Statement);
+          setLastUpdated(new Date());
           setStatus("loaded");
         })
         .catch(() => {
-          if (!cancelled) setStatus("error");
+          if (!cancelled) setStatus((prev) => (prev === "loaded" ? prev : "error"));
         });
+    };
+
+    params.then((p) => {
+      if (cancelled) return;
+      token = p.token;
+      fetchStatement();
     });
+
+    // Auto-refresh: the report stays live so confirmed payments, settlements,
+    // and new invoices show up without a manual reload.
+    const poll = setInterval(fetchStatement, 20000);
+    const onFocus = () => fetchStatement();
+    window.addEventListener("focus", onFocus);
+
     return () => {
       cancelled = true;
+      clearInterval(poll);
+      window.removeEventListener("focus", onFocus);
     };
   }, [params]);
 
@@ -107,8 +128,14 @@ export default function StatementPage({ params }: { params: Promise<{ token: str
     <div dir={dir} className="min-h-screen bg-gray-50 p-4 sm:p-6">
       <div className="mx-auto max-w-4xl space-y-4">
         <div className="flex items-center justify-between">
-          <div className="text-sm text-gray-500">
-            {t("statement.generatedBy")}
+          <div className="flex items-center gap-3 text-sm text-gray-500">
+            <span>{t("statement.generatedBy")}</span>
+            {status === "loaded" && lastUpdated && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />
+                {t("statement.autoRefresh")} · {t("statement.lastUpdate")}: {formatTime(lastUpdated.toISOString())}
+              </span>
+            )}
           </div>
           <button
             onClick={() => window.print()}
@@ -175,20 +202,22 @@ export default function StatementPage({ params }: { params: Promise<{ token: str
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      <tr className="bg-slate-50">
-                        <td className="px-4 py-2.5 whitespace-nowrap text-gray-600">—</td>
-                        <td className="px-4 py-2.5">
-                          <span className="inline-flex rounded-full bg-slate-200 px-2 py-0.5 text-xs font-semibold text-slate-700">
-                            {t("statement.openingBalance")}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2.5 font-medium text-blue-700">{money(data.openingBalance)}</td>
-                        <td className="px-4 py-2.5 font-medium text-green-700">—</td>
-                        <td className="px-4 py-2.5 text-end font-semibold text-slate-800">{money(data.openingBalance)}</td>
-                      </tr>
+                      {data.openingBalance !== 0 && (
+                        <tr className="bg-slate-50">
+                          <td className="px-4 py-2.5 whitespace-nowrap text-gray-600">—</td>
+                          <td className="px-4 py-2.5">
+                            <span className="inline-flex rounded-full bg-slate-200 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                              {t("statement.openingBalance")}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 font-medium text-blue-700">{data.openingBalance > 0 ? money(data.openingBalance) : "—"}</td>
+                          <td className="px-4 py-2.5 font-medium text-green-700">{data.openingBalance < 0 ? money(-data.openingBalance) : "—"}</td>
+                          <td className="px-4 py-2.5 text-end font-semibold text-slate-800">{money(data.openingBalance)}</td>
+                        </tr>
+                      )}
                       {data.rows.map((row) => {
-                        const debit = row.amount > 0 ? money(row.amount) : "";
-                        const credit = row.amount < 0 ? money(-row.amount) : "";
+                        const debit = row.debit > 0 ? money(row.debit) : "";
+                        const credit = row.credit > 0 ? money(row.credit) : "";
                         return (
                           <tr key={row.id} className="hover:bg-gray-50">
                             <td className="px-4 py-2.5 whitespace-nowrap text-gray-600">
@@ -197,7 +226,7 @@ export default function StatementPage({ params }: { params: Promise<{ token: str
                             </td>
                             <td className="px-4 py-2.5">
                               <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${TYPE_BADGES[row.type]}`}>
-                                {typeLabel(row.type) || (row.amount > 0 ? t("statement.settlementOut") : t("statement.settlementIn"))}
+                                {typeLabel(row.type) || (row.debit > 0 ? t("statement.settlementOut") : t("statement.settlementIn"))}
                               </span>
                               <div className="mt-1 text-xs text-gray-500">{descLabel(row.type, row.description)}</div>
                             </td>

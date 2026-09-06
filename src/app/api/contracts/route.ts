@@ -51,7 +51,7 @@ export async function POST(request: Request) {
 
     const VALID_CONTRACT_TYPES = ["MAINTENANCE_ONLY", "MAINTENANCE_AND_PARTS", "MAINTENANCE_AND_PRINTING", "RENTAL"];
     const VALID_BILLING_CYCLES = ["MONTHLY", "HALF_YEARLY", "QUARTERLY", "YEARLY"];
-    const VALID_PAYMENT_METHODS = ["CASH", "CREDIT", "INSTALLMENT", "MIXED"];
+    const VALID_PAYMENT_METHODS = ["CASH", "CREDIT"];
 
     if (!customerId) {
       return NextResponse.json({ error: "العميل مطلوب", code: "CONTRACT_FIELDS_REQUIRED" }, { status: 400 });

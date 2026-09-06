@@ -8,7 +8,9 @@ export interface StatementRow {
   date: string; // ISO datetime used for display + sort
   ref: string | null; // human reference (order number / settlement number / notes / reason)
   description: string | null;
-  amount: number; // signed: positive increases the customer's debt, negative reduces it
+  debit: number; // column value: money that increases the customer's debt (مدين)
+  credit: number; // column value: money that reduces the customer's debt (دائن)
+  amount: number; // derived signed movement (debit - credit): positive increases the debt
   balance: number; // running debt balance after this row
 }
 
@@ -34,8 +36,11 @@ function round2(n: number): number {
  * financial movement: sales invoices, payments, sale returns, and settlements.
  *
  * Balance convention: rows are sorted by (date, createdAt). Each row carries a
- * signed `amount` where positive increases the customer's debt and negative
- * reduces it. The running `balance` therefore ends at the remaining debt.
+ * `debit` (مدين) and `credit` (دائن) column. Invoices billed on credit add to
+ * debit; cash invoices are fully covered the same instant so they appear with
+ * debit === credit and therefore do not change the balance. Payments, approved
+ * returns, and collected settlements reduce the debt and appear under credit.
+ * The running `balance` therefore ends at the remaining debt.
  */
 export async function buildCustomerStatement(customerId: string): Promise<CustomerStatement | null> {
   const customer = await prisma.customer.findUnique({
@@ -50,6 +55,7 @@ export async function buildCustomerStatement(customerId: string): Promise<Custom
       select: {
         id: true,
         total: true,
+        paymentMethod: true,
         orderDate: true,
         createdAt: true,
         status: true,
@@ -91,13 +97,18 @@ export async function buildCustomerStatement(customerId: string): Promise<Custom
 
   for (const o of salesOrders) {
     const statusNote = o.status === "DRAFT" ? " (مسودة)" : "";
+    const cash = o.paymentMethod === "CASH";
+    const debit = o.total;
+    const credit = cash ? o.total : 0;
     drafts.push({
       id: o.id,
       type: "SALE",
       date: o.createdAt.toISOString(),
       ref: o.id,
       description: o.notes ? `${o.notes}${statusNote}` : statusNote.trim() || o.notes,
-      amount: o.total,
+      debit,
+      credit,
+      amount: debit - credit,
       balance: 0,
       sort: o.createdAt.getTime(),
       finalized: o.status !== "DRAFT",
@@ -110,6 +121,8 @@ export async function buildCustomerStatement(customerId: string): Promise<Custom
       date: p.createdAt.toISOString(),
       ref: p.notes,
       description: p.notes,
+      debit: 0,
+      credit: p.amount,
       amount: -p.amount,
       balance: 0,
       sort: p.createdAt.getTime(),
@@ -124,6 +137,8 @@ export async function buildCustomerStatement(customerId: string): Promise<Custom
       date: r.createdAt.toISOString(),
       ref: r.reason,
       description: r.reason,
+      debit: 0,
+      credit: r.total,
       amount: -r.total,
       balance: 0,
       sort: r.createdAt.getTime(),
@@ -132,16 +147,19 @@ export async function buildCustomerStatement(customerId: string): Promise<Custom
   }
 
   for (const s of settlements) {
-    // ADDITION = money collected from the customer (reduces debt),
-    // SUBTRACTION = money given to the customer (increases debt).
+    // ADDITION = money collected from the customer (reduces debt) => credit,
+    // SUBTRACTION = money given to the customer (increases debt) => debit.
     const statusNote = s.status === "INITIAL" ? " (غير معتمدة)" : "";
+    const subtract = s.direction === "SUBTRACTION";
     drafts.push({
       id: s.id,
       type: "SETTLEMENT",
       date: s.createdAt.toISOString(),
       ref: s.settlementNumber,
       description: s.reason ? `${s.reason}${statusNote}` : statusNote.trim() || s.reason,
-      amount: s.direction === "SUBTRACTION" ? s.amount : -s.amount,
+      debit: subtract ? s.amount : 0,
+      credit: subtract ? 0 : s.amount,
+      amount: subtract ? s.amount : -s.amount,
       balance: 0,
       sort: s.createdAt.getTime(),
       finalized: s.status === "VERIFIED",
@@ -178,10 +196,14 @@ export async function buildCustomerStatement(customerId: string): Promise<Custom
       date: d.date,
       ref: d.ref,
       description: d.description,
+      debit: round2(d.debit),
+      credit: round2(d.credit),
       amount: round2(d.amount),
       balance: d.balance,
     });
   }
+
+  const closingBalance = round2(balance);
 
   return {
     customerId: customer.id,
@@ -194,7 +216,8 @@ export async function buildCustomerStatement(customerId: string): Promise<Custom
     // Cap at totalDebt: overpayments become credit (negative remainingDebt) and
     // must not inflate the "paid" figure beyond what was actually billed.
     totalPaid: round2(Math.min(customer.totalDebt, Math.max(0, customer.totalDebt - customer.remainingDebt))),
-    creditBalance: round2(Math.max(0, -(customer.totalDebt - customer.remainingDebt))),
-    closingBalance: round2(balance),
+    // Money under the customer's account: what they paid beyond what they owe.
+    creditBalance: round2(Math.max(0, -closingBalance)),
+    closingBalance,
   };
 }

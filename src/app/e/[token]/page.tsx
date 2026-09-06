@@ -61,11 +61,15 @@ export default function EngineerStatementPage({ params }: { params: Promise<{ to
   const { t, locale, dir } = useI18n();
   const [data, setData] = useState<Statement | null>(null);
   const [status, setStatus] = useState<"loading" | "loaded" | "error">("loading");
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    params.then((p) => {
-      fetch(`/api/public/engineer-statement/${encodeURIComponent(p.token)}`)
+    let token: string | null = null;
+
+    const fetchStatement = () => {
+      if (!token) return;
+      fetch(`/api/public/engineer-statement/${encodeURIComponent(token)}`)
         .then((res) => {
           if (!res.ok) throw new Error("not found");
           return res.json();
@@ -73,14 +77,30 @@ export default function EngineerStatementPage({ params }: { params: Promise<{ to
         .then((json) => {
           if (cancelled) return;
           setData(json as Statement);
+          setLastUpdated(new Date());
           setStatus("loaded");
         })
         .catch(() => {
-          if (!cancelled) setStatus("error");
+          if (!cancelled) setStatus((prev) => (prev === "loaded" ? prev : "error"));
         });
+    };
+
+    params.then((p) => {
+      if (cancelled) return;
+      token = p.token;
+      fetchStatement();
     });
+
+    // Keep the engineer statement live so recent sales, settlements, and salary
+    // entries appear without a manual reload.
+    const poll = setInterval(fetchStatement, 20000);
+    const onFocus = () => fetchStatement();
+    window.addEventListener("focus", onFocus);
+
     return () => {
       cancelled = true;
+      clearInterval(poll);
+      window.removeEventListener("focus", onFocus);
     };
   }, [params]);
 
@@ -128,8 +148,14 @@ export default function EngineerStatementPage({ params }: { params: Promise<{ to
     <div dir={dir} className="min-h-screen bg-gray-50 p-4 sm:p-6">
       <div className="mx-auto max-w-5xl space-y-4">
         <div className="flex items-center justify-between">
-          <div className="text-sm text-gray-500">
-            {t("statement.generatedBy")}
+          <div className="flex items-center gap-3 text-sm text-gray-500">
+            <span>{t("statement.generatedBy")}</span>
+            {status === "loaded" && lastUpdated && (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />
+                {t("statement.autoRefresh")} · {t("statement.lastUpdate")}: {formatTime(lastUpdated.toISOString())}
+              </span>
+            )}
           </div>
           <button
             onClick={() => window.print()}
