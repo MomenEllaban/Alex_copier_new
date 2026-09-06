@@ -170,6 +170,7 @@ export async function POST(request: Request) {
           companyId,
           customerId,
           engineerId,
+          status: "CONFIRMED",
           categoryId: typeof raw.categoryId === "string" && raw.categoryId ? raw.categoryId : null,
           orderType,
           paymentMethod,

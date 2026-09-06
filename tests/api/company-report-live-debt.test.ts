@@ -127,7 +127,7 @@ describe("GET /api/companies/[id]/report", () => {
     expect(body.cashPosition.cashFromSales).toBe(0);
   });
 
-  it("counts all sales orders for a company regardless of their status (DRAFT is the normal state of a sale)", async () => {
+  it("counts all sales orders for a company regardless of their status (sales are saved immediately as the normal state of a sale)", async () => {
     mocks.db.salesOrder.findMany.mockResolvedValue([
       creditOrder("o1", "custA", 5000, 5000, "2026-08-10T10:00:00.000Z"),
     ]);
@@ -143,8 +143,8 @@ describe("GET /api/companies/[id]/report", () => {
     const body = await res.json();
 
     // The query must NOT filter by order status, otherwise newly created sales
-    // (which stay DRAFT) would vanish from the report while still counted on
-    // the company card.
+    // (saved straight to CONFIRMED) would vanish from the report while still
+    // counted on the company card.
     const where = mocks.db.salesOrder.findMany.mock.calls[0][0].where;
     expect(where.status).toBeUndefined();
 

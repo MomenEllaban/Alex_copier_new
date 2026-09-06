@@ -160,6 +160,7 @@ export async function POST(request: Request) {
           companyId: toCompanyId,
           customerId,
           engineerId: engineerId || null,
+          status: "CONFIRMED",
           categoryId: typeof body.categoryId === "string" && body.categoryId ? body.categoryId : null,
           orderType,
           paymentMethod,

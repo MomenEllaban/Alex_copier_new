@@ -766,7 +766,7 @@ model SalesOrder {
   engineerId    String?
   categoryId    String?
   orderType     OrderType
-  status        SalesOrderStatus @default(DRAFT)
+  status        SalesOrderStatus @default(CONFIRMED)
   total         Float            @default(0)
   discount      Float            @default(0)
   discountType  DiscountType     @default(FIXED)

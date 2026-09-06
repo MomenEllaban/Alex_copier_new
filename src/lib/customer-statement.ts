@@ -90,21 +90,21 @@ export async function buildCustomerStatement(customerId: string): Promise<Custom
     }),
   ]);
 
-  interface Draft extends StatementRow {
+  interface Movement extends StatementRow {
     sort: number;
     finalized: boolean;
   }
 
-  const drafts: Draft[] = [];
+  const moves: Movement[] = [];
 
   for (const o of salesOrders) {
     // Every saved invoice already moved the customer's debt at creation
-    // (the sales form has no confirm step), so DRAFT orders are counted as
-    // real movements too. Only cancelled orders are excluded.
+    // (the sales form has no confirm step) and is always stored as CONFIRMED.
+    // Only cancelled orders are excluded.
     const cash = o.paymentMethod === "CASH";
     const debit = o.total;
     const credit = cash ? o.total : 0;
-    drafts.push({
+    moves.push({
       id: o.id,
       type: "SALE",
       date: o.createdAt.toISOString(),
@@ -123,7 +123,7 @@ export async function buildCustomerStatement(customerId: string): Promise<Custom
     // equal debit so the row is visible without moving the balance.
     const tradeIn = Number(o.tradeInTotal) || 0;
     if (tradeIn > 0) {
-      drafts.push({
+      moves.push({
         id: `${o.id}-tradein`,
         type: "TRADE_IN",
         date: o.createdAt.toISOString(),
@@ -139,7 +139,7 @@ export async function buildCustomerStatement(customerId: string): Promise<Custom
     }
   }
   for (const p of payments) {
-    drafts.push({
+    moves.push({
       id: p.id,
       type: "PAYMENT",
       date: p.createdAt.toISOString(),
@@ -155,7 +155,7 @@ export async function buildCustomerStatement(customerId: string): Promise<Custom
   }
 
   for (const r of returns) {
-    drafts.push({
+    moves.push({
       id: r.id,
       type: "RETURN",
       date: r.createdAt.toISOString(),
@@ -175,7 +175,7 @@ export async function buildCustomerStatement(customerId: string): Promise<Custom
     // SUBTRACTION = money given to the customer (increases debt) => debit.
     const statusNote = s.status === "INITIAL" ? " (غير معتمدة)" : "";
     const subtract = s.direction === "SUBTRACTION";
-    drafts.push({
+    moves.push({
       id: s.id,
       type: "SETTLEMENT",
       date: s.createdAt.toISOString(),
@@ -191,7 +191,7 @@ export async function buildCustomerStatement(customerId: string): Promise<Custom
   }
 
   // Sort chronologically; ties broken by created time.
-  drafts.sort((a, b) => a.sort - b.sort || a.date.localeCompare(b.date));
+  moves.sort((a, b) => a.sort - b.sort || a.date.localeCompare(b.date));
 
   // The authoritative debt figures live on the Customer record. The raw
   // movements are built up independently and may carry historical drift, so we
@@ -206,14 +206,14 @@ export async function buildCustomerStatement(customerId: string): Promise<Custom
   //
   // Summary stats are anchored to the authoritative values too so they stay
   // consistent with the dashboard and each other (billed - paid = remaining).
-  const finalizedMovement = drafts
+  const finalizedMovement = moves
     .filter((d) => d.finalized)
     .reduce((sum, d) => sum + d.amount, 0);
   const openingBalance = round2(customer.remainingDebt - finalizedMovement);
 
   const rows: StatementRow[] = [];
   let balance = openingBalance;
-  for (const d of drafts) {
+  for (const d of moves) {
     if (d.finalized) balance += d.amount;
     d.balance = round2(balance);
     rows.push({

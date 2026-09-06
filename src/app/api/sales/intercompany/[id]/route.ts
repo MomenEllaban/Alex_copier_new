@@ -240,6 +240,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
           companyId: toCompanyId,
           customerId,
           engineerId: engineerId || null,
+          status: "CONFIRMED",
           categoryId: typeof body.categoryId === "string" && body.categoryId ? body.categoryId : null,
           orderType,
           paymentMethod,

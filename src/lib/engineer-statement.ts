@@ -43,10 +43,10 @@ export interface EngineerStatement {
   generatedAt: string;
 }
 
-// Sales are saved by default as DRAFT and already count as real money movement
-// (the form has no confirm step), so drafts must appear in the engineer's
-// statement just like confirmed ones. Cancelled orders stay excluded.
-const FINALIZED_SALE_STATUSES: SalesOrderStatus[] = ["CONFIRMED", "DELIVERED", "DRAFT"];
+// Sales are saved every time the form is submitted (no confirm step), so every
+// invoice is a real money movement. They are always created as CONFIRMED and
+// cancelled orders stay excluded.
+const FINALIZED_SALE_STATUSES: SalesOrderStatus[] = ["CONFIRMED", "DELIVERED"];
 const OPEN_REQUEST_STATUSES = ["NEW", "ASSIGNED", "VISITED", "REASSIGNED"];
 const RESOLVED_REQUEST_STATUSES = ["RESOLVED", "CLOSED"];
 
@@ -138,15 +138,15 @@ export interface EngineerStatementData {
 export function assembleEngineerStatement(data: EngineerStatementData): EngineerStatement {
   const { engineer, salesOrders, settlements, serviceRequests, visits, salaryRecords, custodyItems } = data;
 
-  interface Draft extends EngineerStatementRow {
+  interface Movement extends EngineerStatementRow {
     sort: number;
     finalized: boolean;
   }
 
-  const drafts: Draft[] = [];
+  const moves: Movement[] = [];
 
   for (const o of salesOrders) {
-    drafts.push({
+    moves.push({
       id: o.id,
       type: "SALE",
       date: o.createdAt.toISOString(),
@@ -162,7 +162,7 @@ export function assembleEngineerStatement(data: EngineerStatementData): Engineer
   for (const s of settlements) {
     const finalized = s.status === "VERIFIED";
     const customerNote = s.customer ? `${s.customer.name} — ` : "";
-    drafts.push({
+    moves.push({
       id: s.id,
       type: "SETTLEMENT",
       date: s.createdAt.toISOString(),
@@ -176,7 +176,7 @@ export function assembleEngineerStatement(data: EngineerStatementData): Engineer
   }
 
   for (const r of serviceRequests) {
-    drafts.push({
+    moves.push({
       id: r.id,
       type: "SERVICE_REQUEST",
       date: r.createdAt.toISOString(),
@@ -190,7 +190,7 @@ export function assembleEngineerStatement(data: EngineerStatementData): Engineer
   }
 
   for (const v of visits) {
-    drafts.push({
+    moves.push({
       id: v.id,
       type: "VISIT",
       date: v.visitedAt.toISOString(),
@@ -204,7 +204,7 @@ export function assembleEngineerStatement(data: EngineerStatementData): Engineer
   }
 
   for (const s of salaryRecords) {
-    drafts.push({
+    moves.push({
       id: s.id,
       type: "SALARY",
       date: s.createdAt.toISOString(),
@@ -217,11 +217,11 @@ export function assembleEngineerStatement(data: EngineerStatementData): Engineer
     });
   }
 
-  drafts.sort((a, b) => a.sort - b.sort || a.date.localeCompare(b.date));
+  moves.sort((a, b) => a.sort - b.sort || a.date.localeCompare(b.date));
 
   const rows: EngineerStatementRow[] = [];
   let balance = 0;
-  for (const d of drafts) {
+  for (const d of moves) {
     if (d.finalized) balance += d.amount;
     d.balance = round2(balance);
     rows.push({

@@ -225,12 +225,12 @@ describe("customer-statement", () => {
     expect(s?.closingBalance).toBe(0);
   });
 
-  it("counts DRAFT invoices as real movements with no مسودة note", async () => {
+  it("counts confirmed invoices as real movements with no مسودة note", async () => {
     // Every saved invoice already moved the customer's debt at creation, so a
-    // "DRAFT" sale must count toward the balance and read as a normal invoice.
+    // CONFIRMED sale counts toward the balance and reads as a normal invoice.
     seed({
       findUnique: customer({ totalDebt: 8000, remainingDebt: 8000 }),
-      sales: [sale("so-1", 8000, { status: "DRAFT", notes: "لاتريبة" })],
+      sales: [sale("so-1", 8000, { status: "CONFIRMED", notes: "لاتريبة" })],
     });
 
     const s = await buildCustomerStatement("cust-1");
