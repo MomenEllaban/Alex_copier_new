@@ -177,7 +177,7 @@ export default function SalesPage() {
   const [priceHistory, setPriceHistory] = useState<Record<string, PriceHistory>>({});
   const [priceHistoryLoading, setPriceHistoryLoading] = useState<Record<string, boolean>>({});
   const [showInterForm, setShowInterForm] = useState(false);
-  const [interForm, setInterForm] = useState({ fromCompanyId: "", toCompanyId: "", customerId: "", categoryId: "", orderType: "SPARE_PART_SALE", paymentMethod: "CREDIT", internalPaymentMethod: "CREDIT", paidAmount: "", internalPaidAmount: "", isTaxInvoice: false, taxRate: "0", discount: "", notes: "" });
+  const [interForm, setInterForm] = useState({ fromCompanyId: "", toCompanyId: "", customerId: "", engineerId: "", categoryId: "", orderType: "SPARE_PART_SALE", paymentMethod: "CREDIT", internalPaymentMethod: "CREDIT", paidAmount: "", internalPaidAmount: "", isTaxInvoice: false, taxRate: "0", discount: "", notes: "" });
   const [interRows, setInterRows] = useState<InterItemRow[]>([{ productId: "", quantity: "", internalPrice: "", customerPrice: "", costPrice: "" }]);
   const [tradeInProduct, setTradeInProduct] = useState<{ name: string; brand: string; condition: string; value: string; serialNumber: string }>({ name: "", brand: "", condition: "", value: "", serialNumber: "" });
   const [search, setSearch] = useState("");
@@ -340,6 +340,7 @@ export default function SalesPage() {
         fromCompanyId,
         toCompanyId,
         customerId: order.customerId,
+        engineerId: order.engineerId || "",
         categoryId: order.salesCategory?.id || order.categoryId || "",
         orderType: order.orderType,
         paymentMethod: order.paymentMethod,
@@ -546,7 +547,7 @@ export default function SalesPage() {
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) { toastError(apiErrorMessage(data, t)); setSavingInter(false); return; }
-    setInterForm({ fromCompanyId: "", toCompanyId: "", customerId: "", categoryId: "", orderType: "SPARE_PART_SALE", paymentMethod: "CREDIT", internalPaymentMethod: "CREDIT", paidAmount: "", internalPaidAmount: "", isTaxInvoice: false, taxRate: "0", discount: "", notes: "" });
+    setInterForm({ fromCompanyId: "", toCompanyId: "", customerId: "", engineerId: "", categoryId: "", orderType: "SPARE_PART_SALE", paymentMethod: "CREDIT", internalPaymentMethod: "CREDIT", paidAmount: "", internalPaidAmount: "", isTaxInvoice: false, taxRate: "0", discount: "", notes: "" });
     setInterRows([{ productId: "", quantity: "", internalPrice: "", customerPrice: "", costPrice: "" }]);
     setEditingId(null);
     setSavingInter(false);
@@ -841,6 +842,13 @@ export default function SalesPage() {
               <select value={interForm.categoryId} onChange={(e) => setInterForm({ ...interForm, categoryId: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="">{t("sales.noCategory")}</option>
                 {salesCategories.filter((c) => !interForm.toCompanyId || c.companyId === interForm.toCompanyId).map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-slate-700">المهندس (اختياري)</label>
+              <select value={interForm.engineerId} onChange={(e) => setInterForm({ ...interForm, engineerId: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">المهندس (اختياري)</option>
+                {engineers.map((engineer) => (<option key={engineer.id} value={engineer.id}>{engineer.name}</option>))}
               </select>
             </div>
             <div className="space-y-1.5">

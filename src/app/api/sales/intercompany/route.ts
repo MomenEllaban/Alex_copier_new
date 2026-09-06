@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePageAccess, requireAuth } from "@/lib/auth-helpers";
 import { recalculatePaymentStatus } from "@/lib/payment-status";
+import { computeCreditSplit, creditUsedNote } from "@/lib/customer-credit";
 import { traceError } from "@/lib/prisma-errors";
 
 type PrismaTx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
@@ -60,6 +61,7 @@ export async function POST(request: Request) {
       fromCompanyId,
       toCompanyId,
       customerId,
+      engineerId,
       orderType,
       paymentMethod,
       paidAmount,
@@ -89,10 +91,13 @@ export async function POST(request: Request) {
       }
     }
 
-    const [fromCompany, toCompany, customer] = await Promise.all([
+    const [fromCompany, toCompany, customer, engineer] = await Promise.all([
       prisma.company.findUnique({ where: { id: fromCompanyId }, select: { id: true } }),
       prisma.company.findUnique({ where: { id: toCompanyId }, select: { id: true } }),
-      prisma.customer.findUnique({ where: { id: customerId }, select: { id: true } }),
+      prisma.customer.findUnique({ where: { id: customerId }, select: { id: true, remainingDebt: true } }),
+      engineerId
+        ? prisma.engineer.findUnique({ where: { id: engineerId }, select: { id: true } })
+        : Promise.resolve(null),
     ]);
     if (!fromCompany) {
       return NextResponse.json({ error: "شركة المصدر غير موجودة", code: "FROM_COMPANY_NOT_FOUND" }, { status: 400 });
@@ -102,6 +107,9 @@ export async function POST(request: Request) {
     }
     if (!customer) {
       return NextResponse.json({ error: "العميل غير موجود", code: "CUSTOMER_NOT_FOUND" }, { status: 400 });
+    }
+    if (engineerId && !engineer) {
+      return NextResponse.json({ error: "المهندس غير موجود", code: "ENGINEER_NOT_FOUND" }, { status: 400 });
     }
     const productIds = items.map((item: InterItem) => item.productId);
     const distinctProducts = new Set(productIds);
@@ -133,8 +141,8 @@ export async function POST(request: Request) {
       0
     );
 
-    // لا يمكن أن يتجاوز المبلغ المدفوع الإجمالي
-    const finalPaid = Math.min(paid, total);
+    // لا يمكن أن يتجاوز المبلغ المدفوع الإجمالي؛ ويُخصم رصيد تحت الحساب أولاً
+    const split = computeCreditSplit(total, customer?.remainingDebt ?? 0, paid, paymentMethod);
 
     const result = await prisma.$transaction(async (tx: PrismaTx) => {
       const warehouses = await tx.warehouse.findMany({
@@ -151,6 +159,7 @@ export async function POST(request: Request) {
         data: {
           companyId: toCompanyId,
           customerId,
+          engineerId: engineerId || null,
           categoryId: typeof body.categoryId === "string" && body.categoryId ? body.categoryId : null,
           orderType,
           paymentMethod,
@@ -160,7 +169,8 @@ export async function POST(request: Request) {
           taxRate: resolvedTaxRate,
           isTaxInvoice: Boolean(isTaxInvoice),
           total,
-          paidAmount: paymentMethod === "CASH" ? total : finalPaid,
+          paidAmount: split.paidAmount,
+          creditUsed: split.creditUsed,
           paymentStatus: "PENDING",
           tradeInTotal: 0,
           orderDate: new Date(),
@@ -264,19 +274,44 @@ export async function POST(request: Request) {
         });
       }
 
-      // ديون العميل عند عدم السداد الكامل
-      if (paymentMethod !== "CASH" && finalPaid < total) {
+      // ديون العميل حسب التغطية الفعلية (رصيد تحت الحساب أولاً ثم المدفوع النقدي)
+      const remainingDelta = split.unpaid + split.creditUsed;
+      if (remainingDelta > 0 || split.unpaid > 0) {
         await tx.customer.update({
           where: { id: customerId },
           data: {
-            totalDebt: { increment: total - finalPaid },
-            remainingDebt: { increment: total - finalPaid },
+            ...(split.unpaid > 0 ? { totalDebt: { increment: split.unpaid } } : {}),
+            ...(remainingDelta > 0 ? { remainingDebt: { increment: remainingDelta } } : {}),
           },
         });
         await tx.customerLedger.upsert({
           where: { customerId_companyId: { customerId, companyId: toCompanyId } },
-          update: { balance: { increment: total - finalPaid } },
-          create: { customerId, companyId: toCompanyId, balance: total - finalPaid },
+          update: { balance: { increment: remainingDelta } },
+          create: { customerId, companyId: toCompanyId, balance: remainingDelta },
+        });
+      }
+
+      // سجّل كيف تمت تغطية الفاتورة ليظهر في كشف حساب العميل بوضوح
+      if (split.creditUsed > 0) {
+        await tx.customerPayment.create({
+          data: {
+            customerId,
+            companyId: toCompanyId,
+            amount: split.creditUsed,
+            paymentDate: new Date(),
+            notes: creditUsedNote(order.id),
+          },
+        });
+      }
+      if (paymentMethod !== "CASH" && split.cashUpfront > 0) {
+        await tx.customerPayment.create({
+          data: {
+            customerId,
+            companyId: toCompanyId,
+            amount: split.cashUpfront,
+            paymentDate: new Date(),
+            notes: `دفع مبدئي مع فاتورة بيع ${order.id}`,
+          },
         });
       }
 
@@ -315,7 +350,7 @@ export async function POST(request: Request) {
       // القيود المحاسبية لشركة الوجهة (شراء + بيع للعميل)
       const tgtAccounts = await getCompanyAccounts(tx, toCompanyId);
       const tgtEntryNumber = `JE-IC-${Date.now()}-2`;
-      const tgtCash = paymentMethod === "CASH" ? total : finalPaid;
+      const tgtCash = split.paidAmount;
       const tgtReceivable = total - tgtCash;
       await tx.journalEntry.create({
         data: {

@@ -5,7 +5,7 @@ import { Printer } from "lucide-react";
 import PrinterLoader from "@/components/PrinterLoader";
 import { useI18n } from "@/i18n/context";
 
-type RowType = "SALE" | "PAYMENT" | "RETURN" | "SETTLEMENT";
+type RowType = "SALE" | "PAYMENT" | "RETURN" | "SETTLEMENT" | "TRADE_IN";
 
 interface StatementRow {
   id: string;
@@ -36,6 +36,7 @@ const TYPE_BADGES: Record<RowType, string> = {
   PAYMENT: "bg-green-100 text-green-700",
   RETURN: "bg-amber-100 text-amber-700",
   SETTLEMENT: "bg-purple-100 text-purple-700",
+  TRADE_IN: "bg-sky-100 text-sky-700",
 };
 
 export default function StatementPage({ params }: { params: Promise<{ token: string }> }) {
@@ -111,6 +112,7 @@ export default function StatementPage({ params }: { params: Promise<{ token: str
       case "SALE": return t("statement.invoice");
       case "PAYMENT": return t("statement.payment");
       case "RETURN": return t("statement.saleReturn");
+      case "TRADE_IN": return t("statement.tradeIn");
       case "SETTLEMENT": return "";
       default: return type;
     }

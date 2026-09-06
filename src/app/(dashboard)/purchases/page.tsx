@@ -47,11 +47,12 @@ interface InterCompanyInvoice {
   fromCompany: Company; toCompany: Company; items: InterCompanyItem[]; internalPaymentMethod?: string;
   internalPaidAmount?: number; salesOrderId?: string | null;
   customer?: { id: string; name: string } | null;
+  engineer?: { id: string; name: string } | null;
   orderType?: string; paymentMethod?: string; paidAmount?: number; taxRate?: number; discount?: number; discountType?: string;
 }
 interface InterRow { productId: string; quantity: string; internalPrice: string; customerPrice: string; costPrice: string; }
 interface InterForm {
-  fromCompanyId: string; toCompanyId: string; customerId: string; orderType: string; paymentMethod: string;
+  fromCompanyId: string; toCompanyId: string; customerId: string; engineerId: string; orderType: string; paymentMethod: string;
   internalPaymentMethod: string; paidAmount: string; internalPaidAmount: string; isTaxInvoice: boolean; taxRate: string;
   discount: string; notes: string;
 }
@@ -116,12 +117,13 @@ export default function PurchasesPage() {
   const [icDateFrom, setIcDateFrom] = useState("");
   const [icDateTo, setIcDateTo] = useState("");
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [engineers, setEngineers] = useState<{ id: string; name: string }[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [viewingOrder, setViewingOrder] = useState<PurchaseOrder | null>(null);
   const [viewingIc, setViewingIc] = useState<InterCompanyInvoice | null>(null);
   const [editingIc, setEditingIc] = useState<string | null>(null);
   const [interForm, setInterForm] = useState<InterForm>({
-    fromCompanyId: "", toCompanyId: "", customerId: "", orderType: "MACHINE_SALE", paymentMethod: "CREDIT",
+    fromCompanyId: "", toCompanyId: "", customerId: "", engineerId: "", orderType: "MACHINE_SALE", paymentMethod: "CREDIT",
     internalPaymentMethod: "CREDIT", paidAmount: "", internalPaidAmount: "", isTaxInvoice: false, taxRate: "0",
     discount: "0", notes: "",
   });
@@ -130,12 +132,14 @@ export default function PurchasesPage() {
 
   const fetchData = async () => {
     try {
-      const [pRes, sRes, prRes, coRes, cuRes] = await Promise.all([fetch("/api/purchases"), fetch("/api/suppliers"), fetch("/api/inventory"), fetch("/api/companies"), fetch("/api/customers")]);
+      const [pRes, sRes, prRes, coRes, cuRes, enRes] = await Promise.all([fetch("/api/purchases"), fetch("/api/suppliers"), fetch("/api/inventory"), fetch("/api/companies"), fetch("/api/customers"), fetch("/api/engineers")]);
       const pData = await pRes.json();
       setOrders(Array.isArray(pData) ? pData : pData.orders || []);
       setIntercompanyInvoices(Array.isArray(pData) ? [] : pData.intercompany || []);
       setSuppliers(await sRes.json());
       setCompanies(await coRes.json());
+      const en = await enRes.json();
+      setEngineers(Array.isArray(en) ? en.map((e: { id: string; name: string }) => ({ id: e.id, name: e.name })) : []);
       const cu = await cuRes.json();
       setCustomers(Array.isArray(cu) ? cu.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })) : []);
       const inv = await prRes.json();
@@ -293,6 +297,7 @@ export default function PurchasesPage() {
       fromCompanyId: ic.fromCompany?.id || "",
       toCompanyId: ic.toCompany?.id || "",
       customerId: ic.customer?.id || "",
+      engineerId: ic.engineer?.id || "",
       orderType: ic.orderType || "MACHINE_SALE",
       paymentMethod: ic.paymentMethod || "CREDIT",
       internalPaymentMethod: ic.internalPaymentMethod === "CASH" ? "CASH" : "CREDIT",
@@ -817,6 +822,13 @@ export default function PurchasesPage() {
                 <select value={interForm.customerId} onChange={(e) => setInterForm({ ...interForm, customerId: e.target.value })} className={inputClass} required>
                   <option value="">{t("sales.customer")}</option>
                   {customers.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="block text-sm font-medium text-slate-700">المهندس (اختياري)</label>
+                <select value={interForm.engineerId} onChange={(e) => setInterForm({ ...interForm, engineerId: e.target.value })} className={inputClass}>
+                  <option value="">المهندس (اختياري)</option>
+                  {engineers.map((en) => (<option key={en.id} value={en.id}>{en.name}</option>))}
                 </select>
               </div>
               <div className="space-y-1.5">

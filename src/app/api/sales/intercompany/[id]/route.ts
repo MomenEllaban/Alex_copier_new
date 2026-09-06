@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePageAccess, requireAuth } from "@/lib/auth-helpers";
 import { recalculatePaymentStatus } from "@/lib/payment-status";
+import { computeCreditSplit, creditUsedNote } from "@/lib/customer-credit";
 import { traceError } from "@/lib/prisma-errors";
 
 type PrismaTx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
@@ -55,6 +56,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       fromCompanyId,
       toCompanyId,
       customerId,
+      engineerId,
       orderType,
       paymentMethod,
       paidAmount,
@@ -84,10 +86,13 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       }
     }
 
-    const [fromCompany, toCompany, customer] = await Promise.all([
+    const [fromCompany, toCompany, customer, engineer] = await Promise.all([
       prisma.company.findUnique({ where: { id: fromCompanyId }, select: { id: true } }),
       prisma.company.findUnique({ where: { id: toCompanyId }, select: { id: true } }),
-      prisma.customer.findUnique({ where: { id: customerId }, select: { id: true } }),
+      prisma.customer.findUnique({ where: { id: customerId }, select: { id: true, remainingDebt: true } }),
+      engineerId
+        ? prisma.engineer.findUnique({ where: { id: engineerId }, select: { id: true } })
+        : Promise.resolve(null),
     ]);
     if (!fromCompany) {
       return NextResponse.json({ error: "شركة المصدر غير موجودة", code: "FROM_COMPANY_NOT_FOUND" }, { status: 400 });
@@ -97,6 +102,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     }
     if (!customer) {
       return NextResponse.json({ error: "العميل غير موجود", code: "CUSTOMER_NOT_FOUND" }, { status: 400 });
+    }
+    if (engineerId && !engineer) {
+      return NextResponse.json({ error: "المهندس غير موجود", code: "ENGINEER_NOT_FOUND" }, { status: 400 });
     }
     const productIds = items.map((item: InterItem) => item.productId);
     const distinctProducts = new Set(productIds);
@@ -119,12 +127,21 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const total = totalNoTax + taxVal;
     const internalTotal = (items as InterItem[]).reduce((s, it) => s + it.internalPrice * it.quantity, 0);
     const costTotal = (items as InterItem[]).reduce((s, it) => s + (it.costPrice || 0) * it.quantity, 0);
-    const finalPaid = Math.min(paid, total);
 
     const result = await prisma.$transaction(async (tx: PrismaTx) => {
       const existing = await tx.salesOrder.findUnique({
         where: { id: orderId },
-        include: { items: { include: { product: true } }, installments: true },
+        select: {
+          id: true,
+          customerId: true,
+          companyId: true,
+          paymentMethod: true,
+          total: true,
+          paidAmount: true,
+          creditUsed: true,
+          items: { include: { product: true } },
+          installments: true,
+        },
       });
       if (!existing) {
         throw new Error("ORDER_NOT_FOUND");
@@ -136,11 +153,17 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       }
 
       const existingCustomer = await tx.customer.findUnique({ where: { id: existing.customerId! } });
-      const origDebt = existing.paymentMethod !== "CASH" ? (existing.total - existing.paidAmount) : 0;
+      // The original forward logic added: totalDebt += unpaid and
+      // remainingDebt += unpaid + creditUsed (see POST). Reverse the same way.
+      const existingCreditUsed = existing.creditUsed ?? 0;
+      const origUnpaid = existing.paymentMethod !== "CASH"
+        ? Math.max(0, existing.total - existing.paidAmount - existingCreditUsed)
+        : 0;
+      const origDelta = origUnpaid + existingCreditUsed;
 
       // ══════════ REVERSAL ══════════
       // عكس ديون العميل الأصلية
-      if (origDebt > 0 && existingCustomer) {
+      if (origDelta > 0 && existingCustomer) {
         const debtBefore = await tx.customer.findUnique({
           where: { id: existing.customerId! },
           select: { totalDebt: true, remainingDebt: true },
@@ -148,17 +171,22 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         await tx.customer.update({
           where: { id: existing.customerId! },
           data: {
-            totalDebt: Math.max(0, (debtBefore?.totalDebt ?? 0) - origDebt),
+            totalDebt: Math.max(0, (debtBefore?.totalDebt ?? 0) - origUnpaid),
             // No floor clamp: reversal re-instates any under-account credit.
-            remainingDebt: (debtBefore?.remainingDebt ?? 0) - origDebt,
+            remainingDebt: (debtBefore?.remainingDebt ?? 0) - origDelta,
           },
         });
         await tx.customerLedger.upsert({
           where: { customerId_companyId: { customerId: existing.customerId!, companyId: existing.companyId } },
-          update: { balance: { decrement: origDebt } },
-          create: { customerId: existing.customerId!, companyId: existing.companyId, balance: -origDebt },
+          update: { balance: { decrement: origDelta } },
+          create: { customerId: existing.customerId!, companyId: existing.companyId, balance: -origDelta },
         });
       }
+
+      // احذف صفوف الدفع المرتبطة بالفاتورة (خصم رصيد تحت الحساب / دفع مبدئي)
+      await tx.customerPayment.deleteMany({
+        where: { customerId: existing.customerId!, notes: { contains: orderId } },
+      });
 
       // حذف القيود المحاسبية للشركتين
       await tx.journalEntry.deleteMany({ where: { referenceType: "InterCompanyInvoice", referenceId: invoice.id } });
@@ -199,11 +227,19 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         throw new Error("WAREHOUSE_NOT_FOUND");
       }
 
+      // حدد تغطية الفاتورة الجديدة برصيد تحت الحساب الحالي للعميل
+      const customerNow = await tx.customer.findUnique({
+        where: { id: customerId },
+        select: { remainingDebt: true },
+      });
+      const split = computeCreditSplit(total, customerNow?.remainingDebt ?? 0, paid, paymentMethod);
+
       await tx.salesOrder.update({
         where: { id: orderId },
         data: {
           companyId: toCompanyId,
           customerId,
+          engineerId: engineerId || null,
           categoryId: typeof body.categoryId === "string" && body.categoryId ? body.categoryId : null,
           orderType,
           paymentMethod,
@@ -213,7 +249,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
           taxRate: resolvedTaxRate,
           isTaxInvoice: Boolean(isTaxInvoice),
           total,
-          paidAmount: paymentMethod === "CASH" ? total : finalPaid,
+          paidAmount: split.paidAmount,
+          creditUsed: split.creditUsed,
           paymentStatus: "PENDING",
           tradeInTotal: 0,
         },
@@ -324,19 +361,44 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
         });
       }
 
-      // ديون العميل الجديدة
-      if (paymentMethod !== "CASH" && finalPaid < total) {
+      // ديون العميل حسب التغطية الفعلية (رصيد تحت الحساب أولاً ثم المدفوع النقدي)
+      const remainingDelta = split.unpaid + split.creditUsed;
+      if (remainingDelta > 0 || split.unpaid > 0) {
         await tx.customer.update({
           where: { id: customerId },
           data: {
-            totalDebt: { increment: total - finalPaid },
-            remainingDebt: { increment: total - finalPaid },
+            ...(split.unpaid > 0 ? { totalDebt: { increment: split.unpaid } } : {}),
+            ...(remainingDelta > 0 ? { remainingDebt: { increment: remainingDelta } } : {}),
           },
         });
         await tx.customerLedger.upsert({
           where: { customerId_companyId: { customerId, companyId: toCompanyId } },
-          update: { balance: { increment: total - finalPaid } },
-          create: { customerId, companyId: toCompanyId, balance: total - finalPaid },
+          update: { balance: { increment: remainingDelta } },
+          create: { customerId, companyId: toCompanyId, balance: remainingDelta },
+        });
+      }
+
+      // سجّل كيف تمت تغطية الفاتورة ليظهر في كشف حساب العميل بوضوح
+      if (split.creditUsed > 0) {
+        await tx.customerPayment.create({
+          data: {
+            customerId,
+            companyId: toCompanyId,
+            amount: split.creditUsed,
+            paymentDate: new Date(),
+            notes: creditUsedNote(orderId),
+          },
+        });
+      }
+      if (paymentMethod !== "CASH" && split.cashUpfront > 0) {
+        await tx.customerPayment.create({
+          data: {
+            customerId,
+            companyId: toCompanyId,
+            amount: split.cashUpfront,
+            paymentDate: new Date(),
+            notes: `دفع مبدئي مع فاتورة بيع ${orderId}`,
+          },
         });
       }
 
@@ -375,7 +437,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       // القيود المحاسبية لشركة الوجهة
       const tgtAccounts = await getCompanyAccounts(tx, toCompanyId);
       const tgtEntryNumber = `JE-IC-${Date.now()}-2`;
-      const tgtCash = paymentMethod === "CASH" ? total : finalPaid;
+      const tgtCash = split.paidAmount;
       const tgtReceivable = total - tgtCash;
       await tx.journalEntry.create({
         data: {

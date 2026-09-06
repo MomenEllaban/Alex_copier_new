@@ -49,6 +49,27 @@ describe("customer-credit", () => {
       const split = computeCreditSplit(1000, 0, 0, "CREDIT");
       expect(split).toEqual({ creditUsed: 0, cashUpfront: 0, paidAmount: 0, unpaid: 1000 });
     });
+
+    it("applies trade-in first on a CREDIT order (reduces the debt)", () => {
+      const split = computeCreditSplit(1000, 500, 0, "CREDIT", 200);
+      expect(split).toEqual({ creditUsed: 0, cashUpfront: 0, paidAmount: 0, unpaid: 800 });
+    });
+
+    it("trade-in never counts inside paidAmount for a CREDIT order", () => {
+      const split = computeCreditSplit(1000, -500, 100, "CREDIT", 200);
+      // after trade-in 800 remain; credit covers 500, cash covers 100.
+      expect(split).toEqual({ creditUsed: 500, cashUpfront: 100, paidAmount: 600, unpaid: 200 });
+    });
+
+    it("reduces the cash the customer hands over on a CASH order", () => {
+      const split = computeCreditSplit(1000, 0, 0, "CASH", 200);
+      expect(split).toEqual({ creditUsed: 0, cashUpfront: 800, paidAmount: 800, unpaid: 0 });
+    });
+
+    it("clamps trade-in that exceeds the total", () => {
+      const split = computeCreditSplit(1000, 500, 0, "CREDIT", 5000);
+      expect(split).toEqual({ creditUsed: 0, cashUpfront: 0, paidAmount: 0, unpaid: 0 });
+    });
   });
 
   describe("credit-used notes", () => {

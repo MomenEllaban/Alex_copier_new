@@ -60,7 +60,16 @@ export async function PUT(
 
     const existing = await prisma.salesOrder.findUnique({
       where: { id },
-      include: {
+      select: {
+        id: true,
+        customerId: true,
+        companyId: true,
+        paymentMethod: true,
+        total: true,
+        paidAmount: true,
+        creditUsed: true,
+        tradeInTotal: true,
+        orderDate: true,
         items: { include: { tradeInProduct: true } },
         installments: { select: { id: true } },
         returns: { select: { status: true } },
@@ -122,12 +131,24 @@ export async function PUT(
     const taxable = subtotal - orderDiscount;
     const total = Math.round((taxable + taxable * Math.max(0, resolvedTaxRate) / 100) * 100) / 100;
 
+    // Trade-in value (قيمة الاستبدال) is customer coverage toward the invoice.
+    const tradeInVal = items.reduce(
+      (sum: number, item: { tradeIn?: { value?: number } }) =>
+        sum + Math.max(0, Number(item.tradeIn?.value) || 0),
+      0
+    );
+
     // Original debt contribution of this order (to be reversed) — matches the
     // POST forward logic. Unpaid portion adds debt; creditUsed consumed some of
     // the customer's under-account money (also reflected in remainingDebt).
+    // A trade-in value covered part of the original invoice, so it is subtracted
+    // from the unpaid portion to avoid over-reversing.
     const originalCreditUsed = Number((existing as { creditUsed?: number }).creditUsed) || 0;
+    const originalTradeIn = Number((existing as { tradeInTotal?: number }).tradeInTotal) || 0;
     const originalUnpaid =
-      existing.paymentMethod !== "CASH" ? Math.max(0, existing.total - existing.paidAmount) : 0;
+      existing.paymentMethod !== "CASH"
+        ? Math.max(0, existing.total - existing.paidAmount - originalTradeIn)
+        : 0;
     const originalRemainingDelta = originalUnpaid + originalCreditUsed;
 
     const warehouse = await prisma.warehouse.findFirst({
@@ -228,7 +249,7 @@ export async function PUT(
         where: { id: customerId },
         select: { remainingDebt: true },
       });
-      const creditSplit = computeCreditSplit(total, customerNow?.remainingDebt ?? 0, Number(raw.paidAmount) || 0, paymentMethod);
+      const creditSplit = computeCreditSplit(total, customerNow?.remainingDebt ?? 0, Number(raw.paidAmount) || 0, paymentMethod, tradeInVal);
       const initialPaidAmount = creditSplit.paidAmount;
 
       await tx.salesOrder.update({
@@ -404,8 +425,16 @@ export async function DELETE(
 
     const existing = await prisma.salesOrder.findUnique({
       where: { id },
-      include: {
-        items: { select: { id: true } },
+      select: {
+        id: true,
+        customerId: true,
+        companyId: true,
+        paymentMethod: true,
+        total: true,
+        paidAmount: true,
+        creditUsed: true,
+        tradeInTotal: true,
+        items: { select: { id: true, tradeInProductId: true } },
         installments: { select: { id: true } },
         returns: { select: { id: true, status: true } },
       },
@@ -427,6 +456,46 @@ export async function DELETE(
     }
 
     await prisma.$transaction(async (tx) => {
+      // Reverse the customer debt this invoice created (unpaid + consumed
+      // under-account credit). The trade-in value covered part of the invoice
+      // at creation, so it must not be reversed here.
+      const originalCreditUsed = Number(existing.creditUsed) || 0;
+      const originalTradeIn = Number(existing.tradeInTotal) || 0;
+      const originalUnpaid =
+        existing.paymentMethod !== "CASH"
+          ? Math.max(0, existing.total - existing.paidAmount - originalTradeIn)
+          : 0;
+      const originalRemainingDelta = originalUnpaid + originalCreditUsed;
+      if (originalRemainingDelta > 0) {
+        const debtBefore = await tx.customer.findUnique({
+          where: { id: existing.customerId },
+          select: { totalDebt: true, remainingDebt: true },
+        });
+        await tx.customer.update({
+          where: { id: existing.customerId },
+          data: {
+            totalDebt: Math.max(0, (debtBefore?.totalDebt ?? 0) - originalUnpaid),
+            remainingDebt: (debtBefore?.remainingDebt ?? 0) - originalRemainingDelta,
+          },
+        });
+        await tx.customerLedger.upsert({
+          where: { customerId_companyId: { customerId: existing.customerId, companyId: existing.companyId } },
+          update: { balance: { decrement: originalRemainingDelta } },
+          create: { customerId: existing.customerId, companyId: existing.companyId, balance: -originalRemainingDelta },
+        });
+      }
+      await tx.customerPayment.deleteMany({
+        where: { customerId: existing.customerId, notes: { contains: existing.id } },
+      });
+
+      // Clean up trade-in products created for this order before deleting it.
+      const tradeInProductIds = existing.items
+        .map((it) => it.tradeInProductId)
+        .filter((pid): pid is string => Boolean(pid));
+      if (tradeInProductIds.length > 0) {
+        await tx.product.deleteMany({ where: { id: { in: tradeInProductIds } } });
+      }
+
       // Reverse stock movements for this order
       const stockMovements = await tx.stockMovement.findMany({
         where: { referenceId: id },

@@ -92,6 +92,14 @@ export async function POST(request: Request) {
     const taxable = subtotal - orderDiscount;
     const total = Math.round((taxable + taxable * Math.max(0, resolvedTaxRate) / 100) * 100) / 100;
 
+    // Trade-in value (قيمة الاستبدال) is customer coverage toward the invoice:
+    // it reduces what the customer still owes, exactly like cash.
+    const tradeInVal = items.reduce(
+      (sum: number, item: { tradeIn?: { value?: number } }) =>
+        sum + Math.max(0, Number(item.tradeIn?.value) || 0),
+      0
+    );
+
     const [company, customer] = await Promise.all([
       prisma.company.findUnique({ where: { id: companyId }, select: { id: true } }),
       prisma.customer.findUnique({ where: { id: customerId }, select: { id: true, remainingDebt: true } }),
@@ -107,7 +115,8 @@ export async function POST(request: Request) {
     // exceed the order total. If the customer has money under their account
     // (رصيد تحت الحساب), that credit is consumed FIRST automatically and the
     // given upfront amount is treated as cash paying on top of the credit.
-    const creditSplit = computeCreditSplit(total, customer.remainingDebt ?? 0, Number(raw.paidAmount) || 0, paymentMethod);
+    // A trade-in value covers part of the invoice before any of the above.
+    const creditSplit = computeCreditSplit(total, customer.remainingDebt ?? 0, Number(raw.paidAmount) || 0, paymentMethod, tradeInVal);
     const initialPaidAmount = creditSplit.paidAmount;
     if (engineerId) {
       const engineer = await prisma.engineer.findUnique({ where: { id: engineerId }, select: { id: true } });

@@ -23,13 +23,15 @@ export async function getEffectiveTotal(
 /**
  * Compute the paymentStatus for a sales order based on:
  * - effectiveTotal (order total minus approved returns)
- * - paidAmount (accumulated payments)
+ * - paidAmount (accumulated cash + under-account credit)
+ * - tradeInTotal (the value of machines handed over as trade-in, which is
+ *   customer coverage toward the invoice the same way cash is)
  * - installment statuses (for INSTALLMENT/MIXED orders)
  *
  * Priority:
- *   1. PAID   → paidAmount >= effectiveTotal
+ *   1. PAID   → paidAmount + tradeInTotal >= effectiveTotal
  *   2. OVERDUE → any installment is OVERDUE and not fully paid
- *   3. PARTIAL → paidAmount > 0 and paidAmount < effectiveTotal
+ *   3. PARTIAL → paidAmount + tradeInTotal > 0 and below effectiveTotal
  *   4. PENDING → nothing paid yet
  */
 export async function computePaymentStatus(
@@ -41,6 +43,7 @@ export async function computePaymentStatus(
     select: {
       total: true,
       paidAmount: true,
+      tradeInTotal: true,
       paymentMethod: true,
       installments: {
         select: { status: true, amount: true, paidDate: true },
@@ -49,9 +52,10 @@ export async function computePaymentStatus(
   });
 
   const effectiveTotal = await getEffectiveTotal(tx, orderId, order.total);
+  const covered = Math.min(effectiveTotal, order.paidAmount + (order.tradeInTotal || 0));
 
   // If fully paid
-  if (order.paidAmount >= effectiveTotal && effectiveTotal > 0) {
+  if (covered >= effectiveTotal && effectiveTotal > 0) {
     return "PAID";
   }
 
@@ -66,7 +70,7 @@ export async function computePaymentStatus(
   }
 
   // Partial payment
-  if (order.paidAmount > 0 && order.paidAmount < effectiveTotal) {
+  if (covered > 0 && covered < effectiveTotal) {
     return "PARTIAL";
   }
 

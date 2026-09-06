@@ -852,6 +852,7 @@
     "saleReturn": "Sales return",
     "settlementIn": "Collection from customer",
     "settlementOut": "Payment to customer",
+    "tradeIn": "Trade-in value",
     "generatedFor": "Statement for"
   },
   "engineerStatement": {

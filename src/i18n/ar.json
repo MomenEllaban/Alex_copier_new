@@ -853,6 +853,7 @@
     "saleReturn": "مرتجع بيع",
     "settlementIn": "تحصيل من العميل",
     "settlementOut": "دفع للعميل",
+    "tradeIn": "قيمة استبدال",
     "generatedFor": "كشف حساب خاص بـ"
   },
   "engineerStatement": {

@@ -1,6 +1,6 @@
 import { prisma } from "./prisma";
 
-export type StatementRowType = "SALE" | "PAYMENT" | "RETURN" | "SETTLEMENT";
+export type StatementRowType = "SALE" | "PAYMENT" | "RETURN" | "SETTLEMENT" | "TRADE_IN";
 
 export interface StatementRow {
   id: string;
@@ -12,6 +12,7 @@ export interface StatementRow {
   credit: number; // column value: money that reduces the customer's debt (دائن)
   amount: number; // derived signed movement (debit - credit): positive increases the debt
   balance: number; // running debt balance after this row
+  finalized: boolean; // whether this row participates in the running balance
 }
 
 export interface CustomerStatement {
@@ -56,6 +57,7 @@ export async function buildCustomerStatement(customerId: string): Promise<Custom
         id: true,
         total: true,
         paymentMethod: true,
+        tradeInTotal: true,
         orderDate: true,
         createdAt: true,
         status: true,
@@ -115,6 +117,26 @@ export async function buildCustomerStatement(customerId: string): Promise<Custom
       sort: o.createdAt.getTime(),
       finalized: o.status !== "CANCELLED",
     });
+
+    // Trade-in value (قيمة الاستبدال) covers part of the invoice, so it is
+    // shown as an explicit credit. On cash invoices the value is offset by an
+    // equal debit so the row is visible without moving the balance.
+    const tradeIn = Number(o.tradeInTotal) || 0;
+    if (tradeIn > 0) {
+      drafts.push({
+        id: `${o.id}-tradein`,
+        type: "TRADE_IN",
+        date: o.createdAt.toISOString(),
+        ref: o.id,
+        description: "قيمة استبدال",
+        debit: cash ? tradeIn : 0,
+        credit: tradeIn,
+        amount: cash ? 0 : -tradeIn,
+        balance: 0,
+        sort: o.createdAt.getTime() + 1,
+        finalized: o.status !== "CANCELLED",
+      });
+    }
   }
   for (const p of payments) {
     drafts.push({
@@ -204,6 +226,7 @@ export async function buildCustomerStatement(customerId: string): Promise<Custom
       credit: round2(d.credit),
       amount: round2(d.amount),
       balance: d.balance,
+      finalized: d.finalized,
     });
   }
 

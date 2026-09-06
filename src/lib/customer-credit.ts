@@ -30,29 +30,38 @@ export function isCreditUsedNote(notes: string | null | undefined): boolean {
 
 /**
  * Split how an order `total` is covered when the customer has money under their
- * account. The credit is always consumed FIRST; only then any upfront cash.
+ * account, a trade-in value (قيمة الاستبدال), or both. The trade-in value
+ * counts as customer coverage FIRST (they handed over an old machine as a
+ * discount), then under-account credit, then any upfront cash.
  *
- * - CASH orders: the credit covers part of the total, the rest is paid in cash
- *   (paidAmount = total, unpaid = 0).
- * - CREDIT/INSTALLMENT/MIXED orders: credit covers the first part, an optional
- *   `upfrontPaid` cash amount covers the next part, and anything left becomes
- *   debt (unpaid).
+ * - CASH orders: the trade-in + credit + cash fully cover the total, so there
+ *   is never any debt (paidAmount = total - tradeIn).
+ * - CREDIT/INSTALLMENT/MIXED orders: trade-in and credit cover the first parts,
+ *   an optional `upfrontPaid` cash covers the next part, and anything left
+ *   becomes debt (unpaid).
+ *
+ * `paidAmount` still means money actually received (cash + under-account credit),
+ * NOT the trade-in value; payment-status counts `tradeInTotal` separately.
  */
 export function computeCreditSplit(
   total: number,
   remainingDebt: number,
   upfrontPaid: number,
   paymentMethod: string,
+  tradeInPaid = 0,
 ): CreditSplit {
   const t = Math.max(0, total);
+  const tradeIn = Math.min(Math.max(0, tradeInPaid), t);
+  const afterTradeIn = t - tradeIn;
   const credit = availableCredit(remainingDebt);
-  const creditUsed = Math.min(credit, t);
+  const creditUsed = Math.min(credit, afterTradeIn);
 
   if (paymentMethod === "CASH") {
-    return { creditUsed, cashUpfront: t - creditUsed, paidAmount: t, unpaid: 0 };
+    const cashUpfront = afterTradeIn - creditUsed;
+    return { creditUsed, cashUpfront, paidAmount: creditUsed + cashUpfront, unpaid: 0 };
   }
 
-  const cashUpfront = Math.min(Math.max(0, upfrontPaid), t - creditUsed);
+  const cashUpfront = Math.min(Math.max(0, upfrontPaid), afterTradeIn - creditUsed);
   const paidAmount = creditUsed + cashUpfront;
-  return { creditUsed, cashUpfront, paidAmount, unpaid: t - paidAmount };
+  return { creditUsed, cashUpfront, paidAmount, unpaid: afterTradeIn - paidAmount };
 }

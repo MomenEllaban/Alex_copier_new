@@ -120,6 +120,54 @@ describe("customer-statement", () => {
     expect(s?.closingBalance).toBe(8000);
   });
 
+  it("shows the trade-in value as an explicit credit on a CREDIT sale", async () => {
+    seed({
+      findUnique: customer({ totalDebt: 9000, remainingDebt: 7000 }),
+      sales: [sale("so-1", 9000, { tradeInTotal: 2000 })],
+    });
+
+    const s = await buildCustomerStatement("cust-1");
+    const saleRow = s?.rows.find((r) => r.type === "SALE");
+    const tradeRow = s?.rows.find((r) => r.type === "TRADE_IN");
+    expect(saleRow?.debit).toBe(9000);
+    expect(saleRow?.credit).toBe(0);
+    expect(tradeRow).toBeTruthy();
+    expect(tradeRow?.debit).toBe(0);
+    expect(tradeRow?.credit).toBe(2000);
+    expect(tradeRow?.description).toBe("قيمة استبدال");
+    expect(s?.openingBalance).toBe(0);
+    // 9000 - 2000 = 7000 net, matching the stored remainingDebt
+    expect(s?.closingBalance).toBe(7000);
+  });
+
+  it("keeps trade-in rows net-zero on CASH sales (visible without moving the balance)", async () => {
+    seed({
+      findUnique: customer(),
+      sales: [sale("so-1", 9000, { paymentMethod: "CASH", tradeInTotal: 2000 })],
+    });
+
+    const s = await buildCustomerStatement("cust-1");
+    const tradeRow = s?.rows.find((r) => r.type === "TRADE_IN");
+    expect(tradeRow?.debit).toBe(2000);
+    expect(tradeRow?.credit).toBe(2000);
+    expect(tradeRow?.amount).toBe(0);
+    expect(s?.closingBalance).toBe(0);
+  });
+
+  it("excludes the trade-in credit when the sale is cancelled", async () => {
+    seed({
+      findUnique: customer({ totalDebt: 9000, remainingDebt: 9000 }),
+      sales: [sale("so-1", 9000, { status: "CANCELLED", tradeInTotal: 2000 })],
+    });
+
+    const s = await buildCustomerStatement("cust-1");
+    const tradeRow = s?.rows.find((r) => r.type === "TRADE_IN");
+    expect(tradeRow?.finalized).toBe(false);
+    // The cancelled trade-in row stays on screen but keeps the balance frozen.
+    expect(tradeRow?.credit).toBe(2000);
+    expect(s?.closingBalance).toBe(9000);
+  });
+
   it("pushes payments, approved returns, and collected settlements to credit", async () => {
     seed({
       findUnique: customer({ totalDebt: 14000, remainingDebt: 9000 }),
