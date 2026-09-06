@@ -199,7 +199,11 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
           where: { warehouseId_productId: { warehouseId: m.warehouseId, productId: m.productId } },
         });
         const base = inv?.quantity ?? 0;
-        const addsBack = m.movementType === "SALE_OUT" || m.movementType === "INTER_COMPANY_IN";
+        // عكس كل حركة على مصدرها الصحيح:
+        //  - INTER_COMPANY_OUT: خصمت من المصدر → نعيدها للمصدر (+)
+        //  - INTER_COMPANY_IN: أضافت للوجهة → نحذفها من الوجهة (−)
+        //  - SALE_OUT: خصمت من الوجهة → نعيدها للوجهة (+)
+        const addsBack = m.movementType === "SALE_OUT" || m.movementType === "INTER_COMPANY_OUT";
         const newQty = addsBack ? base + m.quantity : base - m.quantity;
         if (newQty < 0) {
           // عكس حركة خصم لا يجب أن يُسقط الرصيد تحت الصفر — يُرفض وقد تُرجَّع العملية كلها.

@@ -149,4 +149,93 @@ describe("intercompany target-side stock guard (Phase 1)", () => {
 
     expect(res.status).toBe(200);
   });
+
+  it("PUT reversal restores source and target to their pre-transfer balances", async () => {
+    mocks.db.salesOrder.findUnique.mockResolvedValue({
+      id: "o1",
+      customerId: "c1",
+      companyId: "t2",
+      paymentMethod: "CASH",
+      total: 100,
+      paidAmount: 100,
+      creditUsed: 0,
+      items: [],
+      installments: [],
+    });
+    mocks.db.interCompanyInvoice.findFirst.mockResolvedValue({ id: "ic1", total: 80 });
+    mocks.db.warehouse.findMany.mockResolvedValue([
+      { id: "src", companyId: "f1", isMain: true },
+      { id: "tgt", companyId: "t2", isMain: true },
+    ]);
+    // حركات الأمر الأصلي: خصم 3 من المصدر، إضافة 3 للوجهة، بيع 3 من الوجهة
+    mocks.db.stockMovement.findMany.mockResolvedValue([
+      { warehouseId: "src", productId: "p1", quantity: 3, movementType: "INTER_COMPANY_OUT" },
+      { warehouseId: "tgt", productId: "p1", quantity: 3, movementType: "INTER_COMPANY_IN" },
+      { warehouseId: "tgt", productId: "p1", quantity: 3, movementType: "SALE_OUT" },
+    ]);
+    // الأرصدة بعد العملية الأصلية: المصدر 7، الوجهة 5 (= قبل: 10 و 5)
+    mocks.db.warehouseInventory.findUnique
+      .mockResolvedValueOnce({ quantity: 7 }) // عكس OUT على المصدر → 10
+      .mockResolvedValueOnce({ quantity: 5 }) // عكس IN على الوجهة → 2
+      .mockResolvedValueOnce({ quantity: 2 }) // عكس SALE_OUT على الوجهة → 5
+      .mockResolvedValue({ quantity: 50 }); // بقية قراءات re-apply
+    mocks.db.warehouseInventory.update.mockResolvedValue({});
+    mocks.db.warehouseInventory.create.mockResolvedValue({});
+    mocks.db.stockMovement.create.mockResolvedValue({});
+    mocks.db.salesOrderItem.create.mockResolvedValue({});
+    mocks.db.salesOrder.update.mockResolvedValue({});
+    mocks.db.journalEntry.deleteMany.mockResolvedValue({});
+    mocks.db.customerPayment.deleteMany.mockResolvedValue({});
+    mocks.db.account.findFirst.mockResolvedValue({ id: "acc" });
+
+    const res = await PUT(
+      jsonReq("http://localhost/api/sales/intercompany/o1", "PUT", baseBody),
+      { params: Promise.resolve({ id: "o1" }) },
+    );
+
+    expect(res.status).toBe(200);
+    // أول 3 عمليات update هي عكس الحركات: المصدر يسترد 3 → 10، الوجهة تفقد 3 → 2، الوجهة تسترد 3 → 5
+    const updates = mocks.db.warehouseInventory.update.mock.calls.map((c) => c[0].data.quantity);
+    expect(updates[0]).toBe(10);
+    expect(updates[1]).toBe(2);
+    expect(updates[2]).toBe(5);
+  });
+
+  it("PUT reversal refuses when removing the INTER_COMPANY_IN would drop target below zero", async () => {
+    mocks.db.salesOrder.findUnique.mockResolvedValue({
+      id: "o1",
+      customerId: "c1",
+      companyId: "t2",
+      paymentMethod: "CASH",
+      total: 100,
+      paidAmount: 100,
+      creditUsed: 0,
+      items: [],
+      installments: [],
+    });
+    mocks.db.interCompanyInvoice.findFirst.mockResolvedValue({ id: "ic1", total: 80 });
+    mocks.db.warehouse.findMany.mockResolvedValue([
+      { id: "src", companyId: "f1", isMain: true },
+      { id: "tgt", companyId: "t2", isMain: true },
+    ]);
+    mocks.db.stockMovement.findMany.mockResolvedValue([
+      { warehouseId: "src", productId: "p1", quantity: 3, movementType: "INTER_COMPANY_OUT" },
+      { warehouseId: "tgt", productId: "p1", quantity: 3, movementType: "INTER_COMPANY_IN" },
+    ]);
+    mocks.db.warehouseInventory.findUnique
+      .mockResolvedValueOnce({ quantity: 7 }) // OUT يعيد للمصدر
+      .mockResolvedValueOnce({ quantity: 2 }); // IN: الوجهة عندها 2 فقط → 2-3 = سالب → رفض
+    mocks.db.warehouseInventory.update.mockResolvedValue({});
+    mocks.db.warehouseInventory.create.mockResolvedValue({});
+
+    const res = await PUT(
+      jsonReq("http://localhost/api/sales/intercompany/o1", "PUT", baseBody),
+      { params: Promise.resolve({ id: "o1" }) },
+    );
+
+    expect(res.status).toBe(409);
+    const body = await res.json();
+    expect(body.code).toBe("INSUFFICIENT_STOCK");
+    expect(mocks.db.salesOrder.update).not.toHaveBeenCalled();
+  });
 });
