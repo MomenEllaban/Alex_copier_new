@@ -10,6 +10,7 @@ import { useConfirm } from "@/components/UIProvider";
 import { apiErrorMessage } from "@/lib/api-client";
 import { Plus, Pencil, Power, Eye, EyeOff, X, Trash2, Save, AlertTriangle } from "lucide-react";
 import SubmitButton from "@/components/SubmitButton";
+import FormModal from "@/components/FormModal";
 import { DateTimeCell } from "@/components/DateTimeCell";
 import RefreshButton from "@/components/RefreshButton";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
@@ -415,26 +416,20 @@ setUsers((prev) => prev.filter((u) => u.id !== user.id));
         </div>
         </div>
 
-      {resetOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4 cursor-pointer"
-          role="dialog"
-          aria-modal="true"
-          onClick={(e) => { if (e.target === e.currentTarget) setResetOpen(false); }}
-        >
-          <form
-            onSubmit={(e) => { e.preventDefault(); handleReset(); }}
-            className="w-full max-w-md rounded-t-2xl sm:rounded-2xl bg-white p-5 sm:p-6 shadow-xl cursor-default"
-          >
-            <div className="flex items-start gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600">
-                <AlertTriangle size={20} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <h3 className="text-lg font-bold text-gray-900">{t("settings.resetData.confirmTitle")}</h3>
-                <p className="mt-1 text-sm leading-6 text-gray-600 whitespace-pre-line">{t("settings.resetData.confirmMessage")}</p>
-              </div>
+      <FormModal
+        open={resetOpen}
+        onClose={() => { setResetOpen(false); setResetText(""); }}
+        title={t("settings.resetData.confirmTitle")}
+      >
+        <form onSubmit={(e) => { e.preventDefault(); handleReset(); }}>
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600">
+              <AlertTriangle size={20} />
             </div>
+            <div className="min-w-0 flex-1">
+              <p className="mt-1 text-sm leading-6 text-gray-600 whitespace-pre-line">{t("settings.resetData.confirmMessage")}</p>
+            </div>
+          </div>
 
             <div className="mt-5">
               <label htmlFor="reset-confirm" className="mb-1 block text-sm font-medium text-red-700">
@@ -469,37 +464,17 @@ setUsers((prev) => prev.filter((u) => u.id !== user.id));
               ><Trash2 size={16} /></SubmitButton>
             </div>
           </form>
-        </div>
-      )}
+      </FormModal>
 
-      {modalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-4 cursor-pointer"
-          role="dialog"
-          aria-modal="true"
-          onClick={(e) => { if (e.target === e.currentTarget) setModalOpen(false); }}
-        >
-          <form
-            onSubmit={handleSave}
-            className="w-full max-w-md rounded-t-2xl sm:rounded-2xl bg-white p-5 sm:p-6 shadow-xl max-h-[92vh] overflow-y-auto sidebar-scroll cursor-default"
-          >
-            <div className="mb-5 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-gray-900">
-                {editingUser ? t("settings.editUser") : t("settings.newUser")}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setModalOpen(false)}
-                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
-                aria-label="close"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label htmlFor="user-name" className="mb-1 block text-sm font-medium text-gray-700">{t("settings.fullName")}</label>
+      <FormModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        title={editingUser ? t("settings.editUser") : t("settings.newUser")}
+      >
+        <form onSubmit={handleSave}>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="user-name" className="mb-1 block text-sm font-medium text-gray-700">{t("settings.fullName")}</label>
                 <input
                   id="user-name"
                   type="text"
@@ -590,10 +565,9 @@ setUsers((prev) => prev.filter((u) => u.id !== user.id));
                 {t("common.cancel")}
               </button>
               <SubmitButton loading={saving} label={t("common.save")} loadingLabel={t("common.saving")} className="bg-blue-600 hover:bg-blue-700 text-white"><Save size={16} /></SubmitButton>
-            </div>
-          </form>
-        </div>
-      )}
+</div>
+        </form>
+      </FormModal>
     </div>
   );
 }

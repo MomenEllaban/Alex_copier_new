@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useI18n } from "@/i18n/context";
 import { buildTemplateCsv, downloadFile } from "@/lib/csv";
 import { getColumns, type EntityKey, type ImportError } from "@/lib/import-schemas";
+import FormModal from "@/components/FormModal";
 
 interface ImportDialogProps {
   open: boolean;
@@ -82,19 +83,8 @@ export default function ImportDialog({ open, onClose, entity, title, onImported 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 cursor-pointer" onClick={onClose}>
-      <div
-        className="w-full max-w-2xl max-h-[90vh] cursor-default overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:p-6"
-        onClick={(e) => e.stopPropagation()}
-        dir={locale === "ar" ? "rtl" : "ltr"}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold">{title}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700">
-            ✕
-          </button>
-        </div>
-
+    <FormModal open={open} onClose={onClose} title={title} wide>
+      <div dir={locale === "ar" ? "rtl" : "ltr"}>
         <p className="text-sm text-gray-600 mb-3">{t("common.importInstructions")}</p>
 
         <button
@@ -179,6 +169,6 @@ export default function ImportDialog({ open, onClose, entity, title, onImported 
           </div>
         )}
       </div>
-    </div>
+    </FormModal>
   );
 }

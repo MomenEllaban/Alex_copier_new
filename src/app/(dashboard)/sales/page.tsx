@@ -85,6 +85,23 @@ interface InterItemRow {
   costPrice: string;
 }
 
+interface PriceHistory {
+  lastSalePrice: number | null;
+  lastSaleTier: string | null;
+  lastSaleAt: string | null;
+  lastPurchasePrice: number | null;
+  lastPurchaseAt: string | null;
+}
+
+const PRICE_TIER_LABELS: Record<string, string> = {
+  legacyCustomer: "عميل قديم",
+  newCustomer: "عميل جديد",
+  jumlaMachines: "شركة جملة آلات",
+  jumlaParts: "شركة جملة قطع غيار",
+  sectori: "شركة قطاعي",
+  engineer: "مهندس",
+};
+
 const COMPANY_ORDER_TIERS: Record<string, string> = {
   company1: "jumlaMachines",
   company2: "jumlaParts",
@@ -157,6 +174,7 @@ export default function SalesPage() {
   const [viewingOrder, setViewingOrder] = useState<SalesOrder | null>(null);
   const [form, setForm] = useState({ companyId: "", customerId: "", engineerId: "", categoryId: "", orderType: "MACHINE_SALE", paymentMethod: "CASH", isTaxInvoice: false, discount: "", discountType: "FIXED", taxRate: "0", notes: "", paidAmount: "" });
   const [itemRows, setItemRows] = useState<ItemRow[]>([{ productId: "", quantity: "", unitPrice: "", discount: "", priceTier: "newCustomer" }]);
+  const [priceHistory, setPriceHistory] = useState<Record<string, PriceHistory>>({});
   const [showInterForm, setShowInterForm] = useState(false);
   const [interForm, setInterForm] = useState({ fromCompanyId: "", toCompanyId: "", customerId: "", categoryId: "", orderType: "SPARE_PART_SALE", paymentMethod: "CREDIT", internalPaymentMethod: "CREDIT", paidAmount: "", internalPaidAmount: "", isTaxInvoice: false, taxRate: "0", discount: "", notes: "" });
   const [interRows, setInterRows] = useState<InterItemRow[]>([{ productId: "", quantity: "", internalPrice: "", customerPrice: "", costPrice: "" }]);
@@ -279,6 +297,23 @@ export default function SalesPage() {
       }
       return merged;
     }));
+    if (next.productId) loadPriceHistory([next.productId], form.companyId);
+  };
+
+  const loadPriceHistory = (productIds: string[], companyId: string) => {
+    if (!companyId) return;
+    const missing = productIds.filter((id) => id && !priceHistory[id]);
+    if (missing.length === 0) return;
+    fetch("/api/products/price-history", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ companyId, productIds: missing }),
+    })
+      .then((res) => res.json().catch(() => null))
+      .then((data) => {
+        if (data?.prices) setPriceHistory((prev) => ({ ...prev, ...data.prices }));
+      })
+      .catch(() => {});
   };
 
   const openEdit = (order: SalesOrder) => {
@@ -350,6 +385,10 @@ export default function SalesPage() {
             priceTier: "newCustomer",
           }))
         : [{ productId: "", quantity: "", unitPrice: "", discount: "", priceTier: "newCustomer" }]
+    );
+    loadPriceHistory(
+      order.items.map((item) => item.productId),
+      order.companyId
     );
     if (hasTradeIn) {
       const tradeInItem = order.items.find((item: any) => item.tradeInProduct);
@@ -636,6 +675,8 @@ export default function SalesPage() {
               const selectedProduct = products.find((product) => product.id === row.productId);
               const availableQty = row.productId ? inventoryByProduct[row.productId] ?? 0 : 0;
               const rowPrice = selectedProduct ? getProductTierPrice(selectedProduct, row.priceTier || "newCustomer") : 0;
+              const ph = row.productId ? priceHistory[row.productId] : undefined;
+              const lastSaleTierLabel = ph?.lastSaleTier && PRICE_TIER_LABELS[ph.lastSaleTier] ? PRICE_TIER_LABELS[ph.lastSaleTier] : null;
               return (
                 <div key={index}>
                   <div className="grid gap-2 rounded-lg border border-gray-200 bg-white p-3 sm:grid-cols-[1.2fr_120px_130px_130px_120px_auto]">
@@ -645,7 +686,14 @@ export default function SalesPage() {
                         <option value="">{t("purchases.selectProduct")}</option>
                         {companyProducts(form.companyId).map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
                       </select>
-                      {selectedProduct && (<div className="mt-1 text-[11px] text-slate-500">السعر: {rowPrice.toLocaleString()} · المتاح: {availableQty}</div>)}
+                      {selectedProduct && (
+                        <div className="mt-1 text-[11px] text-slate-500">
+                          السعر: {rowPrice.toLocaleString()} · المتاح: {availableQty}
+                          {ph?.lastSalePrice != null && (
+                            <span> · آخر بيع: {ph.lastSalePrice.toLocaleString()}{lastSaleTierLabel ? ` (${lastSaleTierLabel})` : ""}</span>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label className="mb-1 block text-[11px] font-medium text-gray-500">شريحة السعر</label>

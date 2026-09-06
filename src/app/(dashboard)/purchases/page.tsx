@@ -33,6 +33,14 @@ interface PurchaseOrder {
   orderDate: string; createdAt: string; supplier: Supplier; company?: Company; items: PurchaseItem[];
 }
 interface ItemRow { productId: string; quantity: string; unitPrice: string; }
+
+interface PriceHistory {
+  lastSalePrice: number | null;
+  lastSaleTier: string | null;
+  lastSaleAt: string | null;
+  lastPurchasePrice: number | null;
+  lastPurchaseAt: string | null;
+}
 interface InterCompanyItem { id: string; productId: string; product: Product | null; quantity: number; unitPrice: number; }
 interface InterCompanyInvoice {
   id: string; invoiceNumber: string; total: number; invoiceDate: string; createdAt: string; notes: string | null;
@@ -96,6 +104,7 @@ export default function PurchasesPage() {
   const [dateTo, setDateTo] = useState("");
   const [form, setForm] = useState({ companyId: "", supplierId: "", notes: "", status: "CONFIRMED" });
   const [itemRows, setItemRows] = useState<ItemRow[]>([{ productId: "", quantity: "", unitPrice: "" }]);
+  const [priceHistory, setPriceHistory] = useState<Record<string, PriceHistory>>({});
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 15;
   const [icPage, setIcPage] = useState(1);
@@ -195,6 +204,23 @@ export default function PurchasesPage() {
     const updated = [...itemRows];
     updated[index] = { ...updated[index], [field]: value };
     setItemRows(updated);
+    if (field === "productId" && value) loadPriceHistory([value], form.companyId);
+  };
+
+  const loadPriceHistory = (productIds: string[], companyId: string) => {
+    if (!companyId) return;
+    const missing = productIds.filter((id) => id && !priceHistory[id]);
+    if (missing.length === 0) return;
+    fetch("/api/products/price-history", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ companyId, productIds: missing }),
+    })
+      .then((res) => res.json().catch(() => null))
+      .then((data) => {
+        if (data?.prices) setPriceHistory((prev) => ({ ...prev, ...data.prices }));
+      })
+      .catch(() => {});
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -232,6 +258,10 @@ export default function PurchasesPage() {
         : [{ productId: "", quantity: "", unitPrice: "" }]
     );
     setShowForm(true);
+    loadPriceHistory(
+      order.items.map((it) => it.productId),
+      order.companyId
+    );
   };
 
   const updateInterRow = (index: number, field: keyof InterRow, value: string) => {
@@ -389,17 +419,25 @@ export default function PurchasesPage() {
               <button type="button" onClick={addRow} className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800"><Plus size={16} />{t("purchases.addRow")}</button>
             </div>
             <div className="space-y-2">
-              {itemRows.map((row, idx) => (
+              {itemRows.map((row, idx) => {
+                const ph = row.productId ? priceHistory[row.productId] : undefined;
+                return (
                 <div key={idx} className="grid gap-2 rounded-lg border border-gray-200 bg-slate-50 p-3 sm:grid-cols-[1fr_100px_120px_auto]">
-                  <select value={row.productId} onChange={(e) => updateRow(idx, "productId", e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <option value="">{t("purchases.selectProduct")}</option>
-                    {products.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
-                  </select>
+                  <div className="min-w-0">
+                    <select value={row.productId} onChange={(e) => updateRow(idx, "productId", e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                      <option value="">{t("purchases.selectProduct")}</option>
+                      {products.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
+                    </select>
+                    {ph?.lastPurchasePrice != null && (
+                      <div className="mt-1 text-[11px] text-slate-500">آخر شراء: {ph.lastPurchasePrice.toLocaleString()}</div>
+                    )}
+                  </div>
                   <input type="number" placeholder={t("purchases.quantity")} value={row.quantity} onChange={(e) => updateRow(idx, "quantity", e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" min="1" />
                   <input type="number" placeholder={t("purchases.unitPrice")} value={row.unitPrice} onChange={(e) => updateRow(idx, "unitPrice", e.target.value)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" step="0.01" />
                   {itemRows.length > 1 && (<button type="button" onClick={() => removeRow(idx)} className="rounded-lg border border-red-200 bg-red-50 px-2 text-red-600 transition hover:bg-red-100">×</button>)}
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
           <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row sm:justify-end">
