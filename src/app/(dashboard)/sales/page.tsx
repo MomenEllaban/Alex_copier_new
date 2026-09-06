@@ -302,7 +302,6 @@ export default function SalesPage() {
   };
 
   const loadPriceHistory = (productIds: string[], companyId: string) => {
-    if (!companyId) return;
     const missing = productIds.filter((id) => id && !priceHistory[id]);
     if (missing.length === 0) return;
     setPriceHistoryLoading((prev) => {
@@ -475,6 +474,8 @@ export default function SalesPage() {
     setFormMode("regular");
     setSaving(false);
     setShowForm(false);
+    setPriceHistory({});
+    setPriceHistoryLoading({});
     refresh();
     notifyDataChanged(["sales", "products", "inventory", "customers", "companies", "trade-ins", "notifications"]);
     toastSuccess(t("common.savedSuccessfully"));
@@ -486,6 +487,8 @@ export default function SalesPage() {
     const data = await res.json().catch(() => null);
     if (!res.ok) { toastError(apiErrorMessage(data, t)); return; }
     setViewingOrder(null);
+    setPriceHistory({});
+    setPriceHistoryLoading({});
     refresh();
     notifyDataChanged(["sales", "products", "inventory", "customers", "companies", "notifications"]);
     toastSuccess(t("common.deletedSuccessfully"));
@@ -548,6 +551,8 @@ export default function SalesPage() {
     setEditingId(null);
     setSavingInter(false);
     setShowInterForm(false);
+    setPriceHistory({});
+    setPriceHistoryLoading({});
     refresh();
     notifyDataChanged(["sales", "products", "inventory", "customers", "companies", "notifications"]);
     toastSuccess(t("common.savedSuccessfully"));

@@ -19,12 +19,11 @@ export async function POST(request: Request) {
     const productIds = Array.isArray(body?.productIds)
       ? (body.productIds as unknown[]).filter((id): id is string => typeof id === "string" && Boolean(id))
       : [];
-    const companyId = typeof body?.companyId === "string" ? body.companyId : "";
-    if (!companyId || productIds.length === 0) {
-      return NextResponse.json({ error: "Missing companyId or productIds" }, { status: 400 });
+    if (productIds.length === 0) {
+      return NextResponse.json({ error: "Missing productIds" }, { status: 400 });
     }
 
-    const [productRows, saleItems, purchaseItems] = await Promise.all([
+    const [productRows, saleRows, purchaseRows] = await Promise.all([
       prisma.product.findMany({
         where: { id: { in: productIds } },
         select: { id: true, pricingTiers: true },
@@ -32,30 +31,33 @@ export async function POST(request: Request) {
       prisma.salesOrderItem.findMany({
         where: {
           productId: { in: productIds },
-          salesOrder: { companyId, status: { notIn: ["DRAFT", "CANCELLED"] } },
+          salesOrder: { status: { not: "CANCELLED" } },
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ salesOrder: { orderDate: "desc" } }, { createdAt: "desc" }],
         select: {
           productId: true,
           unitPrice: true,
           salesOrder: { select: { orderDate: true } },
         },
-        distinct: ["productId"],
       }),
       prisma.purchaseOrderItem.findMany({
         where: {
           productId: { in: productIds },
-          purchaseOrder: { companyId, status: { notIn: ["DRAFT", "CANCELLED"] } },
+          purchaseOrder: { status: { not: "CANCELLED" } },
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ purchaseOrder: { orderDate: "desc" } }, { createdAt: "desc" }],
         select: {
           productId: true,
           unitPrice: true,
           purchaseOrder: { select: { orderDate: true } },
         },
-        distinct: ["productId"],
       }),
     ]);
+
+    const latestSale = new Map<string, (typeof saleRows)[number]>();
+    for (const row of saleRows) if (!latestSale.has(row.productId)) latestSale.set(row.productId, row);
+    const latestPurchase = new Map<string, (typeof purchaseRows)[number]>();
+    for (const row of purchaseRows) if (!latestPurchase.has(row.productId)) latestPurchase.set(row.productId, row);
 
     const tiersByProduct = new Map(
       productRows.map((p) => [p.id, (p.pricingTiers ?? {}) as Record<string, number | null>])
@@ -73,14 +75,14 @@ export async function POST(request: Request) {
 
     const prices: Record<string, ProductPriceHistory> = {};
     for (const id of productIds) {
-      const sale = saleItems.find((s) => s.productId === id);
-      const purchase = purchaseItems.find((p) => p.productId === id);
+      const sale = latestSale.get(id);
+      const purchase = latestPurchase.get(id);
       prices[id] = {
         lastSalePrice: sale?.unitPrice ?? null,
         lastSaleTier: sale ? inferTier(id, sale.unitPrice) : null,
-        lastSaleAt: sale ? (sale.salesOrder.orderDate?.toISOString() ?? null) : null,
+        lastSaleAt: sale?.salesOrder.orderDate?.toISOString() ?? null,
         lastPurchasePrice: purchase?.unitPrice ?? null,
-        lastPurchaseAt: purchase ? (purchase.purchaseOrder.orderDate?.toISOString() ?? null) : null,
+        lastPurchaseAt: purchase?.purchaseOrder.orderDate?.toISOString() ?? null,
       };
     }
 

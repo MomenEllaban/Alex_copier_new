@@ -209,7 +209,6 @@ export default function PurchasesPage() {
   };
 
   const loadPriceHistory = (productIds: string[], companyId: string) => {
-    if (!companyId) return;
     const missing = productIds.filter((id) => id && !priceHistory[id]);
     if (missing.length === 0) return;
     setPriceHistoryLoading((prev) => {
@@ -258,6 +257,8 @@ export default function PurchasesPage() {
     setItemRows([{ productId: "", quantity: "", unitPrice: "" }]);
     setEditingId(null);
     setShowForm(false);
+    setPriceHistory({});
+    setPriceHistoryLoading({});
     refresh();
     notifyDataChanged(["purchases", "products", "inventory", "warehouses", "suppliers"]);
   };
@@ -350,6 +351,8 @@ export default function PurchasesPage() {
     }
     setEditingIc(null);
     setShowIcForm(false);
+    setPriceHistory({});
+    setPriceHistoryLoading({});
   };
 
 
@@ -358,6 +361,8 @@ export default function PurchasesPage() {
     const res = await fetch(`/api/purchases/${id}`, { method: "DELETE" });
     const data = await res.json().catch(() => null);
     if (!res.ok) { toastError(apiErrorMessage(data, t)); return; }
+    setPriceHistory({});
+    setPriceHistoryLoading({});
     refresh();
     notifyDataChanged(["purchases", "products", "inventory", "warehouses", "suppliers"]);
     toastSuccess(t("common.deletedSuccessfully"));
