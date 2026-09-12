@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
+import SearchableSelect from "./SearchableSelect";
 
 export interface QuickAddField {
   key: string;
@@ -106,20 +107,15 @@ export default function SelectWithAdd({
         {required && <span className="text-red-500 ms-0.5">*</span>}
       </label>
       <div className="flex gap-1.5">
-        <select
+        <SearchableSelect
           value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className={`${inputClass} flex-1`}
-          required={required}
+          onChange={onChange}
+          options={options}
+          placeholder={placeholder || `اختر ${label}`}
           disabled={disabled}
-        >
-          <option value="">{placeholder || `اختر ${label}`}</option>
-          {options.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+          required={required}
+          className="flex-1"
+        />
         <button
           type="button"
           onClick={openQuickAdd}
@@ -157,21 +153,15 @@ export default function SelectWithAdd({
                     {field.required && <span className="text-red-500 ms-0.5">*</span>}
                   </label>
                   {field.type === "select" && field.options ? (
-                    <select
+                    <SearchableSelect
                       value={quickAddForm[field.key] || ""}
-                      onChange={(e) =>
-                        setQuickAddForm({ ...quickAddForm, [field.key]: e.target.value })
+                      onChange={(v) =>
+                        setQuickAddForm({ ...quickAddForm, [field.key]: v })
                       }
-                      className={inputClass}
+                      options={field.options}
+                      placeholder={field.placeholder || `اختر ${field.label}`}
                       required={field.required}
-                    >
-                      <option value="">{field.placeholder || `اختر ${field.label}`}</option>
-                      {field.options.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   ) : (
                     <input
                       type={field.type || "text"}

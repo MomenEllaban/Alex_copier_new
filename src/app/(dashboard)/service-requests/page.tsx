@@ -16,6 +16,7 @@ import { DateTimeCell } from "@/components/DateTimeCell";
 import { useUrlParams, useSearchWithDefault } from "@/hooks/useUrlParams";
 import FormModal from "@/components/FormModal";
 import SelectWithAdd from "@/components/SelectWithAdd";
+import SearchableSelect from "@/components/SearchableSelect";
 import { useConfirm, useToast } from "@/components/UIProvider";
 import { apiErrorMessage } from "@/lib/api-client";
 import SubmitButton from "@/components/SubmitButton";
@@ -300,17 +301,11 @@ export default function ServiceRequestsPage() {
           />
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-slate-700">{t("machineDetails.location")}</label>
-            <select value={form.locationId} onChange={(e) => setForm({ ...form, locationId: e.target.value, machineId: "" })} className={inputClass}>
-              <option value="">{t("common.selectOption")}</option>
-              {customers.find(customer => customer.id === form.customerId)?.locations?.map(location => <option key={location.id} value={location.id}>{location.name}</option>)}
-            </select>
+            <SearchableSelect value={form.locationId} onChange={(v) => setForm({ ...form, locationId: v, machineId: "" })} options={(customers.find(customer => customer.id === form.customerId)?.locations || []).map(location => ({ value: location.id, label: location.name }))} placeholder={t("common.selectOption")} />
           </div>
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-slate-700">{t("serviceRequests.machine")}</label>
-            <select value={form.machineId} onChange={(e) => setForm({ ...form, machineId: e.target.value })} className={inputClass}>
-              <option value="">{t("common.selectOption")}</option>
-              {machines.filter(machine => machine.currentOwnerId === form.customerId && (!form.locationId || machine.customerLocationId === form.locationId)).map(machine => <option key={machine.id} value={machine.id}>{machine.serialNumber}{machine.model ? ` · ${machine.model}` : ""}</option>)}
-            </select>
+            <SearchableSelect value={form.machineId} onChange={(v) => setForm({ ...form, machineId: v })} options={machines.filter(machine => machine.currentOwnerId === form.customerId && (!form.locationId || machine.customerLocationId === form.locationId)).map(machine => ({ value: machine.id, label: `${machine.serialNumber}${machine.model ? ` · ${machine.model}` : ""}` }))} placeholder={t("common.selectOption")} />
           </div>
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-slate-700">{t("serviceRequests.priority")}</label>

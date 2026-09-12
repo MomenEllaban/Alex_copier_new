@@ -6,6 +6,7 @@ import { Plus, RotateCcw, ArrowDownLeft, ArrowUpRight, Trash2, Pencil, Eye, Prin
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
 import FormModal from "@/components/FormModal";
+import SearchableSelect from "@/components/SearchableSelect";
 import PrinterLoader from "@/components/PrinterLoader";
 import { useI18n } from "@/i18n/context";
 import { useToast, useConfirm } from "@/components/UIProvider";
@@ -637,14 +638,7 @@ export default function ReturnsPage() {
                   <PrinterLoader size="sm" label={t("common.loading")} />
                 </div>
               ) : (
-                <select className={inputClass} value={form.salesOrderId} onChange={(e) => setForm((prev) => ({ ...prev, salesOrderId: e.target.value }))} required>
-                  <option value="">{t("common.selectOption")}</option>
-                  {salesOrders.map((order) => (
-                    <option key={order.id} value={order.id}>
-                      {order.id.slice(0, 8)} — {order.customer?.name || ""} — {new Date(order.orderDate).toLocaleDateString("en-GB")} {new Date(order.orderDate).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
-                    </option>
-                  ))}
-                </select>
+                <SearchableSelect value={form.salesOrderId} onChange={(v) => setForm((prev) => ({ ...prev, salesOrderId: v }))} options={salesOrders.map((order) => ({ value: order.id, label: `${order.id.slice(0, 8)} — ${order.customer?.name || ""} — ${new Date(order.orderDate).toLocaleDateString("en-GB")} ${new Date(order.orderDate).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}` }))} placeholder={t("common.selectOption")} required />
               )}
             </div>
           )}
@@ -652,21 +646,27 @@ export default function ReturnsPage() {
           {selectedOrder && (
             <div className="space-y-1.5">
               <label className="block text-sm font-medium text-gray-700">{t("returns.selectProduct")}</label>
-              <select className={inputClass} value={form.salesOrderItemId} onChange={(e) => setForm((prev) => ({ ...prev, salesOrderItemId: e.target.value }))} required>
-                <option value="">{t("common.selectOption")}</option>
-                {selectedOrder.items.map((item) => {
+              <SearchableSelect
+                value={form.salesOrderItemId}
+                onChange={(v) => setForm((prev) => ({ ...prev, salesOrderItemId: v }))}
+                options={selectedOrder.items.map((item) => {
                   const existingReturns = returns.filter(
                     (r) => r.salesOrderId === selectedOrder.id && r.salesOrderItemId === item.id && r.status !== "REJECTED"
                   );
                   const totalReturned = existingReturns.reduce((sum, r) => sum + r.quantity, 0);
                   const available = item.quantity - totalReturned;
-                  return (
-                    <option key={item.id} value={item.id} disabled={available <= 0}>
-                      {item.product?.name || item.productId} — {item.unitPrice.toLocaleString()} — متبقي {available}
-                    </option>
-                  );
+                  return { value: item.id, label: `${item.product?.name || item.productId} — ${item.unitPrice.toLocaleString()} — متبقي ${available}` };
                 })}
-              </select>
+                disabledValues={selectedOrder.items.filter((item) => {
+                  const existingReturns = returns.filter(
+                    (r) => r.salesOrderId === selectedOrder.id && r.salesOrderItemId === item.id && r.status !== "REJECTED"
+                  );
+                  const totalReturned = existingReturns.reduce((sum, r) => sum + r.quantity, 0);
+                  return item.quantity - totalReturned <= 0;
+                }).map((item) => item.id)}
+                placeholder={t("common.selectOption")}
+                required
+              />
             </div>
           )}
 
@@ -690,14 +690,7 @@ export default function ReturnsPage() {
                   <PrinterLoader size="sm" label={t("common.loading")} />
                 </div>
               ) : (
-                <select className={inputClass} value={form.purchaseOrderId} onChange={(e) => setForm((prev) => ({ ...prev, purchaseOrderId: e.target.value }))} required>
-                  <option value="">{t("common.selectOption")}</option>
-                  {purchaseOrders.map((order) => (
-                    <option key={order.id} value={order.id}>
-                      {order.id.slice(0, 8)} — {order.supplier?.name || ""} — {new Date(order.orderDate).toLocaleDateString("en-GB")} {new Date(order.orderDate).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
-                    </option>
-                  ))}
-                </select>
+                <SearchableSelect value={form.purchaseOrderId} onChange={(v) => setForm((prev) => ({ ...prev, purchaseOrderId: v }))} options={purchaseOrders.map((order) => ({ value: order.id, label: `${order.id.slice(0, 8)} — ${order.supplier?.name || ""} — ${new Date(order.orderDate).toLocaleDateString("en-GB")} ${new Date(order.orderDate).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}` }))} placeholder={t("common.selectOption")} required />
               )}
             </div>
           )}
@@ -705,21 +698,27 @@ export default function ReturnsPage() {
           {selectedPurchaseOrder && (
             <div className="space-y-1.5">
               <label className="block text-sm font-medium text-gray-700">{t("returns.selectProduct")}</label>
-              <select className={inputClass} value={form.purchaseOrderItemId} onChange={(e) => setForm((prev) => ({ ...prev, purchaseOrderItemId: e.target.value }))} required>
-                <option value="">{t("common.selectOption")}</option>
-                {selectedPurchaseOrder.items.map((item) => {
+              <SearchableSelect
+                value={form.purchaseOrderItemId}
+                onChange={(v) => setForm((prev) => ({ ...prev, purchaseOrderItemId: v }))}
+                options={selectedPurchaseOrder.items.map((item) => {
                   const existingReturns = returns.filter(
                     (r) => r.purchaseOrderId === selectedPurchaseOrder.id && r.purchaseOrderItemId === item.id && r.status !== "REJECTED"
                   );
                   const totalReturned = existingReturns.reduce((sum, r) => sum + r.quantity, 0);
                   const available = item.quantity - totalReturned;
-                  return (
-                    <option key={item.id} value={item.id} disabled={available <= 0}>
-                      {item.product?.name || item.productId} — {item.unitPrice.toLocaleString()} — متبقي {available}
-                    </option>
-                  );
+                  return { value: item.id, label: `${item.product?.name || item.productId} — ${item.unitPrice.toLocaleString()} — متبقي ${available}` };
                 })}
-              </select>
+                disabledValues={selectedPurchaseOrder.items.filter((item) => {
+                  const existingReturns = returns.filter(
+                    (r) => r.purchaseOrderId === selectedPurchaseOrder.id && r.purchaseOrderItemId === item.id && r.status !== "REJECTED"
+                  );
+                  const totalReturned = existingReturns.reduce((sum, r) => sum + r.quantity, 0);
+                  return item.quantity - totalReturned <= 0;
+                }).map((item) => item.id)}
+                placeholder={t("common.selectOption")}
+                required
+              />
             </div>
           )}
 

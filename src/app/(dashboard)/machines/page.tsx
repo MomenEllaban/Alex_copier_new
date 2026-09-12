@@ -10,6 +10,7 @@ import FilterSelect from "@/components/FilterSelect";
 import { Plus, Trash2, Upload, Save } from "lucide-react";
 import ExportButton from "@/components/ExportButton";
 import FormModal from "@/components/FormModal";
+import SearchableSelect from "@/components/SearchableSelect";
 import ImportDialog from "@/components/ImportDialog";
 import PrinterLoader from "@/components/PrinterLoader";
 import { DateTimeCell } from "@/components/DateTimeCell";
@@ -247,10 +248,7 @@ const { success: toastSuccess } = useToast();
           </div>
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-slate-700">المالك الحالي</label>
-            <select value={form.currentOwnerId} onChange={(e) => setField("currentOwnerId", e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="">بدون مالك</option>
-              {customers.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
-            </select>
+            <SearchableSelect value={form.currentOwnerId} onChange={(v) => setField("currentOwnerId", v)} options={customers.map((c) => ({ value: c.id, label: c.name }))} placeholder="بدون مالك" />
           </div>
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-slate-700">{t("common.notes")}</label>

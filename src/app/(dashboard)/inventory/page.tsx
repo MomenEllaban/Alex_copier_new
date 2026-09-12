@@ -12,6 +12,7 @@ import { useUrlParams, useSearchWithDefault } from "@/hooks/useUrlParams";
 import { apiErrorMessage } from "@/lib/api-client";
 import { Save } from "lucide-react";
 import SubmitButton from "@/components/SubmitButton";
+import SearchableSelect from "@/components/SearchableSelect";
 import RefreshButton from "@/components/RefreshButton";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { notifyDataChanged } from "@/lib/data-events";
@@ -193,12 +194,13 @@ export default function InventoryPage() {
             </div>
             <div className="space-y-1.5">
               <label className="block text-sm font-medium text-slate-700">{t("inventory.product")}</label>
-              <select
+              <SearchableSelect
                 value={form.productId}
-                onChange={(e) => setForm({ ...form, productId: e.target.value })}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-sky-500 focus:bg-white focus:ring-2 focus:ring-sky-100"
+                onChange={(v) => setForm({ ...form, productId: v })}
+                options={products.map(product => ({ value: product.id, label: `${product.name}${product.sku ? ` · ${product.sku}` : ""}` }))}
+                placeholder={t("common.selectOption")}
                 required
-              ><option value="">{t("common.selectOption")}</option>{products.map(product => <option key={product.id} value={product.id}>{product.name}{product.sku ? ` · ${product.sku}` : ""}</option>)}</select>
+              />
             </div>
             <div className="space-y-1.5">
               <label className="block text-sm font-medium text-slate-700">{t("inventory.quantity")}</label>

@@ -15,6 +15,7 @@ import { useConfirm, useToast } from "@/components/UIProvider";
 import { apiErrorMessage } from "@/lib/api-client";
 import FormModal from "@/components/FormModal";
 import SelectWithAdd from "@/components/SelectWithAdd";
+import SearchableSelect from "@/components/SearchableSelect";
 import SubmitButton from "@/components/SubmitButton";
 import { DateTimeCell } from "@/components/DateTimeCell";
 import RefreshButton from "@/components/RefreshButton";
@@ -703,10 +704,7 @@ export default function SalesPage() {
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr_1fr_1fr_auto]">
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("sales.product")}</label>
-                        <select value={row.productId} onChange={(e) => updateItemRow(index, { productId: e.target.value, priceTier: row.priceTier || "newCustomer" })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                          <option value="">{t("purchases.selectProduct")}</option>
-                          {companyProducts(form.companyId).map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
-                        </select>
+                        <SearchableSelect value={row.productId} onChange={(v) => updateItemRow(index, { productId: v, priceTier: row.priceTier || "newCustomer" })} options={companyProducts(form.companyId).map((product) => ({ value: product.id, label: product.name }))} placeholder={t("purchases.selectProduct")} required />
                         {selectedProduct && (
                           <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-slate-500">
                             <span>المتاح: <span className="font-semibold text-slate-700">{availableQty}</span></span>
@@ -906,10 +904,7 @@ export default function SalesPage() {
                   <div key={index} className="grid gap-2 rounded-lg border border-gray-200 bg-white p-3 sm:grid-cols-[1.2fr_90px_130px_130px_110px_auto]">
                     <div>
                       <label className="mb-1 block text-[11px] font-medium text-gray-500">{t("sales.product")}</label>
-                      <select value={row.productId} onChange={(e) => updateInterRow(index, { productId: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-                        <option value="">{t("purchases.selectProduct")}</option>
-                        {companyProducts(interForm.fromCompanyId).map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
-                      </select>
+                      <SearchableSelect value={row.productId} onChange={(v) => updateInterRow(index, { productId: v })} options={companyProducts(interForm.fromCompanyId).map((product) => ({ value: product.id, label: product.name }))} placeholder={t("purchases.selectProduct")} required />
                       {selectedProduct && (<div className="mt-1 text-[11px] text-slate-500">المتاح في الشركة المختارة: {availableQty}</div>)}
                     </div>
                     <div>

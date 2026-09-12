@@ -1,5 +1,7 @@
 "use client";
 
+import SearchableSelect from "./SearchableSelect";
+
 export interface FilterOption {
   value: string;
   label: string;
@@ -15,17 +17,12 @@ interface FilterSelectProps {
 
 export default function FilterSelect({ value, onChange, options, allLabel, className = "" }: FilterSelectProps) {
   return (
-    <select
+    <SearchableSelect
       value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={`border border-gray-300 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${className}`}
-    >
-      <option value="">{allLabel}</option>
-      {options.map((opt) => (
-        <option key={opt.value} value={opt.value}>
-          {opt.label}
-        </option>
-      ))}
-    </select>
+      onChange={onChange}
+      options={options}
+      placeholder={allLabel}
+      className={className}
+    />
   );
 }

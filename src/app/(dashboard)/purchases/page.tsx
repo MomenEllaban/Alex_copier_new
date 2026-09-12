@@ -12,6 +12,7 @@ import ExportButton from "@/components/ExportButton";
 import PrinterLoader from "@/components/PrinterLoader";
 import FormModal from "@/components/FormModal";
 import SelectWithAdd from "@/components/SelectWithAdd";
+import SearchableSelect from "@/components/SearchableSelect";
 import { useConfirm, useToast } from "@/components/UIProvider";
 import { apiErrorMessage } from "@/lib/api-client";
 import SubmitButton from "@/components/SubmitButton";
@@ -451,10 +452,7 @@ export default function PurchasesPage() {
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_130px_160px_auto]">
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("sales.product")}</label>
-                        <select value={row.productId} onChange={(e) => updateRow(idx, "productId", e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                          <option value="">{t("purchases.selectProduct")}</option>
-                          {products.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
-                        </select>
+                        <SearchableSelect value={row.productId} onChange={(v) => updateRow(idx, "productId", v)} options={products.map((p) => ({ value: p.id, label: p.name }))} placeholder={t("purchases.selectProduct")} />
                       </div>
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("purchases.quantity")}</label>
@@ -819,10 +817,7 @@ export default function PurchasesPage() {
               </div>
               <div className="space-y-1.5">
                 <label className="block text-sm font-medium text-slate-700">{t("sales.customer")}</label>
-                <select value={interForm.customerId} onChange={(e) => setInterForm({ ...interForm, customerId: e.target.value })} className={inputClass} required>
-                  <option value="">{t("sales.customer")}</option>
-                  {customers.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
-                </select>
+                <SearchableSelect value={interForm.customerId} onChange={(v) => setInterForm({ ...interForm, customerId: v })} options={customers.map((c) => ({ value: c.id, label: c.name }))} placeholder={t("sales.customer")} required />
               </div>
               <div className="space-y-1.5">
                 <label className="block text-sm font-medium text-slate-700">المهندس (اختياري)</label>
@@ -886,10 +881,7 @@ export default function PurchasesPage() {
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.3fr_100px_140px_140px_140px_auto]">
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("sales.product")}</label>
-                        <select value={row.productId} onChange={(e) => updateInterRow(idx, "productId", e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                          <option value="">{t("purchases.selectProduct")}</option>
-                          {products.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
-                        </select>
+                        <SearchableSelect value={row.productId} onChange={(v) => updateInterRow(idx, "productId", v)} options={products.map((p) => ({ value: p.id, label: p.name }))} placeholder={t("purchases.selectProduct")} />
                       </div>
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("purchases.quantity")}</label>
