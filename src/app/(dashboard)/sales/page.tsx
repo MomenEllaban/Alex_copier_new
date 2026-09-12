@@ -101,6 +101,7 @@ const PRICE_TIER_LABELS: Record<string, string> = {
   jumlaParts: "شركة جملة قطع غيار",
   sectori: "شركة قطاعي",
   engineer: "مهندس",
+  custom: "سعر حر (اختياري)",
 };
 
 const COMPANY_ORDER_TIERS: Record<string, string> = {
@@ -292,10 +293,19 @@ export default function SalesPage() {
     setItemRows((current) => current.map((row, rowIndex) => {
       if (rowIndex !== index) return row;
       const merged = { ...row, ...next };
-      const selectedProduct = products.find((product) => product.id === merged.productId);
-      if (merged.productId && selectedProduct) {
-        const chosenTier = merged.priceTier || "newCustomer";
-        merged.unitPrice = String(getProductTierPrice(selectedProduct, chosenTier));
+      const productChanged = next.productId !== undefined && next.productId !== row.productId;
+      const tierChanged = next.priceTier !== undefined && next.priceTier !== row.priceTier;
+      // auto-fill price only when product or tier changes — never while typing price/qty
+      if ((productChanged || tierChanged) && merged.productId) {
+        const selectedProduct = products.find((product) => product.id === merged.productId);
+        if (selectedProduct) {
+          if (merged.priceTier === "custom") {
+            // free price: keep what user typed; suggest default price only for a newly picked product
+            if (productChanged) merged.unitPrice = String(getProductTierPrice(selectedProduct, "newCustomer"));
+          } else {
+            merged.unitPrice = String(getProductTierPrice(selectedProduct, merged.priceTier || "newCustomer"));
+          }
+        }
       }
       return merged;
     }));
@@ -694,7 +704,11 @@ export default function SalesPage() {
             <div className="space-y-3">{itemRows.map((row, index) => {
               const selectedProduct = products.find((product) => product.id === row.productId);
               const availableQty = row.productId ? inventoryByProduct[row.productId] ?? 0 : 0;
-              const rowPrice = selectedProduct ? getProductTierPrice(selectedProduct, row.priceTier || "newCustomer") : 0;
+              const rowPrice = selectedProduct
+                ? row.priceTier === "custom"
+                  ? Number(row.unitPrice) || 0
+                  : getProductTierPrice(selectedProduct, row.priceTier || "newCustomer")
+                : 0;
               const ph = row.productId ? priceHistory[row.productId] : undefined;
               const phLoading = row.productId ? Boolean(priceHistoryLoading[row.productId]) : false;
               const lastSaleTierLabel = ph?.lastSaleTier && PRICE_TIER_LABELS[ph.lastSaleTier] ? PRICE_TIER_LABELS[ph.lastSaleTier] : null;
@@ -716,15 +730,15 @@ export default function SalesPage() {
                       </div>
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-700">شريحة السعر</label>
-                        <select value={row.priceTier} onChange={(e) => updateItemRow(index, { priceTier: e.target.value, unitPrice: String(getProductTierPrice(selectedProduct || undefined, e.target.value)) })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="legacyCustomer">عميل قديم</option><option value="newCustomer">عميل جديد</option><option value="jumlaMachines">شركة جملة آلات</option><option value="jumlaParts">شركة جملة قطع غيار</option><option value="sectori">شركة قطاعي</option><option value="engineer">مهندس</option></select>
+                        <select value={row.priceTier} onChange={(e) => updateItemRow(index, { priceTier: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="legacyCustomer">عميل قديم</option><option value="newCustomer">عميل جديد</option><option value="jumlaMachines">شركة جملة آلات</option><option value="jumlaParts">شركة جملة قطع غيار</option><option value="sectori">شركة قطاعي</option><option value="engineer">مهندس</option><option value="custom">سعر حر (اختياري)</option></select>
                       </div>
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("sales.qty")}</label>
                         <input type="number" min="1" required value={row.quantity} onChange={(e) => updateItemRow(index, { quantity: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
                       </div>
                       <div>
-                        <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("sales.unitPrice")}</label>
-                        <input type="number" min="0" step="0.01" required value={row.unitPrice} onChange={(e) => updateItemRow(index, { unitPrice: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("sales.unitPrice")}{row.priceTier === "custom" && <span className="ms-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">حر</span>}</label>
+                        <input type="number" min="0" step="0.01" required value={row.unitPrice} onChange={(e) => updateItemRow(index, { unitPrice: e.target.value })} placeholder={row.priceTier === "custom" ? "اكتب السعر بحرية" : undefined} className={`w-full rounded-lg border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 ${row.priceTier === "custom" ? "border-amber-400 bg-amber-50/50 focus:border-amber-500 focus:ring-amber-500" : "border-gray-300 focus:border-blue-500 focus:ring-blue-500"}`} />
                       </div>
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("sales.discount")}</label>
