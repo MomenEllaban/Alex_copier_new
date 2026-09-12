@@ -43,10 +43,29 @@ export async function GET(request: Request) {
       }));
 
       const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
-      const taxAmount = order.taxRate > 0 ? ((subtotal - order.discount) * order.taxRate) / 100 : 0;
+      // order.discount is a raw value: percent when discountType is PERCENTAGE, amount when FIXED
+      const discountAmount = order.discountType === "PERCENTAGE"
+        ? (subtotal * Math.min(order.discount, 100)) / 100
+        : Math.min(order.discount, subtotal);
+      const taxAmount = order.taxRate > 0 ? ((subtotal - discountAmount) * order.taxRate) / 100 : 0;
 
       const hasTradeIn = order.tradeInTotal > 0 || order.items.some((it) => it.tradeInProductId);
       const subType = order.orderType === "SPARE_PART_SALE" ? "SPARE_PART_SALE" : hasTradeIn ? "TRADE_IN" : "MACHINE_SALE";
+
+      // T1/T2/T3: payment split, customer account, source warehouse
+      const paidAmount = Number(order.paidAmount) || 0;
+      const dueAmount = Math.max(0, Number(order.total) - paidAmount);
+      const [mainWarehouse, lastPayment] = await Promise.all([
+        prisma.warehouse.findFirst({
+          where: { companyId: order.companyId, isMain: true },
+          select: { name: true },
+        }),
+        prisma.customerPayment.findFirst({
+          where: { customerId: order.customerId },
+          orderBy: { paymentDate: "desc" },
+          select: { amount: true, paymentDate: true },
+        }),
+      ]);
 
       invoiceData = {
         type: "sale",
@@ -64,13 +83,22 @@ export async function GET(request: Request) {
         items,
         subtotal,
         discount: order.discount,
+        discountType: order.discountType,
         taxRate: order.taxRate,
         taxAmount,
         total: order.total,
         paymentMethod: order.paymentMethod,
         paymentStatus: order.paymentStatus,
+        paidAmount,
+        dueAmount,
+        engineerName: order.engineer?.name || undefined,
+        warehouseName: mainWarehouse?.name || undefined,
+        customerDebt: order.customer ? Number(order.customer.remainingDebt) || 0 : undefined,
+        customerLastPayment: lastPayment
+          ? { amount: Number(lastPayment.amount), date: lastPayment.paymentDate.toISOString() }
+          : undefined,
+        invoiceAddedDebt: order.paymentMethod === "CASH" ? 0 : dueAmount,
         notes: order.notes || undefined,
-        extraFields: order.engineer ? [{ label: "المهندس", value: order.engineer.name }] : undefined,
       };
     } else if (type === "purchase") {
       const order = await prisma.purchaseOrder.findUnique({

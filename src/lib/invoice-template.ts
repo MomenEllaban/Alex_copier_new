@@ -21,11 +21,19 @@ export interface InvoiceData {
   items: InvoiceItem[];
   subtotal: number;
   discount: number;
+  discountType?: string;
   taxRate: number;
   taxAmount: number;
   total: number;
   paymentMethod?: string;
   paymentStatus?: string;
+  paidAmount?: number;
+  dueAmount?: number;
+  engineerName?: string;
+  warehouseName?: string;
+  customerDebt?: number;
+  customerLastPayment?: { amount: number; date: string };
+  invoiceAddedDebt?: number;
   notes?: string;
   extraFields?: { label: string; value: string }[];
 }
@@ -122,6 +130,61 @@ const PAYMENT_STATUS_AR: Record<string, string> = {
   OVERDUE: "متأخر",
 };
 
+function discountDisplay(data: InvoiceData): { label: string; amount: number } | null {
+  if (!data.discount || data.discount <= 0) return null;
+  // discount may be stored as a percent value or a fixed amount
+  if (data.discountType === "PERCENTAGE") {
+    const pct = Math.min(data.discount, 100);
+    return { label: `الخصم (${data.discount}%)`, amount: (data.subtotal * pct) / 100 };
+  }
+  return { label: "الخصم", amount: Math.min(data.discount, data.subtotal) };
+}
+
+const fmt = (n: number) => Number(n || 0).toLocaleString("ar-EG");
+
+// T1 — payment summary box (cash paid vs remaining on credit)
+function paymentBox(data: InvoiceData, compact = false): string {
+  if (data.paidAmount === undefined || data.paidAmount === null) return "";
+  const paid = Number(data.paidAmount) || 0;
+  const due = data.dueAmount !== undefined && data.dueAmount !== null
+    ? Number(data.dueAmount)
+    : Math.max(0, Number(data.total) - paid);
+  const pad = compact ? "10px 12px" : "14px 18px";
+  const fs = compact ? "12px" : "13px";
+  const dueLine = due > 0
+    ? `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:${compact ? "13px" : "15px"};font-weight:700;color:#dc2626;"><span>المتبقي أجل</span><span>${fmt(due)} ج.م</span></div>`
+    : `<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:${compact ? "13px" : "15px"};font-weight:700;color:#059669;"><span>الحالة</span><span>خالص — لا يوجد متبقي</span></div>`;
+  return `
+  <div style="background:#fefce8;border:1px solid #fde68a;border-radius:8px;padding:${pad};margin-top:${compact ? "8px" : "0"};">
+    <div style="font-size:${compact ? "11px" : "12px"};font-weight:700;color:#92400e;margin-bottom:6px;">💰 ملخص الدفع</div>
+    <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:${fs};"><span style="color:#57534e;">إجمالي الفاتورة</span><span style="font-weight:600;">${fmt(data.total)} ج.م</span></div>
+    <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:${fs};"><span style="color:#57534e;">تم دفع نقداً</span><span style="font-weight:600;">${fmt(paid)} ج.م</span></div>
+    ${dueLine}
+  </div>`;
+}
+
+// T2 — customer account box (total debt, last payment, what this invoice added)
+function debtBox(data: InvoiceData, compact = false): string {
+  if (data.customerDebt === undefined || data.customerDebt === null) return "";
+  const debt = Number(data.customerDebt) || 0;
+  const added = Number(data.invoiceAddedDebt) || 0;
+  // don't clutter the invoice when the customer has no balance history at all
+  if (debt <= 0 && !data.customerLastPayment && added <= 0) return "";
+  const pad = compact ? "10px 12px" : "14px 18px";
+  const fs = compact ? "12px" : "13px";
+  const lastPay = data.customerLastPayment
+    ? `${fmt(data.customerLastPayment.amount)} ج.م — ${new Date(data.customerLastPayment.date).toLocaleDateString("ar-EG", { year: "numeric", month: "long", day: "numeric" })}`
+    : "لا توجد دفعات مسجلة";
+  return `
+  <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:${pad};margin-top:8px;">
+    <div style="font-size:${compact ? "11px" : "12px"};font-weight:700;color:#1d4ed8;margin-bottom:6px;">📒 حساب العميل</div>
+    <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:${fs};"><span style="color:#475569;">إجمالي المستحق عليه</span><span style="font-weight:700;">${fmt(debt)} ج.م</span></div>
+    <div style="display:flex;justify-content:space-between;gap:8px;padding:3px 0;font-size:${fs};"><span style="color:#475569;">آخر دفعة</span><span style="font-weight:600;text-align:left;">${lastPay}</span></div>
+    ${added > 0 ? `
+    <div style="display:flex;justify-content:space-between;padding:3px 0;font-size:${fs};"><span style="color:#475569;">هذه الفاتورة زوّدت المديونية بـ</span><span style="font-weight:700;color:#dc2626;">+${fmt(added)} ج.م</span></div>` : ""}
+  </div>`;
+}
+
 export function generateInvoiceHtml(data: InvoiceData): string {
   const theme = getTheme(data);
   const typeLabel = theme.label;
@@ -216,6 +279,8 @@ export function generateInvoiceHtml(data: InvoiceData): string {
         <p>التاريخ: ${new Date(data.date).toLocaleDateString("ar-EG", { year: "numeric", month: "long", day: "numeric" })}</p>
         ${paymentMethod ? `<p>طريقة الدفع: ${paymentMethod}</p>` : ""}
         ${paymentStatus ? `<p>حالة الدفع: ${paymentStatus}</p>` : ""}
+        ${data.engineerName ? `<p>👷 المهندس المسؤول: <strong>${data.engineerName}</strong></p>` : ""}
+        ${data.warehouseName ? `<p>🏬 المخزن: <strong>${data.warehouseName}</strong></p>` : ""}
         ${extraRows}
       </div>
     </div>
@@ -244,11 +309,11 @@ export function generateInvoiceHtml(data: InvoiceData): string {
           <span>المجموع الفرعي</span>
           <span>${data.subtotal.toLocaleString("ar-EG")} ج.م</span>
         </div>
-        ${data.discount > 0 ? `
+        ${(() => { const d = discountDisplay(data); return d ? `
         <div class="totals-row">
-          <span>الخصم</span>
-          <span style="color:#dc2626;">-${data.discount.toLocaleString("ar-EG")} ج.م</span>
-        </div>` : ""}
+          <span>${d.label}</span>
+          <span style="color:#dc2626;">-${d.amount.toLocaleString("ar-EG")} ج.م</span>
+        </div>` : ""; })()}
         ${data.taxRate > 0 ? `
         <div class="totals-row">
           <span>الضريبة (${data.taxRate}%)</span>
@@ -260,6 +325,12 @@ export function generateInvoiceHtml(data: InvoiceData): string {
         </div>
       </div>
     </div>
+
+    ${(data.paidAmount !== undefined && data.paidAmount !== null) || (data.customerDebt !== undefined && data.customerDebt !== null) ? `
+    <div style="padding: 0 32px 20px;">
+      ${paymentBox(data)}
+      ${debtBox(data)}
+    </div>` : ""}
 
     ${data.notes ? `
     <div style="padding: 0 32px 20px;">
@@ -385,6 +456,8 @@ export function generateReceiptHtml(data: InvoiceData): string {
         </div>
         ${paymentMethod ? `<div class="receipt-meta-row"><span class="label">طريقة الدفع</span><span class="value">${paymentMethod}</span></div>` : ""}
         ${paymentStatus ? `<div class="receipt-meta-row"><span class="label">حالة الدفع</span><span class="value">${paymentStatus}</span></div>` : ""}
+        ${data.engineerName ? `<div class="receipt-meta-row"><span class="label">👷 المهندس</span><span class="value">${data.engineerName}</span></div>` : ""}
+        ${data.warehouseName ? `<div class="receipt-meta-row"><span class="label">🏬 المخزن</span><span class="value">${data.warehouseName}</span></div>` : ""}
         ${extraRows}
       </div>
 
@@ -412,11 +485,11 @@ export function generateReceiptHtml(data: InvoiceData): string {
           <span>المجموع الفرعي</span>
           <span>${data.subtotal.toLocaleString("ar-EG")} ج.م</span>
         </div>
-        ${data.discount > 0 ? `
+        ${(() => { const d = discountDisplay(data); return d ? `
         <div class="row" style="color:#dc2626;">
-          <span>الخصم</span>
-          <span>-${data.discount.toLocaleString("ar-EG")} ج.م</span>
-        </div>` : ""}
+          <span>${d.label}</span>
+          <span>-${d.amount.toLocaleString("ar-EG")} ج.م</span>
+        </div>` : ""; })()}
         ${data.taxRate > 0 ? `
         <div class="row">
           <span>الضريبة (${data.taxRate}%)</span>
@@ -426,6 +499,8 @@ export function generateReceiptHtml(data: InvoiceData): string {
           <span>الإجمالي</span>
           <span>${data.total.toLocaleString("ar-EG")} ج.م</span>
         </div>
+        ${paymentBox(data, true)}
+        ${debtBox(data, true)}
       </div>
 
       ${data.notes ? `
