@@ -821,10 +821,7 @@ export default function PurchasesPage() {
               </div>
               <div className="space-y-1.5">
                 <label className="block text-sm font-medium text-slate-700">المهندس (اختياري)</label>
-                <select value={interForm.engineerId} onChange={(e) => setInterForm({ ...interForm, engineerId: e.target.value })} className={inputClass}>
-                  <option value="">المهندس (اختياري)</option>
-                  {engineers.map((en) => (<option key={en.id} value={en.id}>{en.name}</option>))}
-                </select>
+                <SearchableSelect value={interForm.engineerId} onChange={(v) => setInterForm({ ...interForm, engineerId: v })} options={engineers.map((en) => ({ value: en.id, label: en.name }))} placeholder="المهندس (اختياري)" />
               </div>
               <div className="space-y-1.5">
                 <label className="block text-sm font-medium text-slate-700">{t("sales.orderType")}</label>

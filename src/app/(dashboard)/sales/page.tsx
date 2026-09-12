@@ -649,7 +649,7 @@ export default function SalesPage() {
               }
               return null;
             })()}
-            <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">المهندس (اختياري)</label><select value={form.engineerId} onChange={(e) => setForm({ ...form, engineerId: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="">المهندس (اختياري)</option>{engineers.map((engineer) => (<option key={engineer.id} value={engineer.id}>{engineer.name}</option>))}</select></div>
+            <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">المهندس (اختياري)</label><SearchableSelect value={form.engineerId} onChange={(v) => setForm({ ...form, engineerId: v })} options={engineers.map((engineer) => ({ value: engineer.id, label: engineer.name }))} placeholder="المهندس (اختياري)" /></div>
             <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">نوع الطلب</label><select value={form.orderType} onChange={(e) => setForm({ ...form, orderType: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="MACHINE_SALE">{ORDER_TYPE_LABELS.MACHINE_SALE}</option><option value="SPARE_PART_SALE">{ORDER_TYPE_LABELS.SPARE_PART_SALE}</option></select></div>
             <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">{t("sales.category")}</label><select value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="">{t("sales.noCategory")}</option>{salesCategories.filter((c) => !form.companyId || c.companyId === form.companyId).map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}</select></div>
             <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">طريقة الدفع</label><select value={form.paymentMethod === "CREDIT" ? "CREDIT" : form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="CASH">{PAYMENT_METHOD_LABELS.CASH}</option><option value="CREDIT">{PAYMENT_METHOD_LABELS.CREDIT}</option></select></div>
@@ -844,10 +844,7 @@ export default function SalesPage() {
             </div>
             <div className="space-y-1.5">
               <label className="block text-sm font-medium text-slate-700">المهندس (اختياري)</label>
-              <select value={interForm.engineerId} onChange={(e) => setInterForm({ ...interForm, engineerId: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="">المهندس (اختياري)</option>
-                {engineers.map((engineer) => (<option key={engineer.id} value={engineer.id}>{engineer.name}</option>))}
-              </select>
+              <SearchableSelect value={interForm.engineerId} onChange={(v) => setInterForm({ ...interForm, engineerId: v })} options={engineers.map((engineer) => ({ value: engineer.id, label: engineer.name }))} placeholder="المهندس (اختياري)" />
             </div>
             <div className="space-y-1.5">
               <label className="block text-sm font-medium text-slate-700">{t("sales.interCompanyPayment")} ({t("sales.toCompany")})</label>

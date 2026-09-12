@@ -9,6 +9,7 @@ import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
 import FormModal from "@/components/FormModal";
 import SelectWithAdd from "@/components/SelectWithAdd";
+import SearchableSelect from "@/components/SearchableSelect";
 import { CheckCircle2, Plus, Save, Trash2 } from "lucide-react";
 import DateRangeFilter, { inDateRange } from "@/components/DateRangeFilter";
 import ExportButton from "@/components/ExportButton";
@@ -228,10 +229,7 @@ export default function SettlementsPage() {
           })()}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">{t("common.engineer")}</label>
-            <select value={form.engineerId} onChange={(e) => setForm({ ...form, engineerId: e.target.value })} className={INPUT}>
-              <option value="">{t("settlements.selectEngineer")}</option>
-              {engineers.map((e) => (<option key={e.id} value={e.id}>{e.name}</option>))}
-            </select>
+            <SearchableSelect value={form.engineerId} onChange={(v) => setForm({ ...form, engineerId: v })} options={engineers.map((e) => ({ value: e.id, label: e.name }))} placeholder={t("settlements.selectEngineer")} />
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">{t("settlements.amount")}</label>

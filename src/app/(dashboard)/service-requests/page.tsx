@@ -447,10 +447,7 @@ export default function ServiceRequestsPage() {
                       </div>
                       {assigningId === req.id && canManageRequests && (
                         <div className="mt-2 flex gap-1">
-                          <select value={assignEngineerId} onChange={(e) => setAssignEngineerId(e.target.value)} className="rounded-lg border border-gray-300 px-2 py-1 text-xs focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                            <option value="">{t("serviceRequests.selectEngineer")}</option>
-                            {engineers.map((eng) => (<option key={eng.id} value={eng.id}>{eng.name}</option>))}
-                          </select>
+                          <SearchableSelect value={assignEngineerId} onChange={setAssignEngineerId} options={engineers.map((eng) => ({ value: eng.id, label: eng.name }))} placeholder={t("serviceRequests.selectEngineer")} className="min-w-44 flex-1" />
                           <button onClick={() => handleAssign(req.id)} className="bg-blue-600 text-white px-2 py-1 rounded text-xs hover:bg-blue-700">{t("serviceRequests.ok")}</button>
                         </div>
                       )}
