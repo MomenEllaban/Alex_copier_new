@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AddFormBoundary, useAutoAddForm } from "@/hooks/useAutoAddForm";
-import { Plus, RotateCcw, ArrowDownLeft, ArrowUpRight, Trash2, Pencil, Eye, Printer, FileText, Save } from "lucide-react";
+import { Plus, RotateCcw, ArrowDownLeft, ArrowUpRight, Trash2, Pencil, Eye, Save } from "lucide-react";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
 import FormModal from "@/components/FormModal";
 import SearchableSelect from "@/components/SearchableSelect";
+import PrintMenu from "@/components/PrintMenu";
 import PrinterLoader from "@/components/PrinterLoader";
 import { useI18n } from "@/i18n/context";
 import { useToast, useConfirm } from "@/components/UIProvider";
@@ -579,12 +580,7 @@ export default function ReturnsPage() {
                         <button onClick={() => setViewingReturn(item)} className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-2 text-xs font-medium text-gray-600 transition hover:bg-gray-100" title={t("common.view")}>
                           <Eye size={14} />
                         </button>
-                        <button onClick={() => window.open(`/api/invoices?type=return&id=${item.id}`, "_blank")} className="inline-flex items-center gap-1 rounded-lg border border-green-200 bg-green-50 px-2.5 py-2 text-xs font-medium text-green-600 transition hover:bg-green-100" title="طباعة المرتجع">
-                          <Printer size={14} />
-                        </button>
-                        <button onClick={() => window.open(`/api/invoices?type=return&id=${item.id}&format=receipt`, "_blank")} className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-xs font-medium text-emerald-600 transition hover:bg-emerald-100" title="طباعة الريسيت">
-                          <FileText size={14} />
-                        </button>
+                        <PrintMenu type="return" id={item.id} />
                         {item.status === "PENDING" && (
                           <>
                             <button onClick={() => { setEditingReturn(item); }} className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-2 text-xs font-medium text-blue-600 transition hover:bg-blue-100" title={t("common.edit")}>

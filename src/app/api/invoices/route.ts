@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
-import { generateInvoiceHtml, generateReceiptHtml, type InvoiceData } from "@/lib/invoice-template";
+import {
+  generateInvoiceHtml,
+  generateReceiptHtml,
+  type InvoiceData,
+  type InvoiceDir,
+  type InvoiceLang,
+} from "@/lib/invoice-template";
 
 export async function GET(request: Request) {
   try {
@@ -14,6 +20,10 @@ export async function GET(request: Request) {
     const type = searchParams.get("type");
     const id = searchParams.get("id");
     const format = searchParams.get("format") || "invoice";
+    const lang: InvoiceLang = searchParams.get("lang") === "en" ? "en" : "ar";
+    const dirParam = searchParams.get("dir");
+    const dir: InvoiceDir =
+      dirParam === "ltr" || dirParam === "rtl" ? dirParam : lang === "en" ? "ltr" : "rtl";
 
     if (!type || !id) {
       return NextResponse.json({ error: "type and id are required" }, { status: 400 });
@@ -252,7 +262,15 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "Invalid type" }, { status: 400 });
     }
 
-    const html = format === "receipt" ? generateReceiptHtml(invoiceData) : generateInvoiceHtml(invoiceData);
+    invoiceData.lang = lang;
+    invoiceData.dir = dir;
+
+    const html =
+      format === "receipt58"
+        ? generateReceiptHtml(invoiceData, 58)
+        : format === "receipt80" || format === "receipt"
+          ? generateReceiptHtml(invoiceData, 80)
+          : generateInvoiceHtml(invoiceData);
 
     return new NextResponse(html, {
       headers: {

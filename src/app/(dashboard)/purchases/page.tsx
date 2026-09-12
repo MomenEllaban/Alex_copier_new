@@ -7,12 +7,13 @@ import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
 import DateRangeFilter, { inDateRange } from "@/components/DateRangeFilter";
-import { Eye, FileText, Pencil, Plus, Printer, Save, Trash2, X } from "lucide-react";
+import { Eye, Pencil, Plus, Printer, Save, Trash2, X } from "lucide-react";
 import ExportButton from "@/components/ExportButton";
 import PrinterLoader from "@/components/PrinterLoader";
 import FormModal from "@/components/FormModal";
 import SelectWithAdd from "@/components/SelectWithAdd";
 import SearchableSelect from "@/components/SearchableSelect";
+import PrintMenu from "@/components/PrintMenu";
 import { useConfirm, useToast } from "@/components/UIProvider";
 import { apiErrorMessage } from "@/lib/api-client";
 import SubmitButton from "@/components/SubmitButton";
@@ -571,12 +572,7 @@ export default function PurchasesPage() {
                       <button onClick={() => openEditOrder(order)} className="ms-1 inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-2 text-xs font-medium text-sky-600 transition hover:bg-sky-100" title={t("common.edit")}>
                         <Pencil size={14} />
                       </button>
-                      <button onClick={() => window.open(`/api/invoices?type=purchase&id=${order.id}`, "_blank")} className="ms-1 inline-flex items-center gap-1 rounded-lg border border-green-200 bg-green-50 px-2.5 py-2 text-xs font-medium text-green-600 transition hover:bg-green-100" title="طباعة الفاتورة">
-                        <Printer size={14} />
-                      </button>
-                      <button onClick={() => window.open(`/api/invoices?type=purchase&id=${order.id}&format=receipt`, "_blank")} className="ms-1 inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-xs font-medium text-emerald-600 transition hover:bg-emerald-100" title="طباعة الريسيت">
-                        <FileText size={14} />
-                      </button>
+                      <PrintMenu type="purchase" id={order.id} />
                       <button onClick={() => handleDelete(order.id)} className="ms-1 inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-2 text-xs font-medium text-red-600 transition hover:bg-red-100" title={t("common.delete")}>
                         <Trash2 size={14} />
                       </button>

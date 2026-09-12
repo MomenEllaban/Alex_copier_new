@@ -7,11 +7,12 @@ import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
 import ExportButton from "@/components/ExportButton";
-import { Eye, FileText, Pencil, Plus, Printer, Save, Trash2 } from "lucide-react";
+import { Eye, Pencil, Plus, Save, Trash2 } from "lucide-react";
 import PrinterLoader from "@/components/PrinterLoader";
 import { useUrlParams, useSearchWithDefault } from "@/hooks/useUrlParams";
 import FormModal from "@/components/FormModal";
 import SelectWithAdd from "@/components/SelectWithAdd";
+import PrintMenu from "@/components/PrintMenu";
 import { DateTimeCell } from "@/components/DateTimeCell";
 import { useConfirm, useToast } from "@/components/UIProvider";
 import { apiErrorMessage } from "@/lib/api-client";
@@ -439,12 +440,7 @@ export default function ContractsPage() {
                         <button onClick={() => openEdit(c)} className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-2 text-xs font-medium text-blue-600 transition hover:bg-blue-100" title={t("common.edit")}>
                           <Pencil size={14} />{t("common.edit")}
                         </button>
-                        <button onClick={() => window.open(`/api/invoices?type=contract&id=${c.id}`, "_blank")} className="inline-flex items-center gap-1 rounded-lg border border-green-200 bg-green-50 px-2.5 py-2 text-xs font-medium text-green-600 transition hover:bg-green-100" title="طباعة العقد">
-                          <Printer size={14} />
-                        </button>
-                        <button onClick={() => window.open(`/api/invoices?type=contract&id=${c.id}&format=receipt`, "_blank")} className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-xs font-medium text-emerald-600 transition hover:bg-emerald-100" title="طباعة الريسيت">
-                          <FileText size={14} />
-                        </button>
+                        <PrintMenu type="contract" id={c.id} />
                         <button onClick={() => handleStatusToggle(c.id, c.status)} className={`text-xs hover:underline ${c.status === "ACTIVE" ? "text-red-600" : "text-green-600"}`}>
                           {c.status === "ACTIVE" ? t("contracts.terminate") : t("contracts.activate")}
                         </button>

@@ -8,7 +8,7 @@ import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
 import DateRangeFilter, { inDateRange } from "@/components/DateRangeFilter";
-import { ArrowLeftRight, Eye, FileText, Pencil, Plus, Printer, RotateCcw, Save, Tags, Trash2, X } from "lucide-react";
+import { ArrowLeftRight, Eye, Pencil, Plus, RotateCcw, Save, Tags, Trash2, X } from "lucide-react";
 import ExportButton from "@/components/ExportButton";
 import PrinterLoader from "@/components/PrinterLoader";
 import { useConfirm, useToast } from "@/components/UIProvider";
@@ -16,6 +16,7 @@ import { apiErrorMessage } from "@/lib/api-client";
 import FormModal from "@/components/FormModal";
 import SelectWithAdd from "@/components/SelectWithAdd";
 import SearchableSelect from "@/components/SearchableSelect";
+import PrintMenu from "@/components/PrintMenu";
 import SubmitButton from "@/components/SubmitButton";
 import { DateTimeCell } from "@/components/DateTimeCell";
 import RefreshButton from "@/components/RefreshButton";
@@ -1112,12 +1113,7 @@ export default function SalesPage() {
                           <button onClick={(e) => { e.stopPropagation(); openEdit(order); }} className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-2 text-xs font-medium text-blue-600 transition hover:bg-blue-100" title={t("common.edit")}>
                             <Pencil size={14} />{t("common.edit")}
                           </button>
-                          <button onClick={(e) => { e.stopPropagation(); window.open(`/api/invoices?type=sale&id=${order.id}`, "_blank"); }} className="inline-flex items-center gap-1 rounded-lg border border-green-200 bg-green-50 px-2.5 py-2 text-xs font-medium text-green-600 transition hover:bg-green-100" title="طباعة الفاتورة">
-                            <Printer size={14} />
-                          </button>
-                          <button onClick={(e) => { e.stopPropagation(); window.open(`/api/invoices?type=sale&id=${order.id}&format=receipt`, "_blank"); }} className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-xs font-medium text-emerald-600 transition hover:bg-emerald-100" title="طباعة الريسيت">
-                            <FileText size={14} />
-                          </button>
+                          <PrintMenu type="sale" id={order.id} />
                           {order.items.length > 0 && (
                             <button onClick={() => setExpandedId(expandedId === order.id ? null : order.id)} className="text-blue-600 hover:underline text-xs">
                               {expandedId === order.id ? t("sales.hide") : `${order.items.length} ${t("sales.items")}`}
