@@ -309,7 +309,17 @@
     "underAccount": "رصيد تحت الحساب",
     "creditAvailable": "رصيد تحت الحساب المتاح",
     "creditHint": "يُخصم تلقائياً من فواتير البيع القادمة",
-    "paymentExcessHint": "أي مبلغ يزيد عن المديونية يتحول تلقائياً لرصيد تحت الحساب للعميل"
+    "paymentExcessHint": "أي مبلغ يزيد عن المديونية يتحول تلقائياً لرصيد تحت الحساب للعميل",
+    "balancesTitle": "أرصدة العملاء",
+    "balancesBtn": "أرصدة العملاء",
+    "balanceFilter": "الرصيد",
+    "debtorFilter": "مدين (عليه فلوس)",
+    "creditorFilter": "دائن (له رصيد)",
+    "totalDebt": "الدين الكلي",
+    "remaining": "المتبقي",
+    "lastPayment": "آخر دفعة",
+    "backToCustomers": "رجوع للعملاء",
+    "reportDate": "تاريخ التقرير"
   },
   "suppliers": {
     "title": "الموردون",
@@ -323,7 +333,21 @@
     "taxNumber": "الرقم الضريبي",
     "companyId": "معرّف الشركة",
     "searchPlaceholder": "ابحث باسم المورد أو جهة الاتصال أو الهاتف...",
-    "companyFilter": "الشركة"
+    "companyFilter": "الشركة",
+    "balancesTitle": "أرصدة الموردين",
+    "balancesBtn": "أرصدة الموردين",
+    "statement": "كشف حساب",
+    "statementType": "النوع",
+    "statementDetails": "البيان",
+    "statementPurchase": "فاتورة شراء",
+    "statementReturn": "مرتجع مشتريات",
+    "totalPurchases": "إجمالي المشتريات",
+    "ordersCount": "عدد الفواتير",
+    "returnsTotal": "إجمالي المرتجعات",
+    "balanceDue": "الرصيد المستحق",
+    "lastOrder": "آخر عملية",
+    "backToSuppliers": "رجوع للموردين",
+    "returnsNote": "ملحوظة: مرتجعات المشتريات تُخصم من إجمالي فاتورة الشراء لحظة اعتمادها، لذلك تظهر هنا للبيان فقط دون خصم مكرر."
   },
   "engineers": {
     "title": "المهندسون",

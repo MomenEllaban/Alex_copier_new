@@ -316,7 +316,17 @@
     "underAccount": "Under-account",
     "creditAvailable": "Available under-account credit",
     "creditHint": "Auto-deducted from upcoming sales invoices",
-    "paymentExcessHint": "Any amount above the outstanding debt automatically becomes under-account credit for the customer"
+    "paymentExcessHint": "Any amount above the outstanding debt automatically becomes under-account credit for the customer",
+    "balancesTitle": "Customer Balances",
+    "balancesBtn": "Customer Balances",
+    "balanceFilter": "Balance",
+    "debtorFilter": "Debtor (owes)",
+    "creditorFilter": "Creditor (has credit)",
+    "totalDebt": "Total Debt",
+    "remaining": "Remaining",
+    "lastPayment": "Last Payment",
+    "backToCustomers": "Back to customers",
+    "reportDate": "Report date"
   },
   "suppliers": {
     "title": "Suppliers",
@@ -330,7 +340,21 @@
     "taxNumber": "Tax Number",
     "companyId": "Company ID",
     "searchPlaceholder": "Search by supplier name, contact, or phone...",
-    "companyFilter": "Company"
+    "companyFilter": "Company",
+    "balancesTitle": "Supplier Balances",
+    "balancesBtn": "Supplier Balances",
+    "statement": "Statement",
+    "statementType": "Type",
+    "statementDetails": "Details",
+    "statementPurchase": "Purchase invoice",
+    "statementReturn": "Purchase return",
+    "totalPurchases": "Total Purchases",
+    "ordersCount": "Invoices Count",
+    "returnsTotal": "Total Returns",
+    "balanceDue": "Balance Due",
+    "lastOrder": "Last Order",
+    "backToSuppliers": "Back to suppliers",
+    "returnsNote": "Note: purchase returns are deducted from the invoice total on approval, so they appear here for reference only without double deduction."
   },
   "engineers": {
     "title": "Engineers",

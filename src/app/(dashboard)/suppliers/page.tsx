@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
 import ExportButton from "@/components/ExportButton";
-import { Eye, Pencil, Plus, Trash2, Upload, Save } from "lucide-react";
+import { Eye, FileText, Pencil, Plus, Trash2, Upload, Save, Wallet } from "lucide-react";
 import ImportDialog from "@/components/ImportDialog";
 import PrinterLoader from "@/components/PrinterLoader";
 import { useConfirm, useToast } from "@/components/UIProvider";
@@ -15,6 +16,8 @@ import SubmitButton from "@/components/SubmitButton";
 import { apiErrorMessage } from "@/lib/api-client";
 import { DateTimeCell } from "@/components/DateTimeCell";
 import RefreshButton from "@/components/RefreshButton";
+import SupplierStatementModal from "@/components/SupplierStatementModal";
+import type { PurchaseOrderLite, PurchaseReturnLite } from "@/lib/supplier-statement";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { notifyDataChanged } from "@/lib/data-events";
 
@@ -61,6 +64,9 @@ export default function SuppliersPage() {
   const [companyFilter, setCompanyFilter] = useState("");
   const [showImport, setShowImport] = useState(false);
   const [page, setPage] = useState(1);
+  const [orders, setOrders] = useState<PurchaseOrderLite[]>([]);
+  const [returns, setReturns] = useState<PurchaseReturnLite[]>([]);
+  const [statementId, setStatementId] = useState<string | null>(null);
   const PAGE_SIZE = 15;
 
   const fetchSuppliers = async () => {
@@ -141,6 +147,20 @@ export default function SuppliersPage() {
     setSelected(supplier);
   };
 
+  const openStatement = async (supplierId: string) => {
+    setStatementId(supplierId);
+    if (orders.length === 0) {
+      try {
+        const [purRes, retRes] = await Promise.all([fetch("/api/purchases"), fetch("/api/returns")]);
+        const [purData, retData] = await Promise.all([purRes.json(), retRes.json()]);
+        setOrders(Array.isArray(purData?.orders) ? purData.orders : []);
+        setReturns(Array.isArray(retData) ? retData : []);
+      } catch {
+        // Modal still opens; statement engine handles empty arrays.
+      }
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -195,9 +215,17 @@ export default function SuppliersPage() {
             <span className="ms-2 text-sm font-medium text-gray-400">({filtered.length})</span>
           </h1>
         </div>
-        <button onClick={openCreate} className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700">
-          <Plus size={16} />{t("suppliers.addSupplier")}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/suppliers/balances"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-700 shadow-sm transition hover:bg-amber-100"
+          >
+            <Wallet size={16} />{t("suppliers.balancesBtn")}
+          </Link>
+          <button onClick={openCreate} className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700">
+            <Plus size={16} />{t("suppliers.addSupplier")}
+          </button>
+        </div>
       </div>
 
       {formError && (
@@ -262,6 +290,9 @@ export default function SuppliersPage() {
             </div>
             <div className="mt-4 flex justify-end gap-2">
               <button onClick={() => setSelected(null)} className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">{t("common.close")}</button>
+              <button onClick={() => { const s = selected; setSelected(null); openStatement(s.id); }} className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-700">
+                <FileText size={14} />{t("suppliers.statement")}
+              </button>
               <button onClick={() => openEdit(selected)} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700">
                 <Pencil size={14} />{t("common.edit")}
               </button>
@@ -341,6 +372,9 @@ export default function SuppliersPage() {
                     <td className="px-4 py-3 text-sm">{supplier.taxNumber || "—"}</td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1">
+                        <button onClick={() => openStatement(supplier.id)} className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-xs font-medium text-sky-700 transition hover:bg-sky-100" title={t("suppliers.statement")}>
+                          <FileText size={14} />{t("suppliers.statement")}
+                        </button>
                         <button onClick={() => openDetails(supplier)} className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-100" title={t("common.view")}>
                           <Eye size={14} />{t("common.view")}
                         </button>
@@ -374,6 +408,21 @@ export default function SuppliersPage() {
         title={`${t("common.import")} — ${t("suppliers.title")}`}
         onImported={refresh}
       />
+
+      {statementId && (() => {
+        const s = suppliers.find((x) => x.id === statementId) || null;
+        return s ? (
+          <SupplierStatementModal
+            open={!!s}
+            onClose={() => setStatementId(null)}
+            supplierId={s.id}
+            supplierName={s.name}
+            companyName={s.company?.name}
+            orders={orders}
+            returns={returns}
+          />
+        ) : null;
+      })()}
     </div>
   );
 }

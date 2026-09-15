@@ -6,7 +6,7 @@ import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
-import { Pencil, Plus, Save, Trash2, Upload } from "lucide-react";
+import { Pencil, Plus, Save, Trash2, Upload, Wallet } from "lucide-react";
 import ExportButton from "@/components/ExportButton";
 import ImportDialog from "@/components/ImportDialog";
 import PrinterLoader from "@/components/PrinterLoader";
@@ -426,12 +426,20 @@ export default function CustomersPage() {
             <span className="ms-2 text-sm font-medium text-gray-400">({filtered.length})</span>
           </h1>
         </div>
-        <button
-          onClick={openCreate}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"
-        >
-          <Plus size={16} />{t("customers.addCustomer")}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/customers/balances"
+            className="inline-flex items-center justify-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-700 shadow-sm transition hover:bg-amber-100"
+          >
+            <Wallet size={16} />{t("customers.balancesBtn")}
+          </Link>
+          <button
+            onClick={openCreate}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"
+          >
+            <Plus size={16} />{t("customers.addCustomer")}
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
