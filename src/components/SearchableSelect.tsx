@@ -49,11 +49,15 @@ export default function SearchableSelect({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(0);
+  const [openUp, setOpenUp] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const reactId = useId();
   const inputId = id || `ss-${reactId.replace(/:/g, "")}`;
+
+  // Cap rendered rows so huge catalogs stay fast with a consistent scroll.
+  const MAX_RENDER = 100;
 
   const selected = useMemo(
     () => options.find((o) => o.value === value),
@@ -65,6 +69,8 @@ export default function SearchableSelect({
     if (!q) return options;
     return options.filter((o) => normalize(o.label).includes(q));
   }, [options, query]);
+
+  const visible = useMemo(() => filtered.slice(0, MAX_RENDER), [filtered]);
 
   useEffect(() => {
     if (!open) return;
@@ -98,11 +104,46 @@ export default function SearchableSelect({
     }
   }, [open ]);
 
+  // Smart direction: open upward when there is no room below
+  // (typical for the last rows inside a scrolled modal).
+  // Measured in the event handler (not an effect) per repo lint rules.
+  const measureDirection = () => {
+    const rect = rootRef.current?.getBoundingClientRect();
+    if (!rect) {
+      setOpenUp(false);
+      return;
+    }
+    const spaceBelow = window.innerHeight - rect.bottom;
+    setOpenUp(spaceBelow < 300 && rect.top > spaceBelow);
+  };
+
+  const handleToggle = () => {
+    if (disabled) return;
+    if (!open) measureDirection();
+    setOpen((o) => !o);
+  };
+
+  const handleOpen = () => {
+    if (disabled || open) return;
+    measureDirection();
+    setOpen(true);
+  };
+
+  // Keep the highlighted option in view WITHOUT moving the page or the
+  // modal: plain scrollIntoView() would scroll every scrollable ancestor.
+  // (offsetTop is relative to the positioned dropdown wrapper, so subtract
+  // the list's own offset to get the row position inside the scroll area.)
   useEffect(() => {
-    const el = listRef.current?.querySelector<HTMLElement>(
-      `[data-index="${highlight}"]`
-    );
-    el?.scrollIntoView({ block: "nearest" });
+    const list = listRef.current;
+    if (!list) return;
+    const el = list.querySelector<HTMLElement>(`[data-index="${highlight}"]`);
+    if (!el) return;
+    const top = el.offsetTop - list.offsetTop;
+    const bottom = top + el.offsetHeight;
+    if (top < list.scrollTop) list.scrollTop = top;
+    else if (bottom > list.scrollTop + list.clientHeight) {
+      list.scrollTop = bottom - list.clientHeight;
+    }
   }, [highlight]);
 
   const pick = (v: string) => {
@@ -132,15 +173,15 @@ export default function SearchableSelect({
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-disabled={disabled}
-        onClick={() => !disabled && setOpen((o) => !o)}
+        onClick={handleToggle}
         onKeyDown={(e) => {
           if (disabled) return;
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
-            setOpen((o) => !o);
+            handleToggle();
           } else if (e.key === "ArrowDown") {
             e.preventDefault();
-            setOpen(true);
+            handleOpen();
           }
         }}
         className={`flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
@@ -173,7 +214,7 @@ export default function SearchableSelect({
 
       {open && !disabled && (
         <div
-          className={`absolute z-[60] mt-1.5 w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl ${dropdownClassName}`}
+          className={`absolute z-[60] w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl ${openUp ? "bottom-full mb-1.5" : "top-full mt-1.5"} ${dropdownClassName}`}
         >
           {/* search is always visible while typing */}
           <div className="border-b border-gray-100 p-2">
@@ -192,13 +233,13 @@ export default function SearchableSelect({
                 onKeyDown={(e) => {
                   if (e.key === "ArrowDown") {
                     e.preventDefault();
-                    setHighlight((h) => Math.min(h + 1, filtered.length - 1));
+                    setHighlight((h) => Math.min(h + 1, visible.length - 1));
                   } else if (e.key === "ArrowUp") {
                     e.preventDefault();
                     setHighlight((h) => Math.max(h - 1, 0));
                   } else if (e.key === "Enter") {
                     e.preventDefault();
-                    const target = filtered[highlight];
+                    const target = visible[highlight];
                     if (target && !disabledValues?.includes(target.value)) pick(target.value);
                   }
                 }}
@@ -218,7 +259,7 @@ export default function SearchableSelect({
             </div>
           </div>
 
-          <div ref={listRef} role="listbox" className="max-h-60 overflow-y-auto p-1.5 sidebar-scroll">
+          <div ref={listRef} role="listbox" className="max-h-56 overflow-y-auto overscroll-contain p-1.5 sidebar-scroll">
             {/* clear / all option */}
             <div
               role="option"
@@ -233,7 +274,7 @@ export default function SearchableSelect({
               {!value && <Check size={15} className="text-blue-600" />}
             </div>
 
-            {filtered.map((opt, i) => {
+            {visible.map((opt, i) => {
               const active = opt.value === value;
               const isDisabled = disabledValues?.includes(opt.value);
               return (
@@ -261,9 +302,14 @@ export default function SearchableSelect({
             {filtered.length === 0 && (
               <div className="px-3 py-6 text-center text-sm text-gray-400">{emptyText}</div>
             )}
+            {filtered.length > visible.length && (
+              <div className="px-3 py-2 text-center text-xs text-gray-400">
+                عرض {visible.length} من {filtered.length} — اكتب حرفين على الأقل لتضييق البحث
+              </div>
+            )}
           </div>
 
-          {query && filtered.length > 0 && (
+          {filtered.length > 0 && (
             <div className="border-t border-gray-100 bg-slate-50 px-3 py-1.5 text-xs text-gray-400">
               {filtered.length} نتيجة
             </div>
