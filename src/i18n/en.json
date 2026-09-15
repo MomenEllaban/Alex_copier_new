@@ -952,6 +952,8 @@
     "machine": "Machine",
     "optionalMachine": "Machine (optional)",
     "noMachine": "No specific machine",
-    "totalTests": "Total tests"
+    "totalTests": "Total tests",
+    "chooseMachine": "Select machine (optional)",
+    "noCustomerMachinesHint": "Customer has no registered machines — you can pick from all machines"
   }
 }

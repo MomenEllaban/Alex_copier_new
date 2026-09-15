@@ -6,7 +6,7 @@ import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
-import { Pencil, Plus, Save, Trash2, Upload, Wallet } from "lucide-react";
+import { Camera, Pencil, Plus, Save, Trash2, Upload, Wallet } from "lucide-react";
 import ExportButton from "@/components/ExportButton";
 import ImportDialog from "@/components/ImportDialog";
 import PrinterLoader from "@/components/PrinterLoader";
@@ -105,6 +105,11 @@ export default function CustomersPage() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Customer | null>(null);
+  const [testsCustomer, setTestsCustomer] = useState<{
+    id: string;
+    name: string;
+    machines: { id: string; serialNumber: string; model?: string | null }[];
+  } | null>(null);
   const [page, setPage] = useState(1);
   const [typeFilter, setTypeFilter] = useState("");
   const [showImport, setShowImport] = useState(false);
@@ -283,6 +288,30 @@ export default function CustomersPage() {
   const openDetails = async (id: string) => {
     const res = await fetch(`/api/customers/${id}`);
     if (res.ok) setSelected(await res.json());
+  };
+
+  const openTests = async (customer: Customer) => {
+    try {
+      const res = await fetch(`/api/customers/${customer.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setTestsCustomer({
+          id: data.id,
+          name: data.name,
+          machines: (data.machines || []).map(
+            (m: { id: string; serialNumber: string; model?: string | null }) => ({
+              id: m.id,
+              serialNumber: m.serialNumber,
+              model: m.model ?? null,
+            }),
+          ),
+        });
+        return;
+      }
+    } catch {
+      /* fall through to row-data fallback */
+    }
+    setTestsCustomer({ id: customer.id, name: customer.name, machines: [] });
   };
 
   const resetLocForm = () => {
@@ -727,17 +756,6 @@ export default function CustomersPage() {
               )}
             </div>
 
-            {selected && (
-              <CopierTests
-                customerId={selected.id}
-                machines={(selected.machines || []).map((m) => ({
-                  id: m.id,
-                  serialNumber: m.serialNumber,
-                  model: m.model,
-                }))}
-              />
-            )}
-
             <div className="grid gap-4 mt-5 lg:grid-cols-2">
               <CustomerPanel title={t("customers.machines")}>
                 {selected.machines?.length ? selected.machines.map(machine => <div key={machine.id} className="flex justify-between border-b border-gray-100 py-2 text-sm"><Link href={`/machines?serial=${encodeURIComponent(machine.serialNumber)}`} className="font-mono font-medium text-blue-600 hover:underline">{machine.serialNumber}</Link><span>{[machine.manufacturer, machine.model].filter(Boolean).join(" ") || "—"} · {machine.currentStatus}</span></div>) : <p className="text-sm text-gray-400">{t("common.noData")}</p>}
@@ -763,6 +781,17 @@ export default function CustomersPage() {
               </button>
             </div>
           </>
+        )}
+      </FormModal>
+
+      <FormModal
+        open={!!testsCustomer}
+        onClose={() => setTestsCustomer(null)}
+        title={testsCustomer ? `${t("copierTests.title")} — ${testsCustomer.name}` : ""}
+        wide
+      >
+        {testsCustomer && (
+          <CopierTests customerId={testsCustomer.id} machines={testsCustomer.machines} />
         )}
       </FormModal>
 
@@ -851,6 +880,9 @@ export default function CustomersPage() {
                       <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                         <button onClick={() => openPaymentModal(customer)} className="inline-flex items-center gap-1 rounded-lg border border-green-200 bg-green-50 px-2.5 py-1.5 text-xs font-medium text-green-700 transition hover:bg-green-100" title="تسجيل دفعة">
                           دفع
+                        </button>
+                        <button onClick={() => openTests(customer)} className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-xs font-medium text-violet-700 transition hover:bg-violet-100" title={t("copierTests.title")}>
+                          <Camera size={14} />{t("copierTests.title")}
                         </button>
                         <button onClick={() => openStatement(customer)} className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-xs font-medium text-sky-700 transition hover:bg-sky-100" title={t("statement.openStatement")}>
                           كشف حساب

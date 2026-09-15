@@ -33,6 +33,13 @@ interface EngineerOption {
   isActive: boolean;
 }
 
+interface MachineOption {
+  id: string;
+  serialNumber: string;
+  model?: string | null;
+  ownerName?: string | null;
+}
+
 interface CopierTestsProps {
   customerId: string;
   machines?: CopierTestMachine[];
@@ -56,6 +63,7 @@ export default function CopierTests({ customerId, machines = [] }: CopierTestsPr
 
   const [tests, setTests] = useState<CopierTest[]>([]);
   const [engineers, setEngineers] = useState<EngineerOption[]>([]);
+  const [fallbackMachines, setFallbackMachines] = useState<MachineOption[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [engineerId, setEngineerId] = useState("");
@@ -87,6 +95,24 @@ export default function CopierTests({ customerId, machines = [] }: CopierTestsPr
         setEngineers(
           (Array.isArray(data) ? data : []).filter((e: EngineerOption) => e.isActive !== false),
         );
+      }
+      // If the customer has no linked machines, offer all machines so the
+      // machine field always has an input (optional to fill).
+      if (machines.length === 0) {
+        const machinesRes = await fetch("/api/machines");
+        if (machinesRes.ok) {
+          const data = await machinesRes.json();
+          setFallbackMachines(
+            (Array.isArray(data) ? data : []).map(
+              (m: { id: string; serialNumber: string; model?: string | null; currentOwner?: { name?: string } | null }) => ({
+                id: m.id,
+                serialNumber: m.serialNumber,
+                model: m.model ?? null,
+                ownerName: m.currentOwner?.name ?? null,
+              }),
+            ),
+          );
+        }
       }
     } finally {
       setLoading(false);
@@ -190,9 +216,14 @@ export default function CopierTests({ customerId, machines = [] }: CopierTestsPr
   };
 
   const latest = tests[0] ?? null;
+  const customerMachines: MachineOption[] = machines;
+  const machineOptions: MachineOption[] =
+    customerMachines.length > 0 ? customerMachines : fallbackMachines;
+  const machineLabel = (m: MachineOption) =>
+    `${m.serialNumber}${m.model ? ` — ${m.model}` : ""}${m.ownerName ? ` (${m.ownerName})` : ""}`;
 
   return (
-    <div dir={dir} className="mt-5 rounded-xl border border-violet-200 bg-violet-50/50 p-4">
+    <div dir={dir} className="rounded-xl border border-violet-200 bg-violet-50/50 p-4">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="flex items-center gap-2 text-sm font-bold text-violet-900">
           <Camera size={16} className="shrink-0" />
@@ -255,12 +286,14 @@ export default function CopierTests({ customerId, machines = [] }: CopierTestsPr
                       {latest.pageCount.toLocaleString(locale === "ar" ? "ar-EG" : "en-US")}
                     </span>
                   </div>
-                  <div>
-                    <span className="block text-xs text-gray-500">{t("copierTests.machine")}</span>
-                    <span className="font-medium text-slate-800" dir="ltr">
-                      {latest.machine?.serialNumber || "—"}
-                    </span>
-                  </div>
+                  {latest.machine && (
+                    <div>
+                      <span className="block text-xs text-gray-500">{t("copierTests.machine")}</span>
+                      <span className="font-medium text-slate-800" dir="ltr">
+                        {latest.machine.serialNumber}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -310,26 +343,26 @@ export default function CopierTests({ customerId, machines = [] }: CopierTestsPr
                     placeholder="1000"
                   />
                 </div>
-                {machines.length > 0 && (
-                  <div className="space-y-1.5">
-                    <label className="block text-sm font-medium text-slate-700">
-                      {t("copierTests.optionalMachine")}
-                    </label>
-                    <select
-                      value={machineId}
-                      onChange={(e) => setMachineId(e.target.value)}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-violet-500 focus:ring-2 focus:ring-violet-500 focus:outline-none"
-                    >
-                      <option value="">{t("copierTests.noMachine")}</option>
-                      {machines.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.serialNumber}
-                          {m.model ? ` — ${m.model}` : ""}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-slate-700">
+                    {t("copierTests.optionalMachine")}
+                  </label>
+                  <select
+                    value={machineId}
+                    onChange={(e) => setMachineId(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-violet-500 focus:ring-2 focus:ring-violet-500 focus:outline-none"
+                  >
+                    <option value="">{t("copierTests.chooseMachine")}</option>
+                    {machineOptions.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {machineLabel(m)}
+                      </option>
+                    ))}
+                  </select>
+                  {customerMachines.length === 0 && fallbackMachines.length > 0 && (
+                    <p className="text-xs text-gray-500">{t("copierTests.noCustomerMachinesHint")}</p>
+                  )}
+                </div>
                 <div className="space-y-1.5">
                   <label className="block text-sm font-medium text-slate-700">
                     {t("copierTests.testDate")}
@@ -429,6 +462,9 @@ export default function CopierTests({ customerId, machines = [] }: CopierTestsPr
                     {t("copierTests.engineer")}
                   </th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">
+                    {t("copierTests.machine")}
+                  </th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">
                     {t("copierTests.pageCount")}
                   </th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">
@@ -451,6 +487,9 @@ export default function CopierTests({ customerId, machines = [] }: CopierTestsPr
                       {formatDate(item.testDate)}
                     </td>
                     <td className="px-4 py-2 font-medium text-slate-800">{item.engineer.name}</td>
+                    <td className="px-4 py-2 text-slate-700" dir="ltr">
+                      {item.machine?.serialNumber || "—"}
+                    </td>
                     <td className="px-4 py-2 font-bold text-violet-700">
                       {item.pageCount.toLocaleString(locale === "ar" ? "ar-EG" : "en-US")}
                     </td>
