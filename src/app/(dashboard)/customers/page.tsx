@@ -14,6 +14,7 @@ import { useConfirm, useToast } from "@/components/UIProvider";
 import { useUrlParams, useSearchWithDefault } from "@/hooks/useUrlParams";
 import { apiErrorMessage } from "@/lib/api-client";
 import FormModal from "@/components/FormModal";
+import CopierTests from "@/components/CopierTests";
 import SubmitButton from "@/components/SubmitButton";
 import RefreshButton from "@/components/RefreshButton";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
@@ -725,6 +726,17 @@ export default function CustomersPage() {
                 !showLocForm && <p className="text-sm text-gray-400">{t("customers.noLocations")}</p>
               )}
             </div>
+
+            {selected && (
+              <CopierTests
+                customerId={selected.id}
+                machines={(selected.machines || []).map((m) => ({
+                  id: m.id,
+                  serialNumber: m.serialNumber,
+                  model: m.model,
+                }))}
+              />
+            )}
 
             <div className="grid gap-4 mt-5 lg:grid-cols-2">
               <CustomerPanel title={t("customers.machines")}>

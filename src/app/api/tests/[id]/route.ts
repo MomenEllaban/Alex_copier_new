@@ -1,0 +1,147 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { requireAuth, requirePageAccess, requireRole } from "@/lib/auth-helpers";
+import { deleteCopierTestImage } from "@/lib/copier-test-upload";
+
+const TEST_INCLUDE = {
+  engineer: { select: { id: true, name: true } },
+  machine: { select: { id: true, serialNumber: true, model: true } },
+  customer: { select: { id: true, name: true } },
+} as const;
+
+async function guardWrite() {
+  const customersAccess = await requirePageAccess("customers");
+  if (customersAccess) return { actor: customersAccess };
+  const serviceAccess = await requirePageAccess("serviceRequests");
+  if (serviceAccess) return { actor: serviceAccess };
+  const authed = await requireAuth();
+  return {
+    actor: null,
+    response: NextResponse.json(
+      { error: authed ? "Forbidden" : "Unauthorized" },
+      { status: authed ? 403 : 401 },
+    ),
+  };
+}
+
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const user = await requireAuth();
+    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { id } = await params;
+    const test = await prisma.copierTest.findUnique({
+      where: { id },
+      include: TEST_INCLUDE,
+    });
+    if (!test) {
+      return NextResponse.json({ error: "الاختبار غير موجود" }, { status: 404 });
+    }
+    return NextResponse.json(test);
+  } catch {
+    return NextResponse.json({ error: "Failed to fetch test" }, { status: 500 });
+  }
+}
+
+export async function PUT(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const { actor, response } = await guardWrite();
+    if (!actor && response) return response;
+    const { id } = await params;
+
+    const existing = await prisma.copierTest.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json({ error: "الاختبار غير موجود" }, { status: 404 });
+    }
+
+    const body = await request.json();
+    const updateData: Record<string, unknown> = {};
+
+    if (body.engineerId !== undefined) {
+      const engineerId = String(body.engineerId).trim();
+      if (!engineerId) {
+        return NextResponse.json({ error: "اختيار المهندس مطلوب", code: "ENGINEER_REQUIRED" }, { status: 400 });
+      }
+      const engineer = await prisma.engineer.findUnique({ where: { id: engineerId } });
+      if (!engineer || !engineer.isActive) {
+        return NextResponse.json({ error: "المهندس غير موجود", code: "ENGINEER_NOT_FOUND" }, { status: 400 });
+      }
+      updateData.engineerId = engineerId;
+    }
+
+    if (body.pageCount !== undefined) {
+      const pageCount = Number(body.pageCount);
+      if (!Number.isInteger(pageCount) || pageCount <= 0) {
+        return NextResponse.json({ error: "عدد الأوراق يجب أن يكون رقمًا أكبر من صفر", code: "PAGE_COUNT_INVALID" }, { status: 400 });
+      }
+      updateData.pageCount = pageCount;
+    }
+
+    if (body.testDate !== undefined) {
+      const testDate = new Date(String(body.testDate));
+      if (Number.isNaN(testDate.getTime())) {
+        return NextResponse.json({ error: "تاريخ الاختبار غير صالح", code: "TEST_DATE_INVALID" }, { status: 400 });
+      }
+      updateData.testDate = testDate;
+    }
+
+    if (body.notes !== undefined) {
+      updateData.notes =
+        body.notes != null && String(body.notes).trim() !== "" ? String(body.notes).trim() : null;
+    }
+
+    if (body.machineId !== undefined) {
+      if (body.machineId == null || String(body.machineId).trim() === "") {
+        updateData.machineId = null;
+      } else {
+        const machine = await prisma.machine.findUnique({ where: { id: String(body.machineId) } });
+        if (!machine) {
+          return NextResponse.json({ error: "الماكينة غير موجودة", code: "MACHINE_NOT_FOUND" }, { status: 400 });
+        }
+        updateData.machineId = machine.id;
+      }
+    }
+
+    const test = await prisma.copierTest.update({
+      where: { id },
+      data: updateData,
+      include: TEST_INCLUDE,
+    });
+    return NextResponse.json(test);
+  } catch {
+    return NextResponse.json({ error: "Failed to update test" }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const admin = await requireRole("GENERAL_MANAGER");
+    if (!admin) {
+      const authed = await requireAuth();
+      return NextResponse.json(
+        { error: authed ? "Forbidden" : "Unauthorized" },
+        { status: authed ? 403 : 401 },
+      );
+    }
+    const { id } = await params;
+
+    const existing = await prisma.copierTest.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json({ error: "الاختبار غير موجود" }, { status: 404 });
+    }
+
+    await prisma.copierTest.delete({ where: { id } });
+    await deleteCopierTestImage(existing.imagePublicId);
+    return NextResponse.json({ message: "Test deleted" });
+  } catch {
+    return NextResponse.json({ error: "Failed to delete test" }, { status: 500 });
+  }
+}

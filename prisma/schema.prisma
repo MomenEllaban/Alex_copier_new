@@ -186,6 +186,7 @@ model Customer {
   settlements       Settlement[]
   returns           ReturnTransaction[]
   payments          CustomerPayment[]
+  copierTests       CopierTest[]
 }
 
 model CustomerPayment {
@@ -275,6 +276,7 @@ model Engineer {
   settlements     Settlement[]
   warranties      Warranty[]
   salesOrders     SalesOrder[]
+  copierTests     CopierTest[]
 }
 
 model EngineerArea {
@@ -471,6 +473,7 @@ model Machine {
   contracts        ContractMachine[]
   scrapOrder       ScrapOrder?
   warranty         Warranty?
+  copierTests      CopierTest[]
 }
 
 model MachineOwnerHistory {
@@ -1150,4 +1153,28 @@ model EngineerSalary {
   updatedAt          DateTime  @updatedAt
 
   engineer Engineer @relation(fields: [engineerId], references: [id], onDelete: Cascade)
+}
+
+// ═══════════════════════════════════════════════════════════
+// PHASE 10 - COPIER TESTS (اختبارات آلات التصوير)
+// ═══════════════════════════════════════════════════════════
+
+model CopierTest {
+  id            String   @id @default(cuid())
+  customerId    String
+  engineerId    String
+  machineId     String?
+  pageCount     Int
+  imageUrl      String
+  imagePublicId String
+  notes         String?
+  testDate      DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  engineer Engineer @relation(fields: [engineerId], references: [id], onDelete: Restrict)
+  machine  Machine? @relation(fields: [machineId], references: [id], onDelete: SetNull)
+
+  @@index([customerId, testDate])
 }
