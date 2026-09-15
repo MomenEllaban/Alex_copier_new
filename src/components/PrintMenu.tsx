@@ -49,7 +49,7 @@ export default function PrintMenu({ type, id }: PrintMenuProps) {
   };
 
   return (
-    <div ref={rootRef} className="relative" onClick={(e) => e.stopPropagation()}>
+    <div ref={rootRef} className="relative inline-block" onClick={(e) => e.stopPropagation()}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}

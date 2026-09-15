@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AddFormBoundary, useAutoAddForm } from "@/hooks/useAutoAddForm";
 import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
@@ -105,7 +105,7 @@ export default function PurchasesPage() {
   const [supplierFilter, setSupplierFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [form, setForm] = useState({ companyId: "", supplierId: "", notes: "", status: "CONFIRMED" });
+  const [form, setForm] = useState({ companyId: "", supplierId: "", notes: "", status: "CONFIRMED", orderDate: new Date().toISOString().slice(0, 10) });
   const [itemRows, setItemRows] = useState<ItemRow[]>([{ productId: "", quantity: "", unitPrice: "" }]);
   const [priceHistory, setPriceHistory] = useState<Record<string, PriceHistory>>({});
   const [priceHistoryLoading, setPriceHistoryLoading] = useState<Record<string, boolean>>({});
@@ -155,9 +155,18 @@ export default function PurchasesPage() {
   useEffect(() => { fetchData(); }, []);
   const { refresh, refreshing } = useAutoRefresh(fetchData, ["purchases", "products", "inventory", "warehouses", "suppliers", "returns"]);
 
+  const openCreateOrder = () => {
+    setEditingId(null);
+    setForm({ companyId: "", supplierId: "", notes: "", status: "CONFIRMED", orderDate: new Date().toISOString().slice(0, 10) });
+    setItemRows([{ productId: "", quantity: "", unitPrice: "" }]);
+    setPriceHistory({});
+    setPriceHistoryLoading({});
+    setShowForm(true);
+  };
+
   const autoAddOpen = useAutoAddForm();
   useEffect(() => {
-    if (autoAddOpen) setShowForm(true);
+    if (autoAddOpen) openCreateOrder();
   }, [autoAddOpen]);
 
   const filtered = orders.filter(order =>
@@ -243,13 +252,25 @@ export default function PurchasesPage() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    const items = itemRows.filter((r) => r.productId && r.quantity && r.unitPrice).map((r) => ({ productId: r.productId, quantity: parseInt(r.quantity), unitPrice: parseFloat(r.unitPrice) }));
-    if (items.length === 0) { setSaving(false); return; }
     if (!form.companyId) { toastError(t("purchases.selectCompany")); return; }
     if (!form.supplierId) { toastError(t("purchases.selectSupplier")); return; }
+    // Received orders have their items frozen (stock already posted) — header-only edit.
+    const locked = editingId && orders.find((o) => o.id === editingId)?.status === "RECEIVED";
+    const items = locked
+      ? []
+      : itemRows
+          .filter((r) => r.productId && r.quantity && r.unitPrice)
+          .map((r) => ({ productId: r.productId, quantity: parseInt(r.quantity), unitPrice: parseFloat(r.unitPrice) }))
+          .filter((it) => Number.isFinite(it.quantity) && it.quantity > 0 && Number.isFinite(it.unitPrice) && it.unitPrice >= 0);
+    if (!locked && items.length === 0) { toastError(t("purchases.addItemsFirst")); return; }
     setSaving(true);
     try {
-      const payload = editingId ? { ...form, items } : { ...form, orderDate: new Date().toISOString(), items };
+      const orderDateIso = form.orderDate
+        ? new Date(`${form.orderDate}T12:00:00.000Z`).toISOString()
+        : new Date().toISOString();
+      const payload = editingId
+        ? { ...form, orderDate: orderDateIso, ...(locked ? {} : { items }) }
+        : { ...form, orderDate: orderDateIso, items };
       const url = editingId ? `/api/purchases/${editingId}` : "/api/purchases";
       const method = editingId ? "PUT" : "POST";
       const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
@@ -259,19 +280,45 @@ export default function PurchasesPage() {
     } finally {
       setSaving(false);
     }
-    setForm({ companyId: "", supplierId: "", notes: "", status: "CONFIRMED" });
+    resetOrderForm();
+    refresh();
+    notifyDataChanged(["purchases", "products", "inventory", "warehouses", "suppliers"]);
+  };
+
+  const resetOrderForm = () => {
+    setForm({ companyId: "", supplierId: "", notes: "", status: "CONFIRMED", orderDate: new Date().toISOString().slice(0, 10) });
     setItemRows([{ productId: "", quantity: "", unitPrice: "" }]);
     setEditingId(null);
     setShowForm(false);
     setPriceHistory({});
     setPriceHistoryLoading({});
-    refresh();
-    notifyDataChanged(["purchases", "products", "inventory", "warehouses", "suppliers"]);
   };
+
+  // Live order totals (ERP-style preview before save).
+  const orderTotals = useMemo(() => {
+    const lines = itemRows.map((r) => {
+      const qty = parseInt(r.quantity);
+      const price = parseFloat(r.unitPrice);
+      const lineTotal = Number.isFinite(qty) && Number.isFinite(price) && qty > 0 && price >= 0 ? qty * price : 0;
+      return { valid: lineTotal > 0 && r.productId !== "", lineTotal };
+    });
+    return {
+      itemsCount: lines.filter((l) => l.valid).length,
+      grandTotal: lines.reduce((s, l) => s + l.lineTotal, 0),
+    };
+  }, [itemRows]);
+
+  const editingLocked = editingId ? orders.find((o) => o.id === editingId)?.status === "RECEIVED" : false;
 
   const openEditOrder = (order: PurchaseOrder) => {
     setEditingId(order.id);
-    setForm({ companyId: order.companyId, supplierId: order.supplierId, notes: order.notes || "", status: order.status });
+    setForm({
+      companyId: order.companyId,
+      supplierId: order.supplierId,
+      notes: order.notes || "",
+      status: order.status,
+      orderDate: (order.orderDate || order.createdAt || "").slice(0, 10),
+    });
     setItemRows(
       order.items.length > 0
         ? order.items.map((it) => ({ productId: it.productId, quantity: String(it.quantity), unitPrice: String(it.unitPrice) }))
@@ -385,10 +432,10 @@ export default function PurchasesPage() {
           <p className="text-xs font-medium tracking-[0.2em] text-sky-600 uppercase">ERP</p>
           <h1 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl lg:text-3xl">{t("purchases.title")}</h1>
         </div>
-        <button onClick={() => setShowForm(true)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"><Plus size={16} />{t("purchases.addOrder")}</button>
+        <button onClick={openCreateOrder} className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"><Plus size={16} />{t("purchases.addOrder")}</button>
       </div>
 
-      <FormModal open={showForm} onClose={() => { setShowForm(false); setEditingId(null); }} title={editingId ? "تعديل فاتورة شراء" : t("purchases.addOrder")} wide>
+      <FormModal open={showForm} onClose={resetOrderForm} title={editingId ? "تعديل فاتورة شراء" : t("purchases.addOrder")} wide>
         <form onSubmit={handleCreate} className="space-y-5">
           <div className="flex items-center justify-between rounded-xl border border-purple-200 bg-purple-50 px-4 py-3 text-purple-700">
             <span className="text-sm font-bold">{editingId ? "تعديل فاتورة شراء" : t("purchases.addOrder")}</span>
@@ -426,14 +473,21 @@ export default function PurchasesPage() {
               }}
             />
           </div>
-          {editingId && (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-slate-700">{t("common.status")}</label>
+              <label className="block text-sm font-medium text-slate-700">{t("purchases.orderDate")}</label>
+              <input type="date" value={form.orderDate} onChange={(e) => setForm({ ...form, orderDate: e.target.value })} className={inputClass} required />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-slate-700">{t("purchases.orderStatus")}</label>
               <select value={form.status || "CONFIRMED"} onChange={(e) => setForm({ ...form, status: e.target.value })} className={inputClass}>
                 {Object.entries(STATUS_LABELS).map(([value, label]) => (<option key={value} value={value}>{label}</option>))}
               </select>
+              {form.status === "RECEIVED" && (
+                <p className="text-xs text-green-700">{t("purchases.receivedStockHint")}</p>
+              )}
             </div>
-          )}
+          </div>
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-slate-700">{t("common.notes")}</label>
             <textarea placeholder={t("common.notes")} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className={inputClass} rows={2} />
@@ -441,29 +495,41 @@ export default function PurchasesPage() {
           <div className="rounded-xl border border-gray-200 bg-slate-50 p-4">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-slate-700">{t("purchases.items")}</h3>
-              <button type="button" onClick={addRow} className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800"><Plus size={16} />{t("purchases.addRow")}</button>
+              {!editingLocked && (
+                <button type="button" onClick={addRow} className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800"><Plus size={16} />{t("purchases.addRow")}</button>
+              )}
             </div>
+            {editingLocked && (
+              <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">{t("purchases.itemsLockedHint")}</p>
+            )}
             <div className="space-y-3">
               {itemRows.map((row, idx) => {
                 const ph = row.productId ? priceHistory[row.productId] : undefined;
                 const phLoading = row.productId ? Boolean(priceHistoryLoading[row.productId]) : false;
                 const lastPurchase = ph?.lastPurchasePrice != null ? ph.lastPurchasePrice.toLocaleString() : null;
+                const qty = parseInt(row.quantity);
+                const price = parseFloat(row.unitPrice);
+                const lineTotal = Number.isFinite(qty) && Number.isFinite(price) && qty > 0 && price >= 0 ? qty * price : 0;
                 return (
                   <div key={idx} className="rounded-lg border border-gray-200 bg-white p-4">
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_130px_160px_auto]">
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_110px_140px_140px_auto]">
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("sales.product")}</label>
-                        <SearchableSelect value={row.productId} onChange={(v) => updateRow(idx, "productId", v)} options={products.map((p) => ({ value: p.id, label: p.name }))} placeholder={t("purchases.selectProduct")} />
+                        <SearchableSelect value={row.productId} onChange={(v) => updateRow(idx, "productId", v)} options={products.map((p) => ({ value: p.id, label: p.name }))} placeholder={t("purchases.selectProduct")} disabled={editingLocked} />
                       </div>
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("purchases.quantity")}</label>
-                        <input type="number" placeholder={t("purchases.quantity")} value={row.quantity} onChange={(e) => updateRow(idx, "quantity", e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" min="1" />
+                        <input type="number" placeholder={t("purchases.quantity")} value={row.quantity} onChange={(e) => updateRow(idx, "quantity", e.target.value)} disabled={editingLocked} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-400" min="1" />
                       </div>
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("purchases.unitPrice")}</label>
-                        <input type="number" placeholder={t("purchases.unitPrice")} value={row.unitPrice} onChange={(e) => updateRow(idx, "unitPrice", e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" min="0" step="0.01" />
+                        <input type="number" placeholder={t("purchases.unitPrice")} value={row.unitPrice} onChange={(e) => updateRow(idx, "unitPrice", e.target.value)} disabled={editingLocked} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-400" min="0" step="0.01" />
                       </div>
-                      {itemRows.length > 1 && <button type="button" onClick={() => removeRow(idx)} className="mt-7 inline-flex h-11 w-11 items-center justify-center self-start rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100">×</button>}
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("purchases.lineTotal")}</label>
+                        <p className="rounded-lg bg-slate-100 px-3 py-2.5 text-sm font-bold text-slate-800">{lineTotal > 0 ? `${lineTotal.toLocaleString()} ج.م` : "—"}</p>
+                      </div>
+                      {!editingLocked && itemRows.length > 1 && <button type="button" onClick={() => removeRow(idx)} className="mt-7 inline-flex h-11 w-11 items-center justify-center self-start rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100">×</button>}
                     </div>
                     {row.productId && (
                       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg bg-blue-50/60 px-3 py-2">
@@ -482,6 +548,10 @@ export default function PurchasesPage() {
                   </div>
                 );
               })}
+            </div>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3">
+              <span className="text-sm font-medium text-sky-700">{t("purchases.itemsCount")}: {orderTotals.itemsCount}</span>
+              <span className="text-base font-bold text-sky-800">{t("purchases.grandTotal")}: {orderTotals.grandTotal.toLocaleString()} ج.م</span>
             </div>
           </div>
           <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row sm:justify-end">
@@ -518,7 +588,7 @@ export default function PurchasesPage() {
               {t("common.resetFilters")}
             </button>
           )}
-          <div className="md:ms-auto mt-2 md:mt-0">
+          <div className="flex flex-wrap gap-2 md:ms-auto mt-2 md:mt-0">
             <RefreshButton onRefresh={refresh} refreshing={refreshing} />
             <ExportButton filename="purchase-orders" getExport={exportPurchases} disabled={filtered.length === 0} />
           </div>
@@ -540,7 +610,7 @@ export default function PurchasesPage() {
         )
         : (
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[860px]">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("purchases.orderNumber")}</th>
@@ -549,33 +619,35 @@ export default function PurchasesPage() {
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("common.status")}</th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("purchases.total")}</th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("common.date")}</th>
-                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500"></th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("common.actions")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {paged.map((order) => (
                   <tr key={order.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm font-medium">{order.id.slice(0, 8)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm font-medium"><span dir="ltr">{order.id.slice(0, 8)}</span></td>
                     <td className="px-4 py-3 text-sm">{order.company?.name || companies.find(c => c.id === order.companyId)?.name || "—"}</td>
-                    <td className="px-4 py-3 text-sm">{order.supplier.name}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[order.status] || ""}`}>
+                    <td className="px-4 py-3 text-sm">{order.supplier?.name || "—"}</td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColors[order.status] || ""}`}>
                         {STATUS_LABELS[order.status] || order.status}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-sm">{order.total.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-sm"><DateTimeCell value={order.orderDate || order.createdAt} /></td>
-                    <td className="px-4 py-3">
-                      <button onClick={() => setViewingOrder(order)} className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-2 text-xs font-medium text-blue-600 transition hover:bg-blue-100" title={t("common.view")}>
-                        <Eye size={14} />
-                      </button>
-                      <button onClick={() => openEditOrder(order)} className="ms-1 inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-2 text-xs font-medium text-sky-600 transition hover:bg-sky-100" title={t("common.edit")}>
-                        <Pencil size={14} />
-                      </button>
-                      <PrintMenu type="purchase" id={order.id} />
-                      <button onClick={() => handleDelete(order.id)} className="ms-1 inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-2 text-xs font-medium text-red-600 transition hover:bg-red-100" title={t("common.delete")}>
-                        <Trash2 size={14} />
-                      </button>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm font-medium">{order.total.toLocaleString()} ج.م</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm"><DateTimeCell value={order.orderDate || order.createdAt} /></td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={() => setViewingOrder(order)} className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-2 text-xs font-medium text-blue-600 transition hover:bg-blue-100" title={t("common.view")}>
+                          <Eye size={14} />
+                        </button>
+                        <button onClick={() => openEditOrder(order)} className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-2 text-xs font-medium text-sky-600 transition hover:bg-sky-100" title={t("common.edit")}>
+                          <Pencil size={14} />
+                        </button>
+                        <PrintMenu type="purchase" id={order.id} />
+                        <button onClick={() => handleDelete(order.id)} className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-2 text-xs font-medium text-red-600 transition hover:bg-red-100" title={t("common.delete")}>
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -607,7 +679,7 @@ export default function PurchasesPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[900px]">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("purchases.orderNumber")}</th>
@@ -617,32 +689,34 @@ export default function PurchasesPage() {
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("purchases.total")}</th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("sales.paymentMethod")}</th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("common.date")}</th>
-                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500"></th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("common.actions")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {icPaged.map((ic) => (
                   <tr key={ic.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm font-medium">{ic.invoiceNumber}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm font-medium"><span dir="ltr">{ic.invoiceNumber}</span></td>
                     <td className="px-4 py-3 text-sm">{ic.fromCompany?.name || "—"}</td>
                     <td className="px-4 py-3 text-sm">{ic.toCompany?.name || "—"}</td>
-                    <td className="px-4 py-3 text-sm">{ic.items && ic.items.length ? ic.items.map((x) => x.product?.name).join("، ") : "—"}</td>
-                    <td className="px-4 py-3 text-sm">{ic.total.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-sm">
+                    <td className="max-w-[220px] truncate px-4 py-3 text-sm">{ic.items && ic.items.length ? ic.items.map((x) => x.product?.name).join("، ") : "—"}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm font-medium">{ic.total.toLocaleString()} ج.م</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm">
                       {ic.internalPaymentMethod === "CASH" ? (
-                        <span className="inline-flex rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">{t("sales.cash")}</span>
+                        <span className="inline-flex whitespace-nowrap rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-700">{t("sales.cash")}</span>
                       ) : (
-                        <span className="inline-flex rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">{t("sales.credit")}</span>
+                        <span className="inline-flex whitespace-nowrap rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700">{t("sales.credit")}</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-sm"><DateTimeCell value={ic.invoiceDate || ic.createdAt} /></td>
-                    <td className="px-4 py-3">
-                      <button onClick={() => setViewingIc(ic)} className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-2 text-xs font-medium text-blue-600 transition hover:bg-blue-100" title={t("common.view")}>
-                        <Eye size={14} />
-                      </button>
-                      <button onClick={() => openEditIc(ic)} className="ms-1 inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-2 text-xs font-medium text-indigo-600 transition hover:bg-indigo-100" title={t("common.edit")}>
-                        <Pencil size={14} />
-                      </button>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm"><DateTimeCell value={ic.invoiceDate || ic.createdAt} /></td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <button onClick={() => setViewingIc(ic)} className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-2 text-xs font-medium text-blue-600 transition hover:bg-blue-100" title={t("common.view")}>
+                          <Eye size={14} />
+                        </button>
+                        <button onClick={() => openEditIc(ic)} className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-2 text-xs font-medium text-indigo-600 transition hover:bg-indigo-100" title={t("common.edit")}>
+                          <Pencil size={14} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

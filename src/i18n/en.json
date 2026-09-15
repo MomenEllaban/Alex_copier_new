@@ -489,7 +489,14 @@
     "internalPaymentMethod": "Internal payment method",
     "internalPaidAmount": "Internal paid amount",
     "saveOrder": "Save invoice",
-    "selectCompany": "Select Company"
+    "selectCompany": "Select Company",
+    "orderDate": "Order date",
+    "orderStatus": "Order status",
+    "receivedStockHint": "Receiving posts the goods into the company's main warehouse",
+    "itemsCount": "Items count",
+    "grandTotal": "Order total",
+    "addItemsFirst": "Add at least one row with a valid product, quantity and price",
+    "itemsLockedHint": "Items are locked because this order was received into stock — header fields only can be edited"
   },
   "sales": {
     "title": "Sales",

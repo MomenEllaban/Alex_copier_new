@@ -482,7 +482,14 @@
     "internalPaymentMethod": "طريقة السداد الداخلي",
     "internalPaidAmount": "المبلغ المسدد داخلياً",
     "saveOrder": "حفظ الفاتورة",
-    "selectCompany": "اختر الشركة"
+    "selectCompany": "اختر الشركة",
+    "orderDate": "تاريخ الطلب",
+    "orderStatus": "حالة الطلب",
+    "receivedStockHint": "الاستلام يُدخل البضاعة في المخزون الرئيسي للشركة",
+    "itemsCount": "عدد الأصناف",
+    "grandTotal": "إجمالي الطلب",
+    "addItemsFirst": "أضف صنفاً واحداً على الأقل بمنتج وكمية وسعر صحيح",
+    "itemsLockedHint": "البنود مثبّتة لأن الطلب تم استلامه ودخل المخزون — يمكن تعديل بيانات الترويسة فقط"
   },
   "sales": {
     "title": "المبيعات",

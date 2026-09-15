@@ -1062,7 +1062,7 @@ export default function SalesPage() {
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("sales.paymentMethod")}</th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("sales.paymentStatus")}</th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("common.date")}</th>
-                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500"></th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("common.actions")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">

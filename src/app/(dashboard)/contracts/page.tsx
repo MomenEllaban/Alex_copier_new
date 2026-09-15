@@ -388,7 +388,7 @@ export default function ContractsPage() {
               {t("common.resetFilters")}
             </button>
           )}
-          <div className="md:ms-auto mt-2 md:mt-0">
+          <div className="flex flex-wrap gap-2 md:ms-auto mt-2 md:mt-0">
             <RefreshButton onRefresh={refresh} refreshing={refreshing} />
             <ExportButton filename="contracts" getExport={exportContracts} disabled={filtered.length === 0} />
           </div>

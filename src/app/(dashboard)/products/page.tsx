@@ -404,7 +404,7 @@ export default function ProductsPage() {
           <FilterSelect value={companyFilter} onChange={(v) => { setCompanyFilter(v); setPage(1); }} options={companies.map((c) => ({ value: c.id, label: c.nameAr || c.name }))} allLabel={`${t("warehouses.company")} — ${t("common.all")}`} className="md:w-52" />
           <FilterSelect value={activeFilter} onChange={(v) => { setActiveFilter(v); setPage(1); }} options={[{ value: "true", label: t("common.active") }, { value: "false", label: t("common.inactive") }]} allLabel={`${t("common.status")} — ${t("common.all")}`} className="md:w-36" />
           {hasActiveFilters && (<button onClick={() => { setSearch(""); setTypeFilter(""); setCompanyFilter(""); setActiveFilter(""); }} className="text-sm text-slate-500 underline transition hover:text-slate-700">{t("common.resetFilters")}</button>)}
-          <div className="md:ms-auto mt-2 md:mt-0"><RefreshButton onRefresh={refresh} refreshing={refreshing} /><ExportButton filename="products" getExport={exportProducts} disabled={filtered.length === 0} /></div>
+          <div className="flex flex-wrap gap-2 md:ms-auto mt-2 md:mt-0"><RefreshButton onRefresh={refresh} refreshing={refreshing} /><ExportButton filename="products" getExport={exportProducts} disabled={filtered.length === 0} /></div>
         </div>
 
         <div className="overflow-x-auto">
