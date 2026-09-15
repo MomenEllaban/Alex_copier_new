@@ -111,7 +111,7 @@ export default function SupplierStatementModal({
       {statement.entries.length === 0 ? (
         <p className="py-8 text-center text-sm text-gray-400">{t("common.noData")}</p>
       ) : (
-        <div className="max-h-[50vh] overflow-y-auto rounded-xl border border-gray-200">
+        <div className="max-h-[50vh] overflow-auto rounded-xl border border-gray-200">
           <table className="w-full min-w-[560px] text-sm">
             <thead className="bg-gray-50">
               <tr>

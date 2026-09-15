@@ -558,20 +558,20 @@ export default function ReturnsPage() {
               <tbody className="divide-y divide-gray-200">
                 {pagedReturns.map((item) => (
                   <tr key={item.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3">
-                      <span className="rounded-full bg-violet-100 px-2.5 py-1 text-xs font-medium text-violet-700">
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <span className="whitespace-nowrap rounded-full bg-violet-100 px-2.5 py-1 text-xs font-medium text-violet-700">
                         {RETURN_TYPE_LABELS[item.type] || item.type}
                       </span>
                     </td>
                     <td className="px-4 py-3">{item.company?.nameAr || item.company?.name || "—"}</td>
                     <td className="px-4 py-3">{item.product?.name || "—"}</td>
                     <td className="px-4 py-3">{item.customer?.name || item.supplier?.name || "—"}</td>
-                    <td className="px-4 py-3 text-xs text-gray-500">{item.salesOrder?.id?.slice(0, 8) || item.purchaseOrder?.id?.slice(0, 8) || "—"}</td>
-                    <td className="px-4 py-3 font-medium">{item.quantity}</td>
-                    <td className="px-4 py-3">{item.unitPrice.toLocaleString()}</td>
-                    <td className="px-4 py-3 font-semibold">{item.total.toLocaleString()}</td>
-                    <td className="px-4 py-3">
-                      <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusClasses[item.status] || "bg-slate-100 text-slate-700"}`}>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500"><span dir="ltr">{item.salesOrder?.id?.slice(0, 8) || item.purchaseOrder?.id?.slice(0, 8) || "—"}</span></td>
+                    <td className="whitespace-nowrap px-4 py-3 font-medium">{item.quantity}</td>
+                    <td className="whitespace-nowrap px-4 py-3">{item.unitPrice.toLocaleString()}</td>
+                    <td className="whitespace-nowrap px-4 py-3 font-semibold">{item.total.toLocaleString()}</td>
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${statusClasses[item.status] || "bg-slate-100 text-slate-700"}`}>
                         {RETURN_STATUS_LABELS[item.status] || item.status}
                       </span>
                     </td>

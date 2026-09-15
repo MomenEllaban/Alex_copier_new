@@ -981,7 +981,8 @@ export default function SalesPage() {
             {viewingOrder.items.length > 0 && (
               <div className="rounded-lg border border-gray-200 bg-slate-50 p-4">
                 <h3 className="mb-3 text-sm font-semibold text-slate-700">{t("sales.items")}</h3>
-                <table className="w-full">
+                <div className="overflow-x-auto">
+                <table className="w-full min-w-[560px]">
                   <thead>
                     <tr>
                       <th className="px-3 py-2 text-start text-xs font-medium text-gray-500">{t("sales.product")}</th>
@@ -1015,6 +1016,7 @@ export default function SalesPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               </div>
             )}
           </div>
@@ -1128,7 +1130,8 @@ export default function SalesPage() {
                     {expandedId === order.id && (
                       <tr key={`${order.id}-items`}>
                         <td colSpan={11} className="px-4 py-3 bg-gray-50">
-                          <table className="w-full">
+                          <div className="overflow-x-auto">
+                          <table className="w-full min-w-[560px]">
                             <thead>
                               <tr>
                                 <th className="px-3 py-2 text-start text-xs font-medium text-gray-500">{t("sales.product")}</th>
@@ -1162,6 +1165,7 @@ export default function SalesPage() {
                               ))}
                             </tbody>
                           </table>
+                          </div>
                         </td>
                       </tr>
                     )}

@@ -312,14 +312,14 @@ export default function SettlementsPage() {
                 <tbody className="divide-y divide-gray-200">
                   {paged.map((s) => (
                     <tr key={s.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm font-medium">{s.settlementNumber}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm font-medium"><span dir="ltr">{s.settlementNumber}</span></td>
                       <td className="px-4 py-3 text-sm">{s.company.name}</td>
                       <td className="px-4 py-3 text-sm">
                         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${s.direction === "SUBTRACTION" ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}>
                           {t(s.direction === "SUBTRACTION" ? "settlements.directionSubtraction" : "settlements.directionAddition")}
                         </span>
                       </td>
-                      <td className={`px-4 py-3 text-sm font-medium ${s.direction === "SUBTRACTION" ? "text-red-600" : "text-slate-900"}`}>
+                      <td className={`whitespace-nowrap px-4 py-3 text-sm font-medium ${s.direction === "SUBTRACTION" ? "text-red-600" : "text-slate-900"}`}>
                         {s.direction === "SUBTRACTION" ? "−" : "+"}{s.amount.toLocaleString()}
                       </td>
                       <td className="px-4 py-3 text-sm">{PAYMENT_METHOD_LABELS[s.paymentMethod] || s.paymentMethod}</td>
@@ -330,11 +330,13 @@ export default function SettlementsPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-sm">{s.collector.name}</td>
-                      <td className="px-4 py-3 text-sm"><DateTimeCell value={s.createdAt} /></td>
-                      <td className="px-4 py-3 text-sm">
-                        {s.status === "INITIAL" && canVerify && (<button onClick={() => handleVerify(s.id)} className="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700"><CheckCircle2 size={14} className="inline-block me-1" />{t("common.verify")}</button>)}
-                        {s.status === "INITIAL" && (<button onClick={() => handleDelete(s.id)} className="ms-1 inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-100" title={t("common.delete")}><Trash2 size={12} /></button>)}
-                        {s.status === "VERIFIED" && s.verifier && (<span className="text-green-600 text-xs">{t("settlements.by")} {s.verifier.name}</span>)}
+                      <td className="whitespace-nowrap px-4 py-3 text-sm"><DateTimeCell value={s.createdAt} /></td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm">
+                        <div className="flex items-center gap-1.5">
+                          {s.status === "INITIAL" && canVerify && (<button onClick={() => handleVerify(s.id)} className="bg-green-600 text-white px-3 py-1 rounded text-xs hover:bg-green-700"><CheckCircle2 size={14} className="inline-block me-1" />{t("common.verify")}</button>)}
+                          {s.status === "INITIAL" && (<button onClick={() => handleDelete(s.id)} className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-100" title={t("common.delete")}><Trash2 size={12} /></button>)}
+                          {s.status === "VERIFIED" && s.verifier && (<span className="text-green-600 text-xs">{t("settlements.by")} {s.verifier.name}</span>)}
+                        </div>
                       </td>
                     </tr>
                   ))}
