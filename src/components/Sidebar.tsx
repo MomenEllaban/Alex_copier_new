@@ -131,9 +131,21 @@ export default function Sidebar() {
 
   const isCollapsed = isDesktop && collapsed;
 
+  const allNavHrefs = navGroups.flatMap((g) => g.items.map((i) => i.href));
+
   const isActive = (href: string) => {
     if (href === "/") return pathname === "/";
-    return pathname.startsWith(href);
+    if (pathname === href) return true;
+    if (pathname.startsWith(`${href}/`)) {
+      const hasMoreSpecific = allNavHrefs.some(
+        (otherHref) =>
+          otherHref !== href &&
+          otherHref.length > href.length &&
+          (pathname === otherHref || pathname.startsWith(`${otherHref}/`))
+      );
+      return !hasMoreSpecific;
+    }
+    return false;
   };
 
   const sidebarContent = (
