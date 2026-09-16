@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/context";
 import PrinterLoader from "@/components/PrinterLoader";
@@ -42,7 +42,7 @@ interface Employee {
   Shift?: Shift | null;
 }
 
-export default function EmployeesPage() {
+function EmployeesContent() {
   const { t } = useI18n();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -677,5 +677,13 @@ export default function EmployeesPage() {
         </FormModal>
       )}
     </div>
+  );
+}
+
+export default function EmployeesPage() {
+  return (
+    <Suspense fallback={<PrinterLoader label="جاري تحميل قائمة الموظفين..." />}>
+      <EmployeesContent />
+    </Suspense>
   );
 }
