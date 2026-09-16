@@ -30,7 +30,9 @@ import {
   LogOut,
   Menu,
   X,
-  Plus,
+  Calendar,
+  UserCheck,
+  Briefcase,
 } from "lucide-react";
 
 interface NavItem {
@@ -77,6 +79,17 @@ const navGroups: { key: string; items: NavItem[] }[] = [
       { key: "navigation.engineers", href: "/engineers", icon: Wrench, page: "engineers", canAdd: true },
       { key: "navigation.workshop", href: "/workshop", icon: Cog, page: "workshop" },
       { key: "navigation.workshopDaily", href: "/workshop-daily", icon: Wallet, page: "workshopDaily", canAdd: true },
+    ],
+  },
+  {
+    key: "navigation.group.hr",
+    items: [
+      { key: "navigation.hrDashboard", href: "/hr", icon: Briefcase, page: "hrDashboard" },
+      { key: "navigation.hrEmployees", href: "/hr/employees", icon: Users, page: "hrEmployees", canAdd: true },
+      { key: "navigation.hrAttendance", href: "/hr/attendance", icon: UserCheck, page: "hrAttendance" },
+      { key: "navigation.hrLeaves", href: "/hr/leaves", icon: Calendar, page: "hrLeaves", canAdd: true },
+      { key: "navigation.hrPayroll", href: "/hr/payroll", icon: DollarSign, page: "hrPayroll" },
+      { key: "navigation.hrDepartments", href: "/hr/departments", icon: Building2, page: "hrSettings" },
     ],
   },
   {

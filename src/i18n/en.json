@@ -30,10 +30,17 @@
       "salesCustomers": "Sales & Customers",
       "purchasing": "Purchases & Inventory",
       "maintenance": "Maintenance",
+      "hr": "Human Resources",
       "finance": "Finance",
       "admin": "Reports & Admin"
     },
-    "expenses": "Expenses"
+    "expenses": "Expenses",
+    "hrDashboard": "HR Dashboard",
+    "hrEmployees": "Employees",
+    "hrAttendance": "Attendance",
+    "hrLeaves": "Leaves & Offs",
+    "hrPayroll": "Payroll",
+    "hrDepartments": "Departments & Job Titles"
   },
   "dashboard": {
     "title": "Dashboard",

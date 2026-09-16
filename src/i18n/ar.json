@@ -30,10 +30,17 @@
       "salesCustomers": "المبيعات والعملاء",
       "purchasing": "المشتريات والمخزون",
       "maintenance": "الصيانة",
+      "hr": "الموارد البشرية",
       "finance": "المالية",
       "admin": "التقارير والإدارة"
     },
-    "expenses": "المصروفات"
+    "expenses": "المصروفات",
+    "hrDashboard": "لوحة HR",
+    "hrEmployees": "الموظفون",
+    "hrAttendance": "التحضير والبصمة",
+    "hrLeaves": "الإجازات والاستئذانات",
+    "hrPayroll": "الرواتب والمسيرات",
+    "hrDepartments": "الأقسام والمسميات"
   },
   "dashboard": {
     "title": "لوحة التحكم",
