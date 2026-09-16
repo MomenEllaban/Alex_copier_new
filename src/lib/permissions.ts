@@ -64,9 +64,9 @@ export const ROLE_PERMISSIONS: Record<Role, Page[]> = {
     "dashboard", "workshop", "inventory", "warehouses", "products", "engineers", "machines",
   ],
 
-  // المهندس — طلبات الصيانة المعينة عليه فقط
+  // المهندس — طلبات الصيانة المعينة عليه + عملاؤه المسندون إليه فقط
   ENGINEER: [
-    "dashboard", "serviceRequests",
+    "dashboard", "serviceRequests", "customers",
   ],
 
   // موظف المبيعات — العملاء والمبيعات والعقود

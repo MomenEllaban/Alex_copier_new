@@ -51,6 +51,8 @@ interface Customer {
   totalDebt: number;
   remainingDebt: number;
   lastPaymentDate: string | null;
+  engineerId?: string | null;
+  engineer?: { id: string; name: string } | null;
   locations: CustomerLocation[];
   payments?: { id: string; amount: number; paymentDate: string; notes?: string | null; company?: { id: string; name: string } | null }[];
   createdAt: string;
@@ -78,6 +80,7 @@ const emptyForm = {
   customerType: "INDIVIDUAL",
   totalDebt: "",
   remainingDebt: "",
+  engineerId: "",
 };
 
 const TYPE_BADGES: Record<string, string> = {
@@ -96,6 +99,7 @@ export default function CustomersPage() {
   const { success: toastSuccess, error: toastError } = useToast();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [engineersList, setEngineersList] = useState<{ id: string; name: string }[]>([]);
   const urlParams = useUrlParams(["q"]);
   const [search, setSearchInput] = useSearchWithDefault(urlParams.q ?? "");
   const [showForm, setShowForm] = useState(false);
@@ -109,6 +113,8 @@ export default function CustomersPage() {
     id: string;
     name: string;
     machines: { id: string; serialNumber: string; model?: string | null }[];
+    engineerId?: string | null;
+    engineer?: { id: string; name: string } | null;
   } | null>(null);
   const [page, setPage] = useState(1);
   const [typeFilter, setTypeFilter] = useState("");
@@ -129,16 +135,19 @@ export default function CustomersPage() {
 
   const fetchCustomers = async () => {
     try {
-      const [customersRes, companiesRes] = await Promise.all([
+      const [customersRes, companiesRes, engineersRes] = await Promise.all([
         fetch("/api/customers"),
         fetch("/api/companies"),
+        fetch("/api/engineers"),
       ]);
-      const [customersData, companiesData] = await Promise.all([
+      const [customersData, companiesData, engineersData] = await Promise.all([
         customersRes.json(),
         companiesRes.json(),
+        engineersRes.json(),
       ]);
       setCustomers(customersData);
       setCompanies(Array.isArray(companiesData) ? companiesData : []);
+      setEngineersList(Array.isArray(engineersData) ? engineersData.filter((e: { isActive?: boolean }) => e.isActive !== false) : []);
     } finally {
       setLoading(false);
     }
@@ -183,6 +192,7 @@ export default function CustomersPage() {
       t("customers.name"),
       t("customers.companyName"),
       t("customers.phone"),
+      t("customers.engineer"),
       t("customers.email"),
       t("customers.city"),
       t("customers.governorate"),
@@ -194,6 +204,7 @@ export default function CustomersPage() {
       c.name,
       c.companyName || "",
       c.phone || "",
+      c.engineer?.name || "",
       c.email || "",
       c.city || "",
       c.governorate || "",
@@ -229,6 +240,7 @@ export default function CustomersPage() {
       customerType: customer.customerType,
       totalDebt: String(customer.totalDebt || ""),
       remainingDebt: String(customer.remainingDebt || ""),
+      engineerId: customer.engineerId || "",
     });
     setEditingId(customer.id);
     setError("");
@@ -305,13 +317,21 @@ export default function CustomersPage() {
               model: m.model ?? null,
             }),
           ),
+          engineerId: data.engineerId ?? data.engineer?.id ?? null,
+          engineer: data.engineer ?? null,
         });
         return;
       }
     } catch {
       /* fall through to row-data fallback */
     }
-    setTestsCustomer({ id: customer.id, name: customer.name, machines: [] });
+    setTestsCustomer({
+      id: customer.id,
+      name: customer.name,
+      machines: [],
+      engineerId: customer.engineerId ?? customer.engineer?.id ?? null,
+      engineer: customer.engineer ?? null,
+    });
   };
 
   const resetLocForm = () => {
@@ -563,6 +583,15 @@ export default function CustomersPage() {
             </select>
           </div>
           <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-slate-700">{t("customers.engineer")}</label>
+            <select value={form.engineerId} onChange={(e) => setField("engineerId", e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="">{t("customers.selectEngineer")}</option>
+              {engineersList.map((eng) => (
+                <option key={eng.id} value={eng.id}>{eng.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1.5">
             <label className="block text-sm font-medium text-slate-700">الدين الكلي (ج.م)</label>
             <input type="number" min="0" step="0.01" value={form.totalDebt} onChange={(e) => setField("totalDebt", e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0" />
           </div>
@@ -587,6 +616,7 @@ export default function CustomersPage() {
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("customers.contactPerson")}</span><span className="mt-1 block font-medium text-slate-800">{selected.contactPerson || "—"}</span></div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("customers.phone")}</span><span className="mt-1 block font-medium text-slate-800" dir="ltr">{selected.phone || "—"}</span></div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("customers.email")}</span><span className="mt-1 block font-medium text-slate-800">{selected.email || "—"}</span></div>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("customers.engineer")}</span><span className="mt-1 block font-medium text-slate-800">{selected.engineer?.name || t("customers.noEngineer")}</span></div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("customers.address")}</span><span className="mt-1 block font-medium text-slate-800">{selected.address || "—"}</span></div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("customers.city")}</span><span className="mt-1 block font-medium text-slate-800">{selected.city || "—"}</span></div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("customers.governorate")}</span><span className="mt-1 block font-medium text-slate-800">{selected.governorate || "—"}</span></div>
@@ -791,7 +821,7 @@ export default function CustomersPage() {
         wide
       >
         {testsCustomer && (
-          <CopierTests customerId={testsCustomer.id} machines={testsCustomer.machines} />
+          <CopierTests customerId={testsCustomer.id} machines={testsCustomer.machines} defaultEngineerId={testsCustomer.engineerId ?? testsCustomer.engineer?.id ?? null} />
         )}
       </FormModal>
 
@@ -848,6 +878,7 @@ export default function CustomersPage() {
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("customers.name")}</th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("customers.companyName")}</th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("customers.phone")}</th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("customers.engineer")}</th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">الدين الكلي</th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">المتبقي</th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">آخر دفعة</th>
@@ -860,6 +891,7 @@ export default function CustomersPage() {
                     <td className="px-4 py-3 text-sm font-medium">{customer.name}</td>
                     <td className="px-4 py-3 text-sm">{customer.companyName || "—"}</td>
                     <td className="px-4 py-3 text-sm">{customer.phone || "—"}</td>
+                    <td className="px-4 py-3 text-sm">{customer.engineer?.name ? (<span className="inline-flex rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700">{customer.engineer.name}</span>) : (<span className="text-gray-400">—</span>)}</td>
                     <td className="px-4 py-3 text-sm font-medium">{customer.totalDebt > 0 ? `${customer.totalDebt.toLocaleString("ar-EG")} ج.م` : "—"}</td>
                     <td className="px-4 py-3 text-sm">
                       {customer.remainingDebt !== 0 ? (

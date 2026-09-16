@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
+import { notifySettlementPendingVerification } from "@/lib/notifications";
 import {
   deleteCopierTestImage,
   uploadCopierTestImage,
@@ -28,6 +29,37 @@ async function guardWrite() {
   };
 }
 
+function actorRole(actor: unknown): string {
+  return (actor as { role?: string } | null)?.role ?? "";
+}
+
+function actorId(actor: unknown): string {
+  return (actor as { id?: string } | null)?.id ?? "";
+}
+
+/**
+ * Engineers are scoped to their own customers: the customer must be linked
+ * to the engineer's record (Customer.engineerId). Managers pass through.
+ */
+async function engineerScopeCheck(actor: unknown, customerId: string) {
+  if (actorRole(actor) !== "ENGINEER") return null;
+  const mine = await prisma.engineer.findUnique({
+    where: { userId: actorId(actor) },
+    select: { id: true },
+  });
+  if (!mine) {
+    return NextResponse.json({ error: "حساب المهندس غير مرتبط", code: "ENGINEER_NOT_LINKED" }, { status: 403 });
+  }
+  const customer = await prisma.customer.findUnique({
+    where: { id: customerId },
+    select: { engineerId: true },
+  });
+  if (!customer || customer.engineerId !== mine.id) {
+    return NextResponse.json({ error: "هذا العميل غير مسند إليك", code: "CUSTOMER_NOT_ASSIGNED" }, { status: 403 });
+  }
+  return null;
+}
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -44,6 +76,8 @@ export async function GET(
     if (!customer) {
       return NextResponse.json({ error: "العميل غير موجود" }, { status: 404 });
     }
+    const scoped = await engineerScopeCheck(user, customerId);
+    if (scoped) return scoped;
 
     const tests = await prisma.copierTest.findMany({
       where: { customerId },
@@ -54,6 +88,13 @@ export async function GET(
   } catch {
     return NextResponse.json({ error: "Failed to fetch tests" }, { status: 500 });
   }
+}
+
+function parseOptionalInt(raw: FormDataEntryValue | null): number | null | undefined {
+  if (raw == null || String(raw).trim() === "") return null;
+  const n = Number(String(raw).trim());
+  if (!Number.isInteger(n) || n < 0) return undefined;
+  return n;
 }
 
 export async function POST(
@@ -67,11 +108,13 @@ export async function POST(
 
     const customer = await prisma.customer.findUnique({
       where: { id: customerId },
-      select: { id: true },
+      select: { id: true, name: true },
     });
     if (!customer) {
       return NextResponse.json({ error: "العميل غير موجود" }, { status: 404 });
     }
+    const scoped = await engineerScopeCheck(actor, customerId);
+    if (scoped) return scoped;
 
     const formData = await request.formData();
     const engineerId = String(formData.get("engineerId") ?? "").trim();
@@ -80,6 +123,10 @@ export async function POST(
     const testDateRaw = formData.get("testDate");
     const machineIdRaw = formData.get("machineId");
     const image = formData.get("image");
+    const repairStatementRaw = formData.get("repairStatement");
+    const sparePartsRaw = formData.get("spareParts");
+    const collectedAmountRaw = formData.get("collectedAmount");
+    const collectionNoteRaw = formData.get("collectionNote");
 
     if (!engineerId) {
       return NextResponse.json({ error: "اختيار المهندس مطلوب", code: "ENGINEER_REQUIRED" }, { status: 400 });
@@ -90,19 +137,33 @@ export async function POST(
     }
 
     const pageCount = Number(pageCountRaw);
-    if (!Number.isInteger(pageCount) || pageCount <= 0) {
-      return NextResponse.json({ error: "عدد الأوراق يجب أن يكون رقمًا أكبر من صفر", code: "PAGE_COUNT_INVALID" }, { status: 400 });
+    if (!Number.isInteger(pageCount) || pageCount < 0) {
+      return NextResponse.json({ error: "عدد الأوراق يجب أن يكون رقمًا صحيحًا", code: "PAGE_COUNT_INVALID" }, { status: 400 });
     }
 
-    if (!(image instanceof File)) {
-      return NextResponse.json({ error: "صورة الاختبار مطلوبة", code: "IMAGE_REQUIRED" }, { status: 400 });
-    }
-    const imageError = validateCopierTestImage(image);
-    if (imageError) {
-      return NextResponse.json({ error: imageError, code: "IMAGE_INVALID" }, { status: 400 });
+    const blackCounter = parseOptionalInt(formData.get("blackCounter"));
+    const colorCounter = parseOptionalInt(formData.get("colorCounter"));
+    if (blackCounter === undefined || colorCounter === undefined) {
+      return NextResponse.json({ error: "عداد الأسود والألوان يجب أن يكونا رقمين صحيحين", code: "COUNTER_INVALID" }, { status: 400 });
     }
 
-    let testDate = new Date();
+    let collectedAmount: number | null = null;
+    if (collectedAmountRaw != null && String(collectedAmountRaw).trim() !== "") {
+      collectedAmount = Number(String(collectedAmountRaw).trim());
+      if (!Number.isFinite(collectedAmount) || collectedAmount <= 0) {
+        return NextResponse.json({ error: "المبلغ المحصل يجب أن يكون رقمًا أكبر من صفر", code: "AMOUNT_INVALID" }, { status: 400 });
+      }
+    }
+
+    const textOrNull = (v: FormDataEntryValue | null) => {
+      const s = v != null ? String(v).trim() : "";
+      return s === "" ? null : s;
+    };
+    const repairStatement = textOrNull(repairStatementRaw);
+    const spareParts = textOrNull(sparePartsRaw);
+    const collectionNote = textOrNull(collectionNoteRaw);
+
+    let testDate: Date | null = new Date();
     if (testDateRaw != null && String(testDateRaw).trim() !== "") {
       testDate = new Date(String(testDateRaw));
       if (Number.isNaN(testDate.getTime())) {
@@ -122,7 +183,18 @@ export async function POST(
     const notes =
       notesRaw != null && String(notesRaw).trim() !== "" ? String(notesRaw).trim() : null;
 
-    const { secureUrl, publicId } = await uploadCopierTestImage(image, customerId);
+    // Image is optional: historical/imported tests may have no photo.
+    let secureUrl: string | null = null;
+    let publicId: string | null = null;
+    if (image instanceof File && image.size > 0) {
+      const imageError = validateCopierTestImage(image);
+      if (imageError) {
+        return NextResponse.json({ error: imageError, code: "IMAGE_INVALID" }, { status: 400 });
+      }
+      const uploaded = await uploadCopierTestImage(image, customerId);
+      secureUrl = uploaded.secureUrl;
+      publicId = uploaded.publicId;
+    }
 
     try {
       const test = await prisma.copierTest.create({
@@ -131,6 +203,12 @@ export async function POST(
           engineerId,
           machineId,
           pageCount,
+          blackCounter,
+          colorCounter,
+          repairStatement,
+          spareParts,
+          collectedAmount,
+          collectionNote,
           imageUrl: secureUrl,
           imagePublicId: publicId,
           notes,
@@ -138,10 +216,46 @@ export async function POST(
         },
         include: TEST_INCLUDE,
       });
-      return NextResponse.json(test, { status: 201 });
+
+      // Collected cash → pending settlement + accountant notification.
+      let settlementId: string | null = null;
+      if (collectedAmount != null) {
+        const company =
+          (await prisma.company.findFirst({ where: { name: "اليكس كوبير" }, select: { id: true } })) ??
+          (await prisma.company.findFirst({ select: { id: true } }));
+        if (company) {
+          const settlementNumber = `STL-${Date.now()}`;
+          const settlement = await prisma.settlement.create({
+            data: {
+              companyId: company.id,
+              customerId,
+              engineerId,
+              amount: collectedAmount,
+              paymentMethod: "CASH",
+              reason: (collectionNote || repairStatement || `تحصيل من العميل ${customer.name}`).slice(0, 500),
+              direction: "ADDITION",
+              status: "INITIAL",
+              collectedBy: actorId(actor),
+              settlementNumber,
+              createdAt: testDate ?? undefined,
+            },
+            include: { collector: { select: { name: true } } },
+          });
+          settlementId = settlement.id;
+          void notifySettlementPendingVerification({
+            settlementId: settlement.id,
+            settlementNumber: settlement.settlementNumber,
+            amount: settlement.amount,
+            collectorName: settlement.collector?.name,
+            actorId: actorId(actor),
+          }).catch(() => undefined);
+        }
+      }
+
+      return NextResponse.json({ ...test, settlementId }, { status: 201 });
     } catch {
       // Avoid orphan images on Cloudinary if the DB write fails.
-      await deleteCopierTestImage(publicId);
+      if (publicId) await deleteCopierTestImage(publicId);
       return NextResponse.json({ error: "Failed to create test" }, { status: 500 });
     }
   } catch {

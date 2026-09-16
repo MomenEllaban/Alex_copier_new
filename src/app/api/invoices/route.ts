@@ -180,6 +180,10 @@ export async function GET(request: Request) {
         MAINTENANCE_AND_PARTS: "صيانة وقطع غيار",
         MAINTENANCE_AND_PRINTING: "صيانة وطباعة",
         RENTAL: "إيجار",
+        VISIT: "زيارة",
+        ARCHIVE: "ارشيف",
+        WARRANTY: "ضمان",
+        PENDING: "مطلوب عقد",
       };
 
       invoiceData = {

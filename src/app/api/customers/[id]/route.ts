@@ -32,12 +32,23 @@ export async function GET(
         contracts: true,
         serviceRequests: true,
         machines: true,
+        engineer: { select: { id: true, name: true } },
         payments: { orderBy: { paymentDate: "desc" } },
       },
     });
 
     if (!customer) {
       return NextResponse.json({ error: "Customer not found" }, { status: 404 });
+    }
+
+    // Engineers may only open their assigned customers.
+    const role = (user as { role?: string }).role;
+    if (role === "ENGINEER") {
+      const userId = (user as { id?: string }).id ?? "";
+      const mine = await prisma.engineer.findUnique({ where: { userId }, select: { id: true } });
+      if (!mine || customer.engineerId !== mine.id) {
+        return NextResponse.json({ error: "هذا العميل غير مسند إليك", code: "CUSTOMER_NOT_ASSIGNED" }, { status: 403 });
+      }
     }
 
     return NextResponse.json(customer);
@@ -63,7 +74,7 @@ export async function PUT(
     const {
       name, phone, email, address, customerType, taxNumber, creditLimit,
       companyName, contactPerson, whatsapp, city, governorate, gpsLat, gpsLng, tradeRegister, paymentTerms,
-      totalDebt, remainingDebt,
+      totalDebt, remainingDebt, notes, engineerId,
     } = body;
 
     const updateData: Record<string, unknown> = {};
@@ -85,6 +96,18 @@ export async function PUT(
     if (paymentTerms !== undefined) updateData.paymentTerms = paymentTerms;
     if (totalDebt !== undefined) updateData.totalDebt = Math.max(0, Number(totalDebt));
     if (remainingDebt !== undefined) updateData.remainingDebt = Math.max(0, Number(remainingDebt));
+    if (notes !== undefined) updateData.notes = notes != null && String(notes).trim() !== "" ? String(notes).trim() : null;
+    if (engineerId !== undefined) {
+      if (engineerId == null || String(engineerId).trim() === "") {
+        updateData.engineerId = null;
+      } else {
+        const engineer = await prisma.engineer.findUnique({ where: { id: String(engineerId) }, select: { id: true } });
+        if (!engineer) {
+          return NextResponse.json({ error: "المهندس غير موجود", code: "ENGINEER_NOT_FOUND" }, { status: 400 });
+        }
+        updateData.engineerId = engineer.id;
+      }
+    }
 
     const customer = await prisma.customer.update({
       where: { id },

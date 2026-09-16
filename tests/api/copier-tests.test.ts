@@ -11,6 +11,12 @@ const mocks = vi.hoisted(() => ({
     machine: {
       findUnique: vi.fn(),
     },
+    company: {
+      findFirst: vi.fn(),
+    },
+    settlement: {
+      create: vi.fn(),
+    },
     copierTest: {
       findMany: vi.fn(),
       findFirst: vi.fn(),
@@ -26,6 +32,7 @@ const mocks = vi.hoisted(() => ({
   uploadCopierTestImage: vi.fn(),
   deleteCopierTestImage: vi.fn(),
   validateCopierTestImage: vi.fn(),
+  notifySettlementPendingVerification: vi.fn(() => Promise.resolve([])),
 }));
 
 vi.mock("@/lib/prisma", () => ({ prisma: mocks.prisma }));
@@ -38,6 +45,9 @@ vi.mock("@/lib/copier-test-upload", () => ({
   uploadCopierTestImage: mocks.uploadCopierTestImage,
   deleteCopierTestImage: mocks.deleteCopierTestImage,
   validateCopierTestImage: mocks.validateCopierTestImage,
+}));
+vi.mock("@/lib/notifications", () => ({
+  notifySettlementPendingVerification: mocks.notifySettlementPendingVerification,
 }));
 
 import { GET as listTests, POST as createTest } from "@/app/api/customers/[id]/tests/route";
@@ -74,18 +84,96 @@ describe("copier tests API", () => {
     expect(body.code).toBe("ENGINEER_REQUIRED");
   });
 
-  it("POST rejects a missing image with an Arabic error", async () => {
-    const res = await createTest(formRequest({ engineerId: "eng_1", pageCount: "1000" }, false), params("c1"));
-    expect(res.status).toBe(400);
-    const body = await res.json();
-    expect(body.code).toBe("IMAGE_REQUIRED");
+  it("POST creates a test without an image (image is optional)", async () => {
+    const created = { id: "t1", pageCount: 1000, imageUrl: null };
+    mocks.prisma.copierTest.create.mockResolvedValue(created);
+    const res = await createTest(formRequest({ engineerId: "eng_1", pageCount: "1000", blackCounter: "1000" }, false), params("c1"));
+    expect(res.status).toBe(201);
+    expect(mocks.uploadCopierTestImage).not.toHaveBeenCalled();
+    const arg = mocks.prisma.copierTest.create.mock.calls[0][0];
+    expect(arg.data.imageUrl).toBeNull();
   });
 
-  it("POST rejects a non-positive page count", async () => {
-    const res = await createTest(formRequest({ engineerId: "eng_1", pageCount: "0" }, true), params("c1"));
+  it("POST rejects a negative page count", async () => {
+    const res = await createTest(formRequest({ engineerId: "eng_1", pageCount: "-1", blackCounter: "10" }, true), params("c1"));
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.code).toBe("PAGE_COUNT_INVALID");
+  });
+
+  it("POST rejects invalid counters", async () => {
+    const res = await createTest(formRequest({ engineerId: "eng_1", pageCount: "0", blackCounter: "-5" }, false), params("c1"));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe("COUNTER_INVALID");
+  });
+
+  it("POST stores counters, repair statement and spare parts", async () => {
+    mocks.uploadCopierTestImage.mockResolvedValue({ secureUrl: "https://img", publicId: "pub_1" });
+    mocks.prisma.copierTest.create.mockResolvedValue({ id: "t2" });
+    const res = await createTest(
+      formRequest(
+        { engineerId: "eng_1", pageCount: "1200", blackCounter: "1200", colorCounter: "300", repairStatement: "صيانة دورية", spareParts: "درام" },
+        true,
+      ),
+      params("c1"),
+    );
+    expect(res.status).toBe(201);
+    const arg = mocks.prisma.copierTest.create.mock.calls[0][0];
+    expect(arg.data.blackCounter).toBe(1200);
+    expect(arg.data.colorCounter).toBe(300);
+    expect(arg.data.repairStatement).toBe("صيانة دورية");
+    expect(arg.data.spareParts).toBe("درام");
+    expect(arg.data.collectedAmount).toBeNull();
+    expect(mocks.prisma.settlement.create).not.toHaveBeenCalled();
+  });
+
+  it("POST with a collected amount creates a settlement and notifies finance", async () => {
+    mocks.prisma.copierTest.create.mockResolvedValue({ id: "t3" });
+    mocks.prisma.company.findFirst.mockResolvedValue({ id: "company-alex" });
+    mocks.prisma.settlement.create.mockResolvedValue({ id: "stl_1", settlementNumber: "STL-1", amount: 500, collector: { name: "شعبان" } });
+    const res = await createTest(
+      formRequest({ engineerId: "eng_1", pageCount: "500", blackCounter: "500", collectedAmount: "500", collectionNote: "زيارة" }, false),
+      params("c1"),
+    );
+    expect(res.status).toBe(201);
+    const body = await res.json();
+    expect(body.settlementId).toBe("stl_1");
+    const stlArg = mocks.prisma.settlement.create.mock.calls[0][0];
+    expect(stlArg.data.amount).toBe(500);
+    expect(stlArg.data.status).toBe("INITIAL");
+    expect(stlArg.data.direction).toBe("ADDITION");
+    expect(mocks.notifySettlementPendingVerification).toHaveBeenCalledOnce();
+  });
+
+  it("POST rejects an invalid collected amount", async () => {
+    const res = await createTest(
+      formRequest({ engineerId: "eng_1", pageCount: "100", blackCounter: "100", collectedAmount: "0" }, false),
+      params("c1"),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe("AMOUNT_INVALID");
+  });
+
+  it("POST blocks engineers from recording tests for unassigned customers", async () => {
+    const engUser = { id: "u_eng", role: "ENGINEER" };
+    mocks.requireAuth.mockResolvedValue(engUser);
+    mocks.requirePageAccess.mockResolvedValue(null);
+    // guardWrite falls back to serviceRequests access for engineers
+    mocks.requirePageAccess.mockImplementation(async (page: string) =>
+      page === "serviceRequests" ? engUser : null,
+    );
+    mocks.prisma.customer.findUnique.mockResolvedValue({ id: "c1", name: "عميل", engineerId: "other_eng" });
+    mocks.prisma.engineer.findUnique.mockImplementation(async (args: { where: { id?: string; userId?: string } }) => {
+      if (args.where.userId) return { id: "my_eng" };
+      return { id: "eng_1", isActive: true };
+    });
+    const res = await createTest(formRequest({ engineerId: "eng_1", pageCount: "10", blackCounter: "10" }, false), params("c1"));
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.code).toBe("CUSTOMER_NOT_ASSIGNED");
+    expect(mocks.prisma.copierTest.create).not.toHaveBeenCalled();
   });
 
   it("POST uploads to Cloudinary and creates the test", async () => {
@@ -124,7 +212,7 @@ describe("copier tests API", () => {
     expect(res.status).toBe(404);
   });
 
-  it("PUT rejects an invalid page count", async () => {
+  it("PUT rejects a negative page count", async () => {
     mocks.prisma.copierTest.findUnique.mockResolvedValue({ id: "t1" });
     const req = new Request("http://localhost/api/tests/t1", {
       method: "PUT",
@@ -135,6 +223,36 @@ describe("copier tests API", () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.code).toBe("PAGE_COUNT_INVALID");
+  });
+
+  it("PUT updates counters, repair statement, spare parts and amount", async () => {
+    mocks.prisma.copierTest.findUnique.mockResolvedValue({ id: "t1" });
+    mocks.prisma.copierTest.update.mockResolvedValue({ id: "t1" });
+    const req = new Request("http://localhost/api/tests/t1", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ blackCounter: 1500, colorCounter: 200, repairStatement: "تعبئة حبر", spareParts: "حبر", collectedAmount: 250, collectionNote: "زيارة" }),
+    });
+    const res = await updateTest(req, params("t1"));
+    expect(res.status).toBe(200);
+    const arg = mocks.prisma.copierTest.update.mock.calls[0][0];
+    expect(arg.data.blackCounter).toBe(1500);
+    expect(arg.data.colorCounter).toBe(200);
+    expect(arg.data.repairStatement).toBe("تعبئة حبر");
+    expect(arg.data.collectedAmount).toBe(250);
+  });
+
+  it("PUT rejects an invalid counter", async () => {
+    mocks.prisma.copierTest.findUnique.mockResolvedValue({ id: "t1" });
+    const req = new Request("http://localhost/api/tests/t1", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ blackCounter: -3 }),
+    });
+    const res = await updateTest(req, params("t1"));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe("COUNTER_INVALID");
   });
 
   it("DELETE is forbidden for non-admin roles", async () => {

@@ -20,10 +20,16 @@ export interface CopierTestMachine {
 interface CopierTest {
   id: string;
   pageCount: number;
-  imageUrl: string;
+  blackCounter?: number | null;
+  colorCounter?: number | null;
+  repairStatement?: string | null;
+  spareParts?: string | null;
+  collectedAmount?: number | null;
+  collectionNote?: string | null;
+  imageUrl?: string | null;
   notes?: string | null;
-  testDate: string;
-  engineer: { id: string; name: string };
+  testDate?: string | null;
+  engineer?: { id: string; name: string } | null;
   machine?: { id: string; serialNumber: string; model?: string | null } | null;
 }
 
@@ -43,6 +49,7 @@ interface MachineOption {
 interface CopierTestsProps {
   customerId: string;
   machines?: CopierTestMachine[];
+  defaultEngineerId?: string | null;
 }
 
 const todayInput = () => {
@@ -51,7 +58,7 @@ const todayInput = () => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 };
 
-export default function CopierTests({ customerId, machines = [] }: CopierTestsProps) {
+export default function CopierTests({ customerId, machines = [], defaultEngineerId = null }: CopierTestsProps) {
   const { t, locale, dir } = useI18n();
   const { data: session } = useSession();
   const confirmAction = useConfirm();
@@ -69,6 +76,12 @@ export default function CopierTests({ customerId, machines = [] }: CopierTestsPr
   const [engineerId, setEngineerId] = useState("");
   const [machineId, setMachineId] = useState("");
   const [pageCount, setPageCount] = useState("");
+  const [blackCounter, setBlackCounter] = useState("");
+  const [colorCounter, setColorCounter] = useState("");
+  const [repairStatement, setRepairStatement] = useState("");
+  const [spareParts, setSpareParts] = useState("");
+  const [collectedAmount, setCollectedAmount] = useState("");
+  const [collectionNote, setCollectionNote] = useState("");
   const [notes, setNotes] = useState("");
   const [testDate, setTestDate] = useState(todayInput());
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -92,9 +105,12 @@ export default function CopierTests({ customerId, machines = [] }: CopierTestsPr
       }
       if (engineersRes.ok) {
         const data = await engineersRes.json();
-        setEngineers(
-          (Array.isArray(data) ? data : []).filter((e: EngineerOption) => e.isActive !== false),
-        );
+        const list = (Array.isArray(data) ? data : []).filter((e: EngineerOption) => e.isActive !== false);
+        setEngineers(list);
+        // Default to the customer's assigned engineer (changeable).
+        if (!engineerId && defaultEngineerId && list.some((e: EngineerOption) => e.id === defaultEngineerId)) {
+          setEngineerId(defaultEngineerId);
+        }
       }
       // If the customer has no linked machines, offer all machines so the
       // machine field always has an input (optional to fill).
@@ -144,16 +160,27 @@ export default function CopierTests({ customerId, machines = [] }: CopierTestsPr
     setPreviewUrl(previewRef.current);
   };
 
-  const formatDate = (value: string) => {
+  const formatDate = (value: string | null | undefined) => {
+    if (!value) return "—";
     const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return "—";
     const loc = locale === "ar" ? "ar-EG" : "en-GB";
     return `${d.toLocaleDateString(loc)} ${d.toLocaleTimeString(loc, { hour: "2-digit", minute: "2-digit" })}`;
   };
 
+  const formatNum = (value: number | null | undefined) =>
+    value == null ? "—" : value.toLocaleString(locale === "ar" ? "ar-EG" : "en-US");
+
   const resetForm = () => {
-    setEngineerId("");
+    setEngineerId(defaultEngineerId ?? "");
     setMachineId("");
     setPageCount("");
+    setBlackCounter("");
+    setColorCounter("");
+    setRepairStatement("");
+    setSpareParts("");
+    setCollectedAmount("");
+    setCollectionNote("");
     setNotes("");
     setTestDate(todayInput());
     clearImage();
@@ -167,21 +194,39 @@ export default function CopierTests({ customerId, machines = [] }: CopierTestsPr
       setFormError(t("copierTests.engineerRequired"));
       return;
     }
-    const count = Number(pageCount);
-    if (!Number.isInteger(count) || count <= 0) {
-      setFormError(t("copierTests.pageCountRequired"));
+    const black = blackCounter.trim() === "" ? null : Number(blackCounter);
+    const color = colorCounter.trim() === "" ? null : Number(colorCounter);
+    if (
+      (black == null && color == null) ||
+      (black != null && (!Number.isInteger(black) || black < 0)) ||
+      (color != null && (!Number.isInteger(color) || color < 0)) ||
+      (black === 0 && color === 0)
+    ) {
+      setFormError(t("copierTests.countersRequired"));
       return;
     }
-    if (!imageFile) {
-      setFormError(t("copierTests.imageRequired"));
+    const count = Number(pageCount);
+    const effectiveCount =
+      pageCount.trim() !== "" && Number.isInteger(count) && count >= 0
+        ? count
+        : ((black ?? 0) > 0 ? (black as number) : (color as number));
+    const amount = collectedAmount.trim() === "" ? null : Number(collectedAmount);
+    if (amount != null && (!Number.isFinite(amount) || amount <= 0)) {
+      setFormError(t("copierTests.amountInvalid"));
       return;
     }
     setSaving(true);
     try {
       const formData = new FormData();
       formData.append("engineerId", engineerId);
-      formData.append("pageCount", String(count));
-      formData.append("image", imageFile);
+      formData.append("pageCount", String(effectiveCount));
+      formData.append("blackCounter", String(black ?? 0));
+      if (color != null) formData.append("colorCounter", String(color));
+      if (imageFile) formData.append("image", imageFile);
+      if (repairStatement.trim()) formData.append("repairStatement", repairStatement.trim());
+      if (spareParts.trim()) formData.append("spareParts", spareParts.trim());
+      if (amount != null) formData.append("collectedAmount", String(amount));
+      if (collectionNote.trim()) formData.append("collectionNote", collectionNote.trim());
       if (notes.trim()) formData.append("notes", notes.trim());
       if (testDate) formData.append("testDate", new Date(testDate).toISOString());
       if (machineId) formData.append("machineId", machineId);
@@ -197,7 +242,7 @@ export default function CopierTests({ customerId, machines = [] }: CopierTestsPr
       }
       resetForm();
       await fetchAll();
-      toastSuccess(t("copierTests.testSaved"));
+      toastSuccess(data?.settlementId ? t("copierTests.testSavedWithSettlement") : t("copierTests.testSaved"));
     } finally {
       setSaving(false);
     }
@@ -257,18 +302,24 @@ export default function CopierTests({ customerId, machines = [] }: CopierTestsPr
                 {t("copierTests.latestTest")}
               </p>
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                <button
-                  onClick={() => setLightboxUrl(latest.imageUrl)}
-                  className="shrink-0 overflow-hidden rounded-lg border border-gray-200"
-                  title={t("copierTests.image")}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={latest.imageUrl}
-                    alt={t("copierTests.testImage")}
-                    className="h-24 w-32 object-cover transition hover:opacity-90"
-                  />
-                </button>
+                {latest.imageUrl ? (
+                  <button
+                    onClick={() => setLightboxUrl(latest.imageUrl as string)}
+                    className="shrink-0 overflow-hidden rounded-lg border border-gray-200"
+                    title={t("copierTests.image")}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={latest.imageUrl}
+                      alt={t("copierTests.testImage")}
+                      className="h-24 w-32 object-cover transition hover:opacity-90"
+                    />
+                  </button>
+                ) : (
+                  <span className="shrink-0 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-xs text-gray-400">
+                    {t("copierTests.noImage")}
+                  </span>
+                )}
                 <div className="grid flex-1 grid-cols-2 gap-2 text-sm sm:grid-cols-4">
                   <div>
                     <span className="block text-xs text-gray-500">{t("copierTests.date")}</span>
@@ -278,13 +329,15 @@ export default function CopierTests({ customerId, machines = [] }: CopierTestsPr
                   </div>
                   <div>
                     <span className="block text-xs text-gray-500">{t("copierTests.engineer")}</span>
-                    <span className="font-semibold text-slate-800">{latest.engineer.name}</span>
+                    <span className="font-semibold text-slate-800">{latest.engineer?.name || "—"}</span>
                   </div>
                   <div>
-                    <span className="block text-xs text-gray-500">{t("copierTests.pageCount")}</span>
-                    <span className="font-bold text-violet-700">
-                      {latest.pageCount.toLocaleString(locale === "ar" ? "ar-EG" : "en-US")}
-                    </span>
+                    <span className="block text-xs text-gray-500">{t("copierTests.blackCounter")}</span>
+                    <span className="font-bold text-violet-700">{formatNum(latest.blackCounter ?? latest.pageCount)}</span>
+                  </div>
+                  <div>
+                    <span className="block text-xs text-gray-500">{t("copierTests.colorCounter")}</span>
+                    <span className="font-bold text-violet-700">{formatNum(latest.colorCounter)}</span>
                   </div>
                   {latest.machine && (
                     <div>
@@ -292,6 +345,18 @@ export default function CopierTests({ customerId, machines = [] }: CopierTestsPr
                       <span className="font-medium text-slate-800" dir="ltr">
                         {latest.machine.serialNumber}
                       </span>
+                    </div>
+                  )}
+                  {latest.repairStatement && (
+                    <div className="col-span-2">
+                      <span className="block text-xs text-gray-500">{t("copierTests.repairStatement")}</span>
+                      <span className="font-medium text-slate-800">{latest.repairStatement}</span>
+                    </div>
+                  )}
+                  {latest.collectedAmount != null && (
+                    <div>
+                      <span className="block text-xs text-gray-500">{t("copierTests.collectedAmount")}</span>
+                      <span className="font-bold text-emerald-700">{formatNum(latest.collectedAmount)}</span>
                     </div>
                   )}
                 </div>
@@ -331,16 +396,32 @@ export default function CopierTests({ customerId, machines = [] }: CopierTestsPr
                 </div>
                 <div className="space-y-1.5">
                   <label className="block text-sm font-medium text-slate-700">
-                    {t("copierTests.pageCount")} <span className="text-red-500">*</span>
+                    {t("copierTests.blackCounter")} <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="number"
-                    min="1"
+                    min="0"
                     step="1"
-                    value={pageCount}
-                    onChange={(e) => setPageCount(e.target.value)}
+                    value={blackCounter}
+                    onChange={(e) => setBlackCounter(e.target.value)}
                     className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-violet-500 focus:ring-2 focus:ring-violet-500 focus:outline-none"
                     placeholder="1000"
+                    dir="ltr"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-slate-700">
+                    {t("copierTests.colorCounter")}
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={colorCounter}
+                    onChange={(e) => setColorCounter(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-violet-500 focus:ring-2 focus:ring-violet-500 focus:outline-none"
+                    placeholder="0"
+                    dir="ltr"
                   />
                 </div>
                 <div className="space-y-1.5">
@@ -376,6 +457,55 @@ export default function CopierTests({ customerId, machines = [] }: CopierTestsPr
                 </div>
                 <div className="space-y-1.5 md:col-span-2">
                   <label className="block text-sm font-medium text-slate-700">
+                    {t("copierTests.repairStatement")}
+                  </label>
+                  <textarea
+                    value={repairStatement}
+                    onChange={(e) => setRepairStatement(e.target.value)}
+                    rows={2}
+                    placeholder={t("copierTests.repairStatementPlaceholder")}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-violet-500 focus:ring-2 focus:ring-violet-500 focus:outline-none"
+                  />
+                </div>
+                <div className="space-y-1.5 md:col-span-2">
+                  <label className="block text-sm font-medium text-slate-700">
+                    {t("copierTests.spareParts")}
+                  </label>
+                  <input
+                    value={spareParts}
+                    onChange={(e) => setSpareParts(e.target.value)}
+                    placeholder={t("copierTests.sparePartsPlaceholder")}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-violet-500 focus:ring-2 focus:ring-violet-500 focus:outline-none"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-slate-700">
+                    {t("copierTests.collectedAmount")}
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="any"
+                    value={collectedAmount}
+                    onChange={(e) => setCollectedAmount(e.target.value)}
+                    placeholder="0"
+                    dir="ltr"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-violet-500 focus:ring-2 focus:ring-violet-500 focus:outline-none"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-slate-700">
+                    {t("copierTests.collectionNote")}
+                  </label>
+                  <input
+                    value={collectionNote}
+                    onChange={(e) => setCollectionNote(e.target.value)}
+                    placeholder={t("copierTests.collectionNotePlaceholder")}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-violet-500 focus:ring-2 focus:ring-violet-500 focus:outline-none"
+                  />
+                </div>
+                <div className="space-y-1.5 md:col-span-2">
+                  <label className="block text-sm font-medium text-slate-700">
                     {t("copierTests.notes")}
                   </label>
                   <textarea
@@ -388,7 +518,7 @@ export default function CopierTests({ customerId, machines = [] }: CopierTestsPr
                 </div>
                 <div className="space-y-1.5 md:col-span-2">
                   <label className="block text-sm font-medium text-slate-700">
-                    {t("copierTests.testImage")} <span className="text-red-500">*</span>
+                    {t("copierTests.testImage")} <span className="text-xs text-gray-400">({t("common.optional")})</span>
                   </label>
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-violet-300 bg-violet-50 px-4 py-2.5 text-sm font-medium text-violet-700 transition hover:bg-violet-100">
@@ -452,7 +582,7 @@ export default function CopierTests({ customerId, machines = [] }: CopierTestsPr
           <p className="py-6 text-center text-sm text-gray-400">{t("copierTests.noTests")}</p>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-gray-200">
-            <table className="w-full min-w-[720px] text-sm">
+            <table className="w-full min-w-[900px] text-sm">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">
@@ -465,7 +595,16 @@ export default function CopierTests({ customerId, machines = [] }: CopierTestsPr
                     {t("copierTests.machine")}
                   </th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">
-                    {t("copierTests.pageCount")}
+                    {t("copierTests.blackCounter")}
+                  </th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">
+                    {t("copierTests.colorCounter")}
+                  </th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">
+                    {t("copierTests.repairStatement")}
+                  </th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">
+                    {t("copierTests.collectedAmount")}
                   </th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">
                     {t("copierTests.image")}
@@ -486,25 +625,38 @@ export default function CopierTests({ customerId, machines = [] }: CopierTestsPr
                     <td className="px-4 py-2 whitespace-nowrap text-slate-700">
                       {formatDate(item.testDate)}
                     </td>
-                    <td className="px-4 py-2 font-medium text-slate-800">{item.engineer.name}</td>
+                    <td className="px-4 py-2 font-medium text-slate-800">{item.engineer?.name || "—"}</td>
                     <td className="px-4 py-2 text-slate-700" dir="ltr">
                       {item.machine?.serialNumber || "—"}
                     </td>
                     <td className="px-4 py-2 font-bold text-violet-700">
-                      {item.pageCount.toLocaleString(locale === "ar" ? "ar-EG" : "en-US")}
+                      {formatNum(item.blackCounter ?? item.pageCount)}
+                    </td>
+                    <td className="px-4 py-2 font-bold text-violet-700">
+                      {formatNum(item.colorCounter)}
+                    </td>
+                    <td className="max-w-[220px] truncate px-4 py-2 text-slate-600">
+                      {item.repairStatement || "—"}
+                    </td>
+                    <td className="px-4 py-2 font-bold text-emerald-700">
+                      {item.collectedAmount != null ? formatNum(item.collectedAmount) : "—"}
                     </td>
                     <td className="px-4 py-2">
-                      <button onClick={() => setLightboxUrl(item.imageUrl)} title={t("copierTests.image")}>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={item.imageUrl}
-                          alt={t("copierTests.testImage")}
-                          className="h-12 w-16 rounded-lg border border-gray-200 object-cover transition hover:opacity-80"
-                        />
-                      </button>
+                      {item.imageUrl ? (
+                        <button onClick={() => setLightboxUrl(item.imageUrl as string)} title={t("copierTests.image")}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={item.imageUrl}
+                            alt={t("copierTests.testImage")}
+                            className="h-12 w-16 rounded-lg border border-gray-200 object-cover transition hover:opacity-80"
+                          />
+                        </button>
+                      ) : (
+                        <span className="text-xs text-gray-400">{t("copierTests.noImage")}</span>
+                      )}
                     </td>
                     <td className="max-w-[200px] truncate px-4 py-2 text-slate-600">
-                      {item.notes || "—"}
+                      {[item.spareParts, item.notes].filter(Boolean).join(" — ") || "—"}
                     </td>
                     {canDelete && (
                       <td className="px-4 py-2">

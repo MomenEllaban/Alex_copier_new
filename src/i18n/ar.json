@@ -152,6 +152,7 @@
     "date": "التاريخ",
     "amount": "المبلغ",
     "notes": "ملاحظات",
+    "optional": "اختياري",
     "description": "الوصف",
     "yes": "نعم",
     "no": "لا",
@@ -284,6 +285,9 @@
     "taxNumber": "الرقم الضريبي",
     "paymentTerms": "شروط الدفع",
     "type": "النوع",
+    "engineer": "المهندس المسؤول",
+    "noEngineer": "بدون مهندس",
+    "selectEngineer": "اختر المهندس (اختياري)",
     "individual": "فرد",
     "company": "شركة",
     "locationName": "الاسم",
@@ -955,6 +959,19 @@
     "noMachine": "بدون ماكينة محددة",
     "totalTests": "إجمالي الاختبارات",
     "chooseMachine": "اختر الماكينة (اختياري)",
-    "noCustomerMachinesHint": "العميل ليس لديه ماكينات مسجلة — يمكنك الاختيار من كل الماكينات"
+    "noCustomerMachinesHint": "العميل ليس لديه ماكينات مسجلة — يمكنك الاختيار من كل الماكينات",
+    "blackCounter": "عداد الأسود",
+    "colorCounter": "عداد الألوان",
+    "repairStatement": "بيان الإصلاح",
+    "repairStatementPlaceholder": "ماذا تم في الزيارة؟...",
+    "spareParts": "قطع الغيار المطلوبة",
+    "sparePartsPlaceholder": "اكتب قطع الغيار المطلوبة إن وجدت...",
+    "collectedAmount": "مبلغ محصل من العميل",
+    "collectionNote": "بيان التحصيل",
+    "collectionNotePlaceholder": "سبب التحصيل...",
+    "countersRequired": "أدخل عداد الأسود أو عداد الألوان (رقم أكبر من صفر)",
+    "amountInvalid": "المبلغ المحصل يجب أن يكون رقمًا أكبر من صفر",
+    "noImage": "بدون صورة",
+    "testSavedWithSettlement": "تم حفظ الاختبار وإنشاء تسوية وتنبيه المحاسب"
   }
 }

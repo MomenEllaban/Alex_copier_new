@@ -152,6 +152,7 @@
     "date": "Date",
     "amount": "Amount",
     "notes": "Notes",
+    "optional": "Optional",
     "description": "Description",
     "yes": "Yes",
     "no": "No",
@@ -291,6 +292,9 @@
     "taxNumber": "Tax Number",
     "paymentTerms": "Payment Terms",
     "type": "Type",
+    "engineer": "Assigned engineer",
+    "noEngineer": "No engineer",
+    "selectEngineer": "Select engineer (optional)",
     "individual": "Individual",
     "company": "Company",
     "locationName": "Name",
@@ -954,6 +958,19 @@
     "noMachine": "No specific machine",
     "totalTests": "Total tests",
     "chooseMachine": "Select machine (optional)",
-    "noCustomerMachinesHint": "Customer has no registered machines — you can pick from all machines"
+    "noCustomerMachinesHint": "Customer has no registered machines — you can pick from all machines",
+    "blackCounter": "Black counter",
+    "colorCounter": "Color counter",
+    "repairStatement": "Repair statement",
+    "repairStatementPlaceholder": "What was done on the visit?...",
+    "spareParts": "Required spare parts",
+    "sparePartsPlaceholder": "Write required spare parts if any...",
+    "collectedAmount": "Amount collected from customer",
+    "collectionNote": "Collection note",
+    "collectionNotePlaceholder": "Collection reason...",
+    "countersRequired": "Enter the black or color counter (a number greater than zero)",
+    "amountInvalid": "Collected amount must be a number greater than zero",
+    "noImage": "No image",
+    "testSavedWithSettlement": "Test saved, settlement created and accountant notified"
   }
 }

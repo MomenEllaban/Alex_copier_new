@@ -76,10 +76,43 @@ export async function PUT(
 
     if (body.pageCount !== undefined) {
       const pageCount = Number(body.pageCount);
-      if (!Number.isInteger(pageCount) || pageCount <= 0) {
-        return NextResponse.json({ error: "عدد الأوراق يجب أن يكون رقمًا أكبر من صفر", code: "PAGE_COUNT_INVALID" }, { status: 400 });
+      if (!Number.isInteger(pageCount) || pageCount < 0) {
+        return NextResponse.json({ error: "عدد الأوراق يجب أن يكون رقمًا صحيحًا", code: "PAGE_COUNT_INVALID" }, { status: 400 });
       }
       updateData.pageCount = pageCount;
+    }
+
+    for (const field of ["blackCounter", "colorCounter"] as const) {
+      if (body[field] !== undefined) {
+        if (body[field] == null || String(body[field]).trim() === "") {
+          updateData[field] = null;
+        } else {
+          const n = Number(body[field]);
+          if (!Number.isInteger(n) || n < 0) {
+            return NextResponse.json({ error: "عداد الأسود والألوان يجب أن يكونا رقمين صحيحين", code: "COUNTER_INVALID" }, { status: 400 });
+          }
+          updateData[field] = n;
+        }
+      }
+    }
+
+    for (const field of ["repairStatement", "spareParts", "collectionNote"] as const) {
+      if (body[field] !== undefined) {
+        updateData[field] =
+          body[field] != null && String(body[field]).trim() !== "" ? String(body[field]).trim() : null;
+      }
+    }
+
+    if (body.collectedAmount !== undefined) {
+      if (body.collectedAmount == null || String(body.collectedAmount).trim() === "") {
+        updateData.collectedAmount = null;
+      } else {
+        const amount = Number(body.collectedAmount);
+        if (!Number.isFinite(amount) || amount <= 0) {
+          return NextResponse.json({ error: "المبلغ المحصل يجب أن يكون رقمًا أكبر من صفر", code: "AMOUNT_INVALID" }, { status: 400 });
+        }
+        updateData.collectedAmount = amount;
+      }
     }
 
     if (body.testDate !== undefined) {
@@ -139,7 +172,7 @@ export async function DELETE(
     }
 
     await prisma.copierTest.delete({ where: { id } });
-    await deleteCopierTestImage(existing.imagePublicId);
+    if (existing.imagePublicId) await deleteCopierTestImage(existing.imagePublicId);
     return NextResponse.json({ message: "Test deleted" });
   } catch {
     return NextResponse.json({ error: "Failed to delete test" }, { status: 500 });

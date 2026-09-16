@@ -88,11 +88,15 @@ export async function GET() {
     ]);
 
     const contractProfitability = contracts.map((contract) => {
-      const marginRate = {
+      const marginRate: number = {
         MAINTENANCE_ONLY: 0.22,
         MAINTENANCE_AND_PARTS: 0.28,
         MAINTENANCE_AND_PRINTING: 0.25,
         RENTAL: 0.18,
+        VISIT: 0.3,
+        ARCHIVE: 0.1,
+        WARRANTY: 0.12,
+        PENDING: 0.2,
       }[contract.contractType] ?? 0.2;
 
       const estimatedProfit = Math.round(contract.value * marginRate);

@@ -26,6 +26,10 @@ const TYPE_LABELS: Record<string, string> = {
   MAINTENANCE_AND_PARTS: "صيانة وقطع غيار",
   MAINTENANCE_AND_PRINTING: "صيانة وطباعة",
   RENTAL: "إيجار",
+  VISIT: "زيارة",
+  ARCHIVE: "ارشيف",
+  WARRANTY: "ضمان",
+  PENDING: "مطلوب عقد",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -56,6 +60,10 @@ const contractTypeColors: Record<string, string> = {
   MAINTENANCE_AND_PARTS: "bg-green-100 text-green-800",
   MAINTENANCE_AND_PRINTING: "bg-purple-100 text-purple-800",
   RENTAL: "bg-orange-100 text-orange-800",
+  VISIT: "bg-teal-100 text-teal-800",
+  ARCHIVE: "bg-gray-100 text-gray-800",
+  WARRANTY: "bg-yellow-100 text-yellow-800",
+  PENDING: "bg-red-100 text-red-800",
 };
 
 const statusColors: Record<string, string> = {
@@ -299,6 +307,10 @@ export default function ContractsPage() {
                   <option value="MAINTENANCE_AND_PARTS">{TYPE_LABELS.MAINTENANCE_AND_PARTS}</option>
                   <option value="MAINTENANCE_AND_PRINTING">{TYPE_LABELS.MAINTENANCE_AND_PRINTING}</option>
                   <option value="RENTAL">{TYPE_LABELS.RENTAL}</option>
+                  <option value="VISIT">{TYPE_LABELS.VISIT}</option>
+                  <option value="ARCHIVE">{TYPE_LABELS.ARCHIVE}</option>
+                  <option value="WARRANTY">{TYPE_LABELS.WARRANTY}</option>
+                  <option value="PENDING">{TYPE_LABELS.PENDING}</option>
                 </select>
               </div>
               <div className="space-y-1.5">

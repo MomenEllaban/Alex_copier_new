@@ -161,6 +161,7 @@ model Customer {
   address         String?
   city            String?
   governorate     String?
+  notes           String?
   gpsLat          Float?
   gpsLng          Float?
   taxNumber       String?
@@ -173,9 +174,11 @@ model Customer {
   remainingDebt   Float        @default(0)
   lastPaymentDate DateTime?
   statementToken  String?      @unique
+  engineerId      String?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
+  engineer          Engineer?      @relation(fields: [engineerId], references: [id])
   locations         CustomerLocation[]
   ledgers           CustomerLedger[]
   orders            SalesOrder[]
@@ -258,6 +261,7 @@ model Engineer {
   name               String
   phone              String?
   email              String?
+  nationalId         String?
   baseSalary         Float    @default(8000)
   transportAllowance Float    @default(2000)
   commissionRate     Float    @default(25)
@@ -277,6 +281,7 @@ model Engineer {
   warranties      Warranty[]
   salesOrders     SalesOrder[]
   copierTests     CopierTest[]
+  customers       Customer[]
 }
 
 model EngineerArea {
@@ -458,6 +463,9 @@ model Machine {
   salePrice          Float?
   saleDate           DateTime?
   notes              String?
+  deliveryBlack      Int?
+  deliveryColor      Int?
+  isPrinter          Boolean       @default(false)
   productId          String?
   currentOwnerId     String?
   customerLocationId String?
@@ -736,6 +744,10 @@ enum ContractType {
   MAINTENANCE_AND_PARTS
   MAINTENANCE_AND_PRINTING
   RENTAL
+  VISIT
+  ARCHIVE
+  WARRANTY
+  PENDING
 }
 
 enum ContractStatus {
@@ -1160,20 +1172,26 @@ model EngineerSalary {
 // ═══════════════════════════════════════════════════════════
 
 model CopierTest {
-  id            String   @id @default(cuid())
-  customerId    String
-  engineerId    String
-  machineId     String?
-  pageCount     Int
-  imageUrl      String
-  imagePublicId String
-  notes         String?
-  testDate      DateTime @default(now())
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id               String   @id @default(cuid())
+  customerId       String
+  engineerId       String?
+  machineId        String?
+  pageCount        Int
+  blackCounter     Int?
+  colorCounter     Int?
+  repairStatement  String?
+  spareParts       String?
+  collectedAmount  Float?
+  collectionNote   String?
+  imageUrl         String?
+  imagePublicId    String?
+  notes            String?
+  testDate         DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  engineer Engineer @relation(fields: [engineerId], references: [id], onDelete: Restrict)
+  engineer Engineer? @relation(fields: [engineerId], references: [id], onDelete: Restrict)
   machine  Machine? @relation(fields: [machineId], references: [id], onDelete: SetNull)
 
   @@index([customerId, testDate])

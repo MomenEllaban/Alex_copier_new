@@ -7,10 +7,20 @@ export async function GET() {
   try {
     const user = await requireAuth();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // Engineers only see their assigned customers (Customer.engineerId).
+    let engineerFilter: { engineerId: string } | undefined;
+    const role = (user as { role?: string }).role;
+    if (role === "ENGINEER") {
+      const userId = (user as { id?: string }).id ?? "";
+      const mine = await prisma.engineer.findUnique({ where: { userId }, select: { id: true } });
+      engineerFilter = { engineerId: mine?.id ?? "__none__" };
+    }
     const customers = await prisma.customer.findMany({
+      where: engineerFilter,
       include: {
         locations: true,
         ledgers: true,
+        engineer: { select: { id: true, name: true } },
         payments: { orderBy: { paymentDate: "desc" }, take: 1 },
       },
       orderBy: { createdAt: "desc" },
@@ -29,10 +39,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: authed ? "Forbidden" : "Unauthorized" }, { status: authed ? 403 : 401 });
     }
     const body = await request.json();
-    const { companyId, name, phone, email, address, customerType, taxNumber, creditLimit, companyName, contactPerson, whatsapp, city, governorate, gpsLat, gpsLng, tradeRegister, paymentTerms, totalDebt, remainingDebt } = body;
+    const { companyId, name, phone, email, address, customerType, taxNumber, creditLimit, companyName, contactPerson, whatsapp, city, governorate, gpsLat, gpsLng, tradeRegister, paymentTerms, totalDebt, remainingDebt, notes, engineerId } = body;
 
     if (!name || typeof name !== "string" || name.trim() === "") {
       return NextResponse.json({ error: "اسم العميل مطلوب", code: "NAME_REQUIRED" }, { status: 400 });
+    }
+
+    if (engineerId) {
+      const engineer = await prisma.engineer.findUnique({ where: { id: String(engineerId) }, select: { id: true } });
+      if (!engineer) {
+        return NextResponse.json({ error: "المهندس غير موجود", code: "ENGINEER_NOT_FOUND" }, { status: 400 });
+      }
     }
 
     if (companyId) {
@@ -61,6 +78,8 @@ export async function POST(request: Request) {
         gpsLng: gpsLng != null ? Number(gpsLng) : undefined,
         tradeRegister: tradeRegister ?? undefined,
         paymentTerms: paymentTerms ?? undefined,
+        notes: notes != null && String(notes).trim() !== "" ? String(notes).trim() : undefined,
+        engineerId: engineerId ? String(engineerId) : undefined,
         totalDebt: totalDebt != null ? Math.max(0, Number(totalDebt)) : 0,
         remainingDebt: remainingDebt != null ? Math.max(0, Number(remainingDebt)) : (totalDebt != null ? Math.max(0, Number(totalDebt)) : 0),
       },

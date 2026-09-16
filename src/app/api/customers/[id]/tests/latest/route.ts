@@ -13,10 +13,20 @@ export async function GET(
 
     const customer = await prisma.customer.findUnique({
       where: { id: customerId },
-      select: { id: true },
+      select: { id: true, engineerId: true },
     });
     if (!customer) {
       return NextResponse.json({ error: "العميل غير موجود" }, { status: 404 });
+    }
+
+    // Engineers may only read tests of their assigned customers.
+    const role = (user as { role?: string }).role;
+    if (role === "ENGINEER") {
+      const userId = (user as { id?: string }).id ?? "";
+      const mine = await prisma.engineer.findUnique({ where: { userId }, select: { id: true } });
+      if (!mine || customer.engineerId !== mine.id) {
+        return NextResponse.json({ error: "هذا العميل غير مسند إليك", code: "CUSTOMER_NOT_ASSIGNED" }, { status: 403 });
+      }
     }
 
     const latest = await prisma.copierTest.findFirst({
