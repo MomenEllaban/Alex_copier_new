@@ -22,13 +22,15 @@ import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { notifyDataChanged } from "@/lib/data-events";
 
 const TYPE_LABELS: Record<string, string> = {
-  MAINTENANCE_ONLY: "صيانة فقط",
+  ARCHIVE: "ارشيف",
+  RENTAL: "ايجار",
+  MAINTENANCE: "صيانه",
+  VISIT: "زياره",
+  WARRANTY: "ضمان",
+  CONTRACT_REQUIRED: "مطلوب عقد",
+  MAINTENANCE_ONLY: "صيانه",
   MAINTENANCE_AND_PARTS: "صيانة وقطع غيار",
   MAINTENANCE_AND_PRINTING: "صيانة وطباعة",
-  RENTAL: "إيجار",
-  VISIT: "زيارة",
-  ARCHIVE: "ارشيف",
-  WARRANTY: "ضمان",
   PENDING: "مطلوب عقد",
 };
 
@@ -56,14 +58,16 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
 const PAYMENT_METHOD_OPTIONS = ["CASH", "CREDIT"] as const;
 
 const contractTypeColors: Record<string, string> = {
-  MAINTENANCE_ONLY: "bg-blue-100 text-blue-800",
-  MAINTENANCE_AND_PARTS: "bg-green-100 text-green-800",
-  MAINTENANCE_AND_PRINTING: "bg-purple-100 text-purple-800",
-  RENTAL: "bg-orange-100 text-orange-800",
-  VISIT: "bg-teal-100 text-teal-800",
-  ARCHIVE: "bg-gray-100 text-gray-800",
-  WARRANTY: "bg-yellow-100 text-yellow-800",
-  PENDING: "bg-red-100 text-red-800",
+  ARCHIVE: "bg-slate-100 text-slate-800 border border-slate-300",
+  RENTAL: "bg-blue-100 text-blue-800 border border-blue-300",
+  MAINTENANCE: "bg-emerald-100 text-emerald-800 border border-emerald-300",
+  VISIT: "bg-amber-100 text-amber-800 border border-amber-300",
+  WARRANTY: "bg-purple-100 text-purple-800 border border-purple-300",
+  CONTRACT_REQUIRED: "bg-rose-100 text-rose-800 border border-rose-300",
+  MAINTENANCE_ONLY: "bg-emerald-100 text-emerald-800 border border-emerald-300",
+  MAINTENANCE_AND_PARTS: "bg-teal-100 text-teal-800 border border-teal-300",
+  MAINTENANCE_AND_PRINTING: "bg-indigo-100 text-indigo-800 border border-indigo-300",
+  PENDING: "bg-rose-100 text-rose-800 border border-rose-300",
 };
 
 const statusColors: Record<string, string> = {
@@ -109,7 +113,7 @@ export default function ContractsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [form, setForm] = useState({
-    customerId: "", contractType: "MAINTENANCE_ONLY", startDate: "", endDate: "",
+    customerId: "", contractType: "MAINTENANCE", startDate: "", endDate: "",
     value: "", amountPaid: "", paymentMethod: "CASH", billingCycle: "MONTHLY", notes: "", machineIds: [] as string[],
   });
   const [page, setPage] = useState(1);
@@ -161,7 +165,7 @@ export default function ContractsPage() {
       }),
     });
     setSaving(false);
-    setForm({ customerId: "", contractType: "MAINTENANCE_ONLY", startDate: "", endDate: "", value: "", amountPaid: "", paymentMethod: "CASH", billingCycle: "MONTHLY", notes: "", machineIds: [] });
+    setForm({ customerId: "", contractType: "MAINTENANCE", startDate: "", endDate: "", value: "", amountPaid: "", paymentMethod: "CASH", billingCycle: "MONTHLY", notes: "", machineIds: [] });
     setShowForm(false);
     refresh();
     notifyDataChanged(["contracts", "machines", "customers"]);
@@ -182,7 +186,7 @@ export default function ContractsPage() {
     });
     setSaving(false);
     setEditingId(null);
-    setForm({ customerId: "", contractType: "MAINTENANCE_ONLY", startDate: "", endDate: "", value: "", amountPaid: "", paymentMethod: "CASH", billingCycle: "MONTHLY", notes: "", machineIds: [] });
+    setForm({ customerId: "", contractType: "MAINTENANCE", startDate: "", endDate: "", value: "", amountPaid: "", paymentMethod: "CASH", billingCycle: "MONTHLY", notes: "", machineIds: [] });
     setShowForm(false);
     refresh();
     notifyDataChanged(["contracts", "machines", "customers"]);
@@ -273,7 +277,7 @@ export default function ContractsPage() {
         </button>
       </div>
 
-      <FormModal open={showForm} onClose={() => { setShowForm(false); setEditingId(null); setForm({ customerId: "", contractType: "MAINTENANCE_ONLY", startDate: "", endDate: "", value: "", amountPaid: "", paymentMethod: "CASH", billingCycle: "MONTHLY", notes: "", machineIds: [] }); }} title={editingId ? t("common.edit") : t("contracts.addContract")} wide>
+      <FormModal open={showForm} onClose={() => { setShowForm(false); setEditingId(null); setForm({ customerId: "", contractType: "MAINTENANCE", startDate: "", endDate: "", value: "", amountPaid: "", paymentMethod: "CASH", billingCycle: "MONTHLY", notes: "", machineIds: [] }); }} title={editingId ? t("common.edit") : t("contracts.addContract")} wide>
         <form onSubmit={editingId ? handleUpdate : handleCreate} className="space-y-5">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
               <SelectWithAdd
@@ -301,14 +305,12 @@ export default function ContractsPage() {
               <div className="space-y-1.5">
                 <label className="block text-sm font-medium text-slate-700">{t("contracts.type")}</label>
                 <select value={form.contractType} onChange={(e) => setForm({ ...form, contractType: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  <option value="MAINTENANCE_ONLY">{TYPE_LABELS.MAINTENANCE_ONLY}</option>
-                  <option value="MAINTENANCE_AND_PARTS">{TYPE_LABELS.MAINTENANCE_AND_PARTS}</option>
-                  <option value="MAINTENANCE_AND_PRINTING">{TYPE_LABELS.MAINTENANCE_AND_PRINTING}</option>
-                  <option value="RENTAL">{TYPE_LABELS.RENTAL}</option>
-                  <option value="VISIT">{TYPE_LABELS.VISIT}</option>
                   <option value="ARCHIVE">{TYPE_LABELS.ARCHIVE}</option>
+                  <option value="RENTAL">{TYPE_LABELS.RENTAL}</option>
+                  <option value="MAINTENANCE">{TYPE_LABELS.MAINTENANCE}</option>
+                  <option value="VISIT">{TYPE_LABELS.VISIT}</option>
                   <option value="WARRANTY">{TYPE_LABELS.WARRANTY}</option>
-                  <option value="PENDING">{TYPE_LABELS.PENDING}</option>
+                  <option value="CONTRACT_REQUIRED">{TYPE_LABELS.CONTRACT_REQUIRED}</option>
                 </select>
               </div>
               <div className="space-y-1.5">
@@ -382,7 +384,7 @@ export default function ContractsPage() {
             </div>
 
             <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row sm:justify-end">
-              <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setForm({ customerId: "", contractType: "MAINTENANCE_ONLY", startDate: "", endDate: "", value: "", amountPaid: "", paymentMethod: "CASH", billingCycle: "MONTHLY", notes: "", machineIds: [] }); }} className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">{t("common.cancel")}</button>
+              <button type="button" onClick={() => { setShowForm(false); setEditingId(null); setForm({ customerId: "", contractType: "MAINTENANCE", startDate: "", endDate: "", value: "", amountPaid: "", paymentMethod: "CASH", billingCycle: "MONTHLY", notes: "", machineIds: [] }); }} className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">{t("common.cancel")}</button>
               <SubmitButton loading={saving} label={t("common.save")} loadingLabel={t("common.saving")} className="bg-blue-600 hover:bg-blue-700 text-white"><Save size={16} /></SubmitButton>
             </div>
           </form>

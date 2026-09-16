@@ -58,15 +58,15 @@ describe("access contracts", () => {
     expect(mapContractType("زيارة").type).toBe("VISIT");
     expect(mapContractType("ايجار").type).toBe("RENTAL");
     expect(mapContractType("ارشيف").type).toBe("ARCHIVE");
-    expect(mapContractType("صيانة").type).toBe("MAINTENANCE_ONLY");
+    expect(mapContractType("صيانة").type).toBe("MAINTENANCE");
     expect(mapContractType("ضمان").type).toBe("WARRANTY");
-    expect(mapContractType("مطلوب عقد").type).toBe("PENDING");
+    expect(mapContractType("مطلوب عقد").type).toBe("CONTRACT_REQUIRED");
   });
   it("flags the هله typo and empty values", () => {
     const typo = mapContractType("هله");
     expect(typo.type).toBe("VISIT");
     expect(typo.flagged).toBe(true);
-    expect(mapContractType(null).type).toBe("PENDING");
+    expect(mapContractType(null).type).toBe("CONTRACT_REQUIRED");
   });
 });
 

@@ -1,23 +1,29 @@
 import { normalizeArabicName } from "./normalize";
 
 // Access [نوع العقد] -> ERP ContractType.
-// "هله" is a one-row typo kept as VISIT (same customer already has a visit row).
+// Types requested: أرشيف (ARCHIVE), إيجار (RENTAL), صيانة (MAINTENANCE), زيارة (VISIT), ضمان (WARRANTY), مطلوب عقد (CONTRACT_REQUIRED).
 
 export type AccessContractType =
-  | "RENTAL"
-  | "VISIT"
   | "ARCHIVE"
-  | "MAINTENANCE_ONLY"
+  | "RENTAL"
+  | "MAINTENANCE"
+  | "VISIT"
   | "WARRANTY"
+  | "CONTRACT_REQUIRED"
+  | "MAINTENANCE_ONLY"
   | "PENDING";
 
 const MAP: Record<string, AccessContractType> = {
-  [normalizeArabicName("ايجار")]: "RENTAL",
-  [normalizeArabicName("زيارة")]: "VISIT",
   [normalizeArabicName("ارشيف")]: "ARCHIVE",
-  [normalizeArabicName("صيانة")]: "MAINTENANCE_ONLY",
+  [normalizeArabicName("أرشيف")]: "ARCHIVE",
+  [normalizeArabicName("ايجار")]: "RENTAL",
+  [normalizeArabicName("إيجار")]: "RENTAL",
+  [normalizeArabicName("صيانه")]: "MAINTENANCE",
+  [normalizeArabicName("صيانة")]: "MAINTENANCE",
+  [normalizeArabicName("زياره")]: "VISIT",
+  [normalizeArabicName("زيارة")]: "VISIT",
   [normalizeArabicName("ضمان")]: "WARRANTY",
-  [normalizeArabicName("مطلوب عقد")]: "PENDING",
+  [normalizeArabicName("مطلوب عقد")]: "CONTRACT_REQUIRED",
   [normalizeArabicName("هله")]: "VISIT",
 };
 
@@ -26,17 +32,19 @@ export function mapContractType(raw: string | null | undefined): {
   flagged: boolean;
 } {
   const key = normalizeArabicName(raw);
-  if (!key) return { type: "PENDING", flagged: true };
+  if (!key) return { type: "CONTRACT_REQUIRED", flagged: true };
   const mapped = MAP[key];
-  if (!mapped) return { type: "PENDING", flagged: true };
+  if (!mapped) return { type: "CONTRACT_REQUIRED", flagged: true };
   return { type: mapped, flagged: key === normalizeArabicName("هله") };
 }
 
 export const CONTRACT_TYPE_AR: Record<AccessContractType, string> = {
-  RENTAL: "ايجار",
-  VISIT: "زيارة",
   ARCHIVE: "ارشيف",
-  MAINTENANCE_ONLY: "صيانة",
+  RENTAL: "ايجار",
+  MAINTENANCE: "صيانه",
+  VISIT: "زياره",
   WARRANTY: "ضمان",
+  CONTRACT_REQUIRED: "مطلوب عقد",
+  MAINTENANCE_ONLY: "صيانه",
   PENDING: "مطلوب عقد",
 };

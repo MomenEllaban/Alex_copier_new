@@ -752,28 +752,28 @@ async function main() {
 
   const contract1 = await prisma.contract.create({
     data: {
-      id: 'contract-1', contractNumber: 'CNT-2024-001', customerId: 'cust-1', contractType: 'MAINTENANCE_ONLY', status: 'ACTIVE', startDate: new Date('2024-01-01'), endDate: new Date('2025-01-01'), value: 24000, billingCycle: 'MONTHLY', visitLimit: 4, costPerCopy: 0.30, notes: 'Maintenance contract for maktb al-nour',
+      id: 'contract-1', contractNumber: 'CNT-2024-001', customerId: 'cust-1', contractType: 'MAINTENANCE', status: 'ACTIVE', startDate: new Date('2024-01-01'), endDate: new Date('2025-01-01'), value: 24000, billingCycle: 'MONTHLY', visitLimit: 4, costPerCopy: 0.30, notes: 'Maintenance contract for maktb al-nour',
       machines: { create: [{ machineId: 'mach-01' }] },
     },
   });
 
   const contract2 = await prisma.contract.create({
     data: {
-      id: 'contract-2', contractNumber: 'CNT-2024-002', customerId: 'cust-2', contractType: 'MAINTENANCE_ONLY', status: 'ACTIVE', startDate: new Date('2024-03-01'), endDate: new Date('2025-03-01'), value: 36000, billingCycle: 'MONTHLY', visitLimit: 4, costPerCopy: 0.35, notes: 'Maintenance for al-shrooq',
+      id: 'contract-2', contractNumber: 'CNT-2024-002', customerId: 'cust-2', contractType: 'MAINTENANCE', status: 'ACTIVE', startDate: new Date('2024-03-01'), endDate: new Date('2025-03-01'), value: 36000, billingCycle: 'MONTHLY', visitLimit: 4, costPerCopy: 0.35, notes: 'Maintenance for al-shrooq',
       machines: { create: [{ machineId: 'mach-02' }] },
     },
   });
 
   const contract3 = await prisma.contract.create({
     data: {
-      id: 'contract-3', contractNumber: 'CNT-2024-003', customerId: 'cust-4', contractType: 'MAINTENANCE_AND_PARTS', status: 'ACTIVE', startDate: new Date('2024-04-01'), endDate: new Date('2025-04-01'), value: 60000, billingCycle: 'MONTHLY', visitLimit: 6, costPerCopy: 0.40, notes: 'Maintenance and parts for al-fagr',
+      id: 'contract-3', contractNumber: 'CNT-2024-003', customerId: 'cust-4', contractType: 'MAINTENANCE', status: 'ACTIVE', startDate: new Date('2024-04-01'), endDate: new Date('2025-04-01'), value: 60000, billingCycle: 'MONTHLY', visitLimit: 6, costPerCopy: 0.40, notes: 'Maintenance and parts for al-fagr',
       machines: { create: [{ machineId: 'mach-04' }] },
     },
   });
 
   const contract4 = await prisma.contract.create({
     data: {
-      id: 'contract-4', contractNumber: 'CNT-2024-004', customerId: 'cust-6', contractType: 'MAINTENANCE_AND_PARTS', status: 'ACTIVE', startDate: new Date('2024-05-01'), endDate: new Date('2025-05-01'), value: 48000, billingCycle: 'MONTHLY', visitLimit: 4, costPerCopy: 0.35, notes: 'Maintenance and parts for al-aman',
+      id: 'contract-4', contractNumber: 'CNT-2024-004', customerId: 'cust-6', contractType: 'MAINTENANCE', status: 'ACTIVE', startDate: new Date('2024-05-01'), endDate: new Date('2025-05-01'), value: 48000, billingCycle: 'MONTHLY', visitLimit: 4, costPerCopy: 0.35, notes: 'Maintenance and parts for al-aman',
       machines: { create: [{ machineId: 'mach-05' }] },
     },
   });
@@ -787,7 +787,7 @@ async function main() {
 
   const contract6 = await prisma.contract.create({
     data: {
-      id: 'contract-6', contractNumber: 'CNT-2024-006', customerId: 'cust-8', contractType: 'MAINTENANCE_ONLY', status: 'EXPIRED', startDate: new Date('2023-06-01'), endDate: new Date('2024-06-01'), value: 18000, billingCycle: 'QUARTERLY', visitLimit: 3, costPerCopy: 0.30, notes: 'Expired maintenance contract for al-amal',
+      id: 'contract-6', contractNumber: 'CNT-2024-006', customerId: 'cust-8', contractType: 'MAINTENANCE', status: 'EXPIRED', startDate: new Date('2023-06-01'), endDate: new Date('2024-06-01'), value: 18000, billingCycle: 'QUARTERLY', visitLimit: 3, costPerCopy: 0.30, notes: 'Expired maintenance contract for al-amal',
       machines: { create: [{ machineId: 'mach-06' }] },
     },
   });
