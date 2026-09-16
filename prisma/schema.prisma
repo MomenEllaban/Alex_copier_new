@@ -148,6 +148,8 @@ model Company {
   accounts              Account[]
   journalEntries        JournalEntry[]
   payments              CustomerPayment[]
+  workshopBooks         WorkshopDailyBook[]
+  workshopTransactions  WorkshopTransaction[]
 }
 
 model Customer {
@@ -1082,6 +1084,7 @@ model ExpenseCategory {
 
   company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   expenses Expense[]
+  workshopTransactions WorkshopTransaction[]
 
   @@unique([companyId, name])
 }
@@ -1165,6 +1168,71 @@ model EngineerSalary {
   updatedAt          DateTime  @updatedAt
 
   engineer Engineer @relation(fields: [engineerId], references: [id], onDelete: Cascade)
+}
+
+// ═══════════════════════════════════════════════════════════
+// PHASE 11 - WORKSHOP DAILY CASHBOX (يومية الورشة)
+// ═══════════════════════════════════════════════════════════
+
+enum WorkshopBookStatus {
+  OPEN
+  CLOSED
+}
+
+enum WorkshopTxDirection {
+  IN
+  OUT
+}
+
+enum WorkshopTxStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+
+model WorkshopDailyBook {
+  id              String             @id @default(cuid())
+  companyId       String
+  bookDate        DateTime
+  status          WorkshopBookStatus @default(OPEN)
+  notes           String?
+  openedBy        String
+  closedBy        String?
+  closedAt        DateTime?
+  handoverAmount  Float?
+  handoverTo      String?
+  handoverNote    String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  transactions WorkshopTransaction[]
+
+  @@index([companyId, status])
+}
+
+model WorkshopTransaction {
+  id           String              @id @default(cuid())
+  bookId       String
+  companyId    String
+  direction    WorkshopTxDirection
+  amount       Float
+  categoryId   String?
+  reason       String
+  status       WorkshopTxStatus    @default(PENDING)
+  createdBy    String
+  confirmedBy  String?
+  confirmedAt  DateTime?
+  rejectReason String?
+  expenseId    String?
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  book     WorkshopDailyBook @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  company  Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  category ExpenseCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([bookId, status])
 }
 
 // ═══════════════════════════════════════════════════════════

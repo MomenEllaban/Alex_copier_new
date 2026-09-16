@@ -76,6 +76,7 @@ const navGroups: { key: string; items: NavItem[] }[] = [
       { key: "navigation.serviceRequests", href: "/service-requests", icon: AlertTriangle, page: "serviceRequests", canAdd: true },
       { key: "navigation.engineers", href: "/engineers", icon: Wrench, page: "engineers", canAdd: true },
       { key: "navigation.workshop", href: "/workshop", icon: Cog, page: "workshop" },
+      { key: "navigation.workshopDaily", href: "/workshop-daily", icon: Wallet, page: "workshopDaily", canAdd: true },
     ],
   },
   {

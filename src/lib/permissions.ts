@@ -28,7 +28,8 @@ export type Page =
   | "suppliers"
   | "investors"
   | "returns"
-  | "tradeIns";
+  | "tradeIns"
+  | "workshopDaily";
 
 export const ROLE_PERMISSIONS: Record<Role, Page[]> = {
   // المدير العام — يشوف كل حاجة (ادمن)
@@ -36,7 +37,7 @@ export const ROLE_PERMISSIONS: Record<Role, Page[]> = {
     "dashboard", "machines", "customers", "engineers",
     "serviceRequests", "contracts", "purchases", "sales",
     "inventory", "warehouses", "products", "workshop", "finance", "companies",
-    "settlements", "reports", "settings", "suppliers", "investors", "returns", "tradeIns",
+    "settlements", "reports", "settings", "suppliers", "investors", "returns", "tradeIns", "workshopDaily",
   ],
 
   // مدير الشركة — إدارة شاملة لشركته
@@ -44,13 +45,13 @@ export const ROLE_PERMISSIONS: Record<Role, Page[]> = {
     "dashboard", "machines", "customers", "engineers",
     "serviceRequests", "contracts", "purchases", "sales",
     "inventory", "warehouses", "products", "workshop", "finance", "settlements",
-    "reports", "suppliers", "returns", "tradeIns",
+    "reports", "suppliers", "returns", "tradeIns", "workshopDaily",
   ],
 
   // المحاسب — المالية والفواتير والتقارير
   ACCOUNTANT: [
     "dashboard", "purchases", "sales", "finance",
-    "settlements", "reports", "companies", "returns",
+    "settlements", "reports", "companies", "returns", "workshopDaily",
   ],
 
   // مدير الصيانة — طلبات الصيانة والمهندسين والورشة
@@ -61,7 +62,7 @@ export const ROLE_PERMISSIONS: Record<Role, Page[]> = {
 
   // مدير الورشة — الورشة والمخزون وengineers
   WORKSHOP_MANAGER: [
-    "dashboard", "workshop", "inventory", "warehouses", "products", "engineers", "machines",
+    "dashboard", "workshop", "inventory", "warehouses", "products", "engineers", "machines", "workshopDaily",
   ],
 
   // المهندس — طلبات الصيانة المعينة عليه + عملاؤه المسندون إليه فقط
