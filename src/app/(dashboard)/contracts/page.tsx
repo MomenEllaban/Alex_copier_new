@@ -21,6 +21,15 @@ import RefreshButton from "@/components/RefreshButton";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { notifyDataChanged } from "@/lib/data-events";
 
+const CONTRACT_TYPE_OPTIONS = [
+  { value: "ARCHIVE", label: "ارشيف" },
+  { value: "RENTAL", label: "ايجار" },
+  { value: "MAINTENANCE", label: "صيانه" },
+  { value: "VISIT", label: "زياره" },
+  { value: "WARRANTY", label: "ضمان" },
+  { value: "CONTRACT_REQUIRED", label: "مطلوب عقد" },
+];
+
 const TYPE_LABELS: Record<string, string> = {
   ARCHIVE: "ارشيف",
   RENTAL: "ايجار",
@@ -29,8 +38,8 @@ const TYPE_LABELS: Record<string, string> = {
   WARRANTY: "ضمان",
   CONTRACT_REQUIRED: "مطلوب عقد",
   MAINTENANCE_ONLY: "صيانه",
-  MAINTENANCE_AND_PARTS: "صيانة وقطع غيار",
-  MAINTENANCE_AND_PRINTING: "صيانة وطباعة",
+  MAINTENANCE_AND_PARTS: "صيانه",
+  MAINTENANCE_AND_PRINTING: "صيانه",
   PENDING: "مطلوب عقد",
 };
 
@@ -394,7 +403,7 @@ export default function ContractsPage() {
         <div className="flex flex-col gap-3 border-b border-slate-200 p-4 md:flex-row md:items-center md:flex-wrap">
           <div className="w-full md:w-80 md:flex-none"><SearchInput value={search} onChange={setSearchInput} placeholder={t("contracts.searchPlaceholder")} /></div>
           <FilterSelect value={statusFilter} onChange={(v) => { setStatusFilter(v); setPage(1); }} options={Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))} allLabel={`${t("common.status")} — ${t("common.all")}`} className="md:w-40" />
-          <FilterSelect value={typeFilter} onChange={(v) => { setTypeFilter(v); setPage(1); }} options={Object.entries(TYPE_LABELS).map(([value, label]) => ({ value, label }))} allLabel={`${t("contracts.typeFilter")} — ${t("common.all")}`} className="md:w-44" />
+          <FilterSelect value={typeFilter} onChange={(v) => { setTypeFilter(v); setPage(1); }} options={CONTRACT_TYPE_OPTIONS} allLabel={`${t("contracts.typeFilter")} — ${t("common.all")}`} className="md:w-44" />
           {hasActiveFilters && (
             <button onClick={() => { setSearchInput(null); setStatusFilter(""); setTypeFilter(""); }} className="text-sm text-gray-500 hover:text-gray-700 underline">
               {t("common.resetFilters")}

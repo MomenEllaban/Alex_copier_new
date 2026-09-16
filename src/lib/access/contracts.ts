@@ -9,9 +9,7 @@ export type AccessContractType =
   | "MAINTENANCE"
   | "VISIT"
   | "WARRANTY"
-  | "CONTRACT_REQUIRED"
-  | "MAINTENANCE_ONLY"
-  | "PENDING";
+  | "CONTRACT_REQUIRED";
 
 const MAP: Record<string, AccessContractType> = {
   [normalizeArabicName("ارشيف")]: "ARCHIVE",
@@ -45,6 +43,4 @@ export const CONTRACT_TYPE_AR: Record<AccessContractType, string> = {
   VISIT: "زياره",
   WARRANTY: "ضمان",
   CONTRACT_REQUIRED: "مطلوب عقد",
-  MAINTENANCE_ONLY: "صيانه",
-  PENDING: "مطلوب عقد",
 };
