@@ -12,7 +12,7 @@ import SubmitButton from "@/components/SubmitButton";
 import ExportButton from "@/components/ExportButton";
 import RefreshButton from "@/components/RefreshButton";
 import { useConfirm, useToast } from "@/components/UIProvider";
-import { Plus, Eye, Pencil, Trash2, Users, Building2, CreditCard, ShieldCheck } from "lucide-react";
+import { Plus, Eye, Pencil, Trash2, Users } from "lucide-react";
 
 interface Department { id: string; name: string; nameAr?: string | null; }
 interface JobTitle { id: string; title: string; titleAr?: string | null; }
@@ -53,7 +53,6 @@ export default function EmployeesPage() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [jobTitles, setJobTitles] = useState<JobTitle[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [shifts, setShifts] = useState<Shift[]>([]);
   
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -212,7 +211,6 @@ export default function EmployeesPage() {
     const ok = await confirmAction({
       title: "حذف الموظف",
       message: "هل أنت تأكد من رغبتك في حذف هذا الموظف؟ لن يمكنك التراجع.",
-      type: "danger",
     });
     if (!ok) return;
 
@@ -241,7 +239,7 @@ export default function EmployeesPage() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE) || 1;
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-  if (loading) return <PrinterLoader message="جاري تحميل قائمة الموظفين..." />;
+  if (loading) return <PrinterLoader label="جاري تحميل قائمة الموظفين..." />;
 
   return (
     <div className="space-y-6">
@@ -257,8 +255,21 @@ export default function EmployeesPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <RefreshButton onClick={fetchData} loading={loading} />
-          <ExportButton data={filtered} filename="employees_export" title="تصدير الموظفين" />
+          <RefreshButton onRefresh={fetchData} refreshing={loading} />
+          <ExportButton
+            filename="employees_export"
+            getExport={() => ({
+              headers: ["كود الموظف", "الاسم", "رقم البصمة", "القسم", "الراتب الأساسي", "الحالة"],
+              rows: filtered.map((e) => [
+                e.code,
+                e.fullNameAr || e.fullName,
+                e.fingerprintId || "",
+                e.Department?.nameAr || e.Department?.name || "",
+                String(e.baseSalary || 0),
+                e.status,
+              ]),
+            })}
+          />
           <button
             onClick={openAddModal}
             className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2.5 rounded-lg shadow-sm transition-colors text-sm"
@@ -279,16 +290,14 @@ export default function EmployeesPage() {
         <FilterSelect
           value={departmentFilter}
           onChange={(v) => { setDepartmentFilter(v); setPage(1); }}
-          options={[
-            { label: "جميع الأقسام", value: "" },
-            ...departments.map((d) => ({ label: d.nameAr || d.name, value: d.id })),
-          ]}
+          allLabel="جميع الأقسام"
+          options={departments.map((d) => ({ label: d.nameAr || d.name, value: d.id }))}
         />
         <FilterSelect
           value={statusFilter}
           onChange={(v) => { setStatusFilter(v); setPage(1); }}
+          allLabel="جميع الحالات"
           options={[
-            { label: "جميع الحالات", value: "" },
             { label: "نشط (Active)", value: "ACTIVE" },
             { label: "في إجازة (On Leave)", value: "ON_LEAVE" },
             { label: "موقوف (Suspended)", value: "SUSPENDED" },
@@ -405,10 +414,10 @@ export default function EmployeesPage() {
       {/* Modal Add / Edit Employee */}
       {showModal && (
         <FormModal
-          isOpen={showModal}
+          open={showModal}
           onClose={() => setShowModal(false)}
           title={editingEmployee ? "تعديل بيانات الموظف" : "إضافة موظف جديد"}
-          size="xl"
+          xl
         >
           <form onSubmit={handleSubmit} className="space-y-4">
             {formError && (
@@ -610,9 +619,7 @@ export default function EmployeesPage() {
               >
                 إلغاء
               </button>
-              <SubmitButton isSubmitting={isPending}>
-                {editingEmployee ? "تحديث الموظف" : "إضافة الموظف"}
-              </SubmitButton>
+              <SubmitButton loading={isPending} label={editingEmployee ? "تحديث الموظف" : "إضافة الموظف"} />
             </div>
           </form>
         </FormModal>
@@ -621,10 +628,10 @@ export default function EmployeesPage() {
       {/* Modal View Employee Details */}
       {selectedEmployee && (
         <FormModal
-          isOpen={!!selectedEmployee}
+          open={!!selectedEmployee}
           onClose={() => setSelectedEmployee(null)}
           title={`تفاصيل الموظف: ${selectedEmployee.fullName}`}
-          size="lg"
+          wide
         >
           <div className="space-y-4 text-sm">
             <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">

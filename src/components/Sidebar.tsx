@@ -33,6 +33,7 @@ import {
   Calendar,
   UserCheck,
   Briefcase,
+  Plus,
 } from "lucide-react";
 
 interface NavItem {

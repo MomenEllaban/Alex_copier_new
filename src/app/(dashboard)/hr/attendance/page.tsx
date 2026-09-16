@@ -9,7 +9,7 @@ import SubmitButton from "@/components/SubmitButton";
 import ExportButton from "@/components/ExportButton";
 import RefreshButton from "@/components/RefreshButton";
 import { useToast } from "@/components/UIProvider";
-import { UserCheck, Clock, Calendar, Plus, Filter, AlertCircle, FileSpreadsheet } from "lucide-react";
+import { UserCheck, Calendar, Plus } from "lucide-react";
 
 interface Employee {
   id: string;
@@ -172,7 +172,7 @@ export default function AttendancePage() {
     return d.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
   };
 
-  if (loading) return <PrinterLoader message="جاري تحميل سجل البصمات والحضور..." />;
+  if (loading) return <PrinterLoader label="جاري تحميل سجل البصمات والحضور..." />;
 
   return (
     <div className="space-y-6">
@@ -188,8 +188,21 @@ export default function AttendancePage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <RefreshButton onClick={fetchData} loading={loading} />
-          <ExportButton data={filtered} filename={`attendance_${date}`} title="تصدير البصمات" />
+          <RefreshButton onRefresh={fetchData} refreshing={loading} />
+          <ExportButton
+            filename={`attendance_${date}`}
+            getExport={() => ({
+              headers: ["كود الموظف", "الاسم", "الدخول", "الخروج", "التأخير بالدقائق", "الحالة"],
+              rows: filtered.map((r) => [
+                r.Employee?.code || "",
+                r.Employee?.fullNameAr || r.Employee?.fullName || "",
+                formatTime(r.firstIn),
+                formatTime(r.lastOut),
+                String(r.lateMinutes || 0),
+                r.status,
+              ]),
+            })}
+          />
           <button
             onClick={handleOpenAddModal}
             className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2.5 rounded-lg shadow-sm transition-colors text-sm"
@@ -307,10 +320,9 @@ export default function AttendancePage() {
       {/* Manual Attendance Modal */}
       {showModal && (
         <FormModal
-          isOpen={showModal}
+          open={showModal}
           onClose={() => setShowModal(false)}
           title="تسجيل حضور / تعديل بصمة يدويًا"
-          size="md"
         >
           <form onSubmit={handleSubmit} className="space-y-4">
             {formError && (
@@ -402,7 +414,7 @@ export default function AttendancePage() {
               >
                 إلغاء
               </button>
-              <SubmitButton isSubmitting={isPending}>حفظ السجل</SubmitButton>
+              <SubmitButton loading={isPending} label="حفظ السجل" />
             </div>
           </form>
         </FormModal>

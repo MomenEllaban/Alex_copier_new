@@ -9,7 +9,7 @@ import SubmitButton from "@/components/SubmitButton";
 import ExportButton from "@/components/ExportButton";
 import RefreshButton from "@/components/RefreshButton";
 import { useConfirm, useToast } from "@/components/UIProvider";
-import { Calendar, Plus, CheckCircle2, XCircle, Clock, ShieldAlert, FileText } from "lucide-react";
+import { Calendar, Plus, CheckCircle2, XCircle, Clock } from "lucide-react";
 
 interface Employee {
   id: string;
@@ -125,7 +125,6 @@ export default function LeavesPage() {
     const ok = await confirmAction({
       title: "الموافقة على الإجازة",
       message: "هل أنت متأكد من موافقتك على طلب الإجازة؟",
-      type: "warning",
     });
     if (!ok) return;
 
@@ -199,7 +198,7 @@ export default function LeavesPage() {
     }
   };
 
-  if (loading) return <PrinterLoader message="جاري تحميل طلبات الإجازات..." />;
+  if (loading) return <PrinterLoader label="جاري تحميل طلبات الإجازات..." />;
 
   return (
     <div className="space-y-6">
@@ -215,8 +214,22 @@ export default function LeavesPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <RefreshButton onClick={fetchData} loading={loading} />
-          <ExportButton data={filtered} filename="leaves_export" title="تصدير الإجازات" />
+          <RefreshButton onRefresh={fetchData} refreshing={loading} />
+          <ExportButton
+            filename="leaves_export"
+            getExport={() => ({
+              headers: ["كود الموظف", "الاسم", "نوع الإجازة", "من", "إلى", "عدد الأيام", "الحالة"],
+              rows: filtered.map((l) => [
+                l.Employee?.code || "",
+                l.Employee?.fullNameAr || l.Employee?.fullName || "",
+                getLeaveTypeLabel(l.category),
+                new Date(l.startDate).toLocaleDateString("ar-EG"),
+                new Date(l.endDate).toLocaleDateString("ar-EG"),
+                String(l.daysCount),
+                l.status,
+              ]),
+            })}
+          />
           <button
             onClick={handleOpenAddModal}
             className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2.5 rounded-lg shadow-sm transition-colors text-sm"
@@ -341,10 +354,9 @@ export default function LeavesPage() {
       {/* Add Leave Modal */}
       {showAddModal && (
         <FormModal
-          isOpen={showAddModal}
+          open={showAddModal}
           onClose={() => setShowAddModal(false)}
           title="تقديم طلب إجازة جديد"
-          size="md"
         >
           <form onSubmit={handleAddSubmit} className="space-y-4">
             {formError && (
@@ -429,7 +441,7 @@ export default function LeavesPage() {
               >
                 إلغاء
               </button>
-              <SubmitButton isSubmitting={isPending}>تقديم الطلب</SubmitButton>
+              <SubmitButton loading={isPending} label="تقديم الطلب" />
             </div>
           </form>
         </FormModal>
@@ -438,10 +450,9 @@ export default function LeavesPage() {
       {/* Reject Modal */}
       {showRejectModal && (
         <FormModal
-          isOpen={!!showRejectModal}
+          open={!!showRejectModal}
           onClose={() => setShowRejectModal(null)}
           title="رفض طلب الإجازة"
-          size="md"
         >
           <form onSubmit={handleRejectSubmit} className="space-y-4">
             <p className="text-sm text-gray-700">
@@ -468,9 +479,7 @@ export default function LeavesPage() {
               >
                 إلغاء
               </button>
-              <SubmitButton isSubmitting={isPending} className="bg-rose-600 hover:bg-rose-700">
-                تأكيد الرفض
-              </SubmitButton>
+              <SubmitButton loading={isPending} label="تأكيد الرفض" className="bg-rose-600 hover:bg-rose-700 text-white" />
             </div>
           </form>
         </FormModal>

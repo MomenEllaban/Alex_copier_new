@@ -7,7 +7,7 @@ import FormModal from "@/components/FormModal";
 import SubmitButton from "@/components/SubmitButton";
 import RefreshButton from "@/components/RefreshButton";
 import { useToast } from "@/components/UIProvider";
-import { Building2, Plus, Users, Briefcase } from "lucide-react";
+import { Building2, Plus, Briefcase } from "lucide-react";
 
 interface Department {
   id: string;
@@ -123,7 +123,7 @@ export default function DepartmentsPage() {
     });
   };
 
-  if (loading) return <PrinterLoader message="جاري تحميل الأقسام والمسميات الوظيفية..." />;
+  if (loading) return <PrinterLoader label="جاري تحميل الأقسام والمسميات الوظيفية..." />;
 
   return (
     <div className="space-y-6">
@@ -139,7 +139,7 @@ export default function DepartmentsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <RefreshButton onClick={fetchData} loading={loading} />
+          <RefreshButton onRefresh={fetchData} refreshing={loading} />
           <button
             onClick={() => { setFormError(""); setShowDeptModal(true); }}
             className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2.5 rounded-lg shadow-sm transition-colors text-sm"
@@ -246,10 +246,9 @@ export default function DepartmentsPage() {
       {/* Add Department Modal */}
       {showDeptModal && (
         <FormModal
-          isOpen={showDeptModal}
+          open={showDeptModal}
           onClose={() => setShowDeptModal(false)}
           title="إضافة قسم جديد"
-          size="md"
         >
           <form onSubmit={handleCreateDept} className="space-y-4">
             {formError && (
@@ -301,7 +300,7 @@ export default function DepartmentsPage() {
               >
                 إلغاء
               </button>
-              <SubmitButton isSubmitting={isPending}>حفظ القسم</SubmitButton>
+              <SubmitButton loading={isPending} label="حفظ القسم" />
             </div>
           </form>
         </FormModal>
@@ -310,10 +309,9 @@ export default function DepartmentsPage() {
       {/* Add Job Title Modal */}
       {showJobModal && (
         <FormModal
-          isOpen={showJobModal}
+          open={showJobModal}
           onClose={() => setShowJobModal(false)}
           title="إضافة مسمى وظيفي جديد"
-          size="md"
         >
           <form onSubmit={handleCreateJob} className="space-y-4">
             {formError && (
@@ -381,9 +379,7 @@ export default function DepartmentsPage() {
               >
                 إلغاء
               </button>
-              <SubmitButton isSubmitting={isPending} className="bg-emerald-600 hover:bg-emerald-700">
-                حفظ المسمى
-              </SubmitButton>
+              <SubmitButton loading={isPending} label="حفظ المسمى" className="bg-emerald-600 hover:bg-emerald-700 text-white" />
             </div>
           </form>
         </FormModal>

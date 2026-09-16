@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Users, UserCheck, Calendar, DollarSign, Building2, UserPlus, Clock, FileBadge } from "lucide-react";
+import { Users, UserCheck, Calendar, DollarSign, Building2, UserPlus, Clock, FileBadge, Briefcase } from "lucide-react";
 import PrinterLoader from "@/components/PrinterLoader";
 
 interface SummaryData {
@@ -80,7 +80,7 @@ export default function HRDashboardPage() {
     fetchStats();
   }, []);
 
-  if (loading) return <PrinterLoader message="جاري تحميل لوحة الموارد البشرية..." />;
+  if (loading) return <PrinterLoader label="جاري تحميل لوحة الموارد البشرية..." />;
 
   const statCards = [
     { label: "إجمالي الموظفين", value: stats.totalEmployees, sub: `${stats.activeEmployees} نشط`, icon: Users, color: "bg-blue-500", href: "/hr/employees" },

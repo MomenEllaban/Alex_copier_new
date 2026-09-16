@@ -8,7 +8,7 @@ import SubmitButton from "@/components/SubmitButton";
 import ExportButton from "@/components/ExportButton";
 import RefreshButton from "@/components/RefreshButton";
 import { useConfirm, useToast } from "@/components/UIProvider";
-import { Banknote, Calculator, CheckCircle2, Lock, Plus, Eye, Calendar, FileText, AlertTriangle } from "lucide-react";
+import { Banknote, Calculator, Lock, Eye } from "lucide-react";
 
 interface Period {
   id: string;
@@ -114,7 +114,6 @@ export default function PayrollPage() {
     const ok = await confirmAction({
       title: "اعتماد كشف الرواتب",
       message: "هل أنت متأكد من اعتماد هذا المسير المالي وتثبيته للاعتماد النهائي؟",
-      type: "warning",
     });
     if (!ok) return;
 
@@ -141,7 +140,6 @@ export default function PayrollPage() {
     const ok = await confirmAction({
       title: "قفل وصرف الرواتب",
       message: "هل تريد قفل الكشف وإغلاقه نهائياً وتأكيد الخصومات والسلف؟",
-      type: "danger",
     });
     if (!ok) return;
 
@@ -179,7 +177,7 @@ export default function PayrollPage() {
     }
   };
 
-  if (loading) return <PrinterLoader message="جاري تحميل كشوف ومسيرات الرواتب..." />;
+  if (loading) return <PrinterLoader label="جاري تحميل كشوف ومسيرات الرواتب..." />;
 
   return (
     <div className="space-y-6">
@@ -195,7 +193,7 @@ export default function PayrollPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <RefreshButton onClick={fetchRuns} loading={loading} />
+          <RefreshButton onRefresh={fetchRuns} refreshing={loading} />
           <button
             onClick={() => setShowCalcModal(true)}
             className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2.5 rounded-lg shadow-sm transition-colors text-sm"
@@ -301,10 +299,9 @@ export default function PayrollPage() {
       {/* Calculate Modal */}
       {showCalcModal && (
         <FormModal
-          isOpen={showCalcModal}
+          open={showCalcModal}
           onClose={() => setShowCalcModal(false)}
           title="احتساب مسير رواتب جديد"
-          size="md"
         >
           <form onSubmit={handleCalculatePayroll} className="space-y-4">
             {formError && (
@@ -354,7 +351,7 @@ export default function PayrollPage() {
               >
                 إلغاء
               </button>
-              <SubmitButton isSubmitting={isPending}>بدء الاحتساب</SubmitButton>
+              <SubmitButton loading={isPending} label="بدء الاحتساب" />
             </div>
           </form>
         </FormModal>
@@ -363,16 +360,32 @@ export default function PayrollPage() {
       {/* Details / Slip Modal */}
       {selectedRunDetails && selectedRunItems && (
         <FormModal
-          isOpen={!!selectedRunDetails}
+          open={!!selectedRunDetails}
           onClose={() => { setSelectedRunDetails(null); setSelectedRunItems(null); }}
           title={`مفردات رواتب: شهر ${selectedRunDetails.Period?.month} / ${selectedRunDetails.Period?.year}`}
-          size="xl"
+          xl
         >
           <div className="space-y-4">
             <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-200">
               <span className="text-xs text-gray-600">إجمالي الموظفين: <strong>{selectedRunItems.length}</strong></span>
               <span className="text-xs text-emerald-800 font-bold">إجمالي الصافي: {selectedRunDetails.totalNet.toLocaleString()} ج.م</span>
-              <ExportButton data={selectedRunItems} filename={`payroll_slip_${selectedRunDetails.Period?.month}_${selectedRunDetails.Period?.year}`} title="تصدير الكشف" />
+              <ExportButton
+                filename={`payroll_slip_${selectedRunDetails.Period?.month}_${selectedRunDetails.Period?.year}`}
+                getExport={() => ({
+                  headers: ["كود الموظف", "الاسم", "الأساسي", "أيام العمل", "الغياب", "التأخير", "الإيراد", "الخصم", "الصافي"],
+                  rows: selectedRunItems.map((i) => [
+                    i.Employee?.code || "",
+                    i.Employee?.fullNameAr || i.Employee?.fullName || "",
+                    String(i.basicSalary),
+                    String(i.workedDays),
+                    String(i.absentDays),
+                    String(i.lateDays),
+                    String(i.totalEarnings),
+                    String(i.totalDeductions),
+                    String(i.netSalary),
+                  ]),
+                })}
+              />
             </div>
 
             <div className="overflow-x-auto max-h-[60vh]">
@@ -383,7 +396,7 @@ export default function PayrollPage() {
                     <th className="p-2">الأساسي</th>
                     <th className="p-2">أيام العمل</th>
                     <th className="p-2">أيام الغياب</th>
-                    <th className="p-2">التأخير (أيام/ساعات)</th>
+                    <th className="p-2">التأخير (أيام)</th>
                     <th className="p-2">إجمالي الإيراد</th>
                     <th className="p-2">إجمالي الخصم</th>
                     <th className="p-2">الصافي</th>
@@ -401,7 +414,7 @@ export default function PayrollPage() {
                       <td className="p-2 text-amber-700">{item.lateDays} يوم</td>
                       <td className="p-2 font-semibold">{item.totalEarnings.toLocaleString()} ج.م</td>
                       <td className="p-2 text-rose-600 font-semibold">{item.totalDeductions.toLocaleString()} ج.م</td>
-                      <td className="p-2 text-emerald-700 font-extrabold text-sm">{item.netSalary.toLocaleString()} ج.m</td>
+                      <td className="p-2 text-emerald-700 font-extrabold text-sm">{item.netSalary.toLocaleString()} ج.م</td>
                     </tr>
                   ))}
                 </tbody>
