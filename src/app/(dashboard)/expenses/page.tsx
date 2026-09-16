@@ -22,7 +22,7 @@ import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { notifyDataChanged } from "@/lib/data-events";
 
 interface Company { id: string; name: string; }
-interface Category { id: string; name: string; }
+interface Category { id: string; name: string; companyId?: string; }
 interface Expense {
   id: string; companyId: string; categoryId: string | null; category: string; description: string; amount: number;
   paidBy: string; date: string; createdAt: string; company: Company;
@@ -82,20 +82,58 @@ export default function FinancePage() {
     return () => window.removeEventListener("erp-open-add", handler);
   }, []);
 
-  const filtered = expenses.filter(expense =>
-    (!companyFilter || expense.companyId === companyFilter) &&
-    (!categoryFilter || (expense.expenseCategory?.id || expense.categoryId) === categoryFilter) &&
-    inDateRange(expense.date || expense.createdAt, dateFrom, dateTo) &&
-    (matchesQuery(expense.category, search) ||
-      matchesQuery(expense.description, search) ||
-      matchesQuery(expense.company?.name, search))
-  );
+  const filtered = expenses.filter((expense) => {
+    const matchesCompany = !companyFilter || expense.companyId === companyFilter;
+    let matchesCategory = true;
+    if (categoryFilter) {
+      const filterCatObj = categories.find((c) => c.id === categoryFilter);
+      const filterCatName = filterCatObj?.name || categoryFilter;
+      const expCatName = expense.expenseCategory?.name || expense.category;
+      const expCatId = expense.expenseCategory?.id || expense.categoryId;
+      matchesCategory = expCatId === categoryFilter || expCatName === filterCatName;
+    }
+    return (
+      matchesCompany &&
+      matchesCategory &&
+      inDateRange(expense.date || expense.createdAt, dateFrom, dateTo) &&
+      (matchesQuery(expense.category, search) ||
+        matchesQuery(expense.description, search) ||
+        matchesQuery(expense.company?.name, search))
+    );
+  });
+
   const hasActiveFilters = companyFilter !== "" || categoryFilter !== "" || dateFrom !== "" || dateTo !== "" || search !== "";
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  const categoryOptions = categories.map((cat) => ({ value: cat.id, label: cat.name }));
+  // Deduplicated category options for table filter:
+  const filterCategories = companyFilter
+    ? categories.filter((c) => c.companyId === companyFilter)
+    : categories;
+  const uniqueFilterCategories: { id: string; name: string }[] = [];
+  const seenFilterNames = new Set<string>();
+  for (const cat of filterCategories) {
+    if (!seenFilterNames.has(cat.name)) {
+      seenFilterNames.add(cat.name);
+      uniqueFilterCategories.push({ id: cat.id, name: cat.name });
+    }
+  }
+  const categoryFilterOptions = uniqueFilterCategories.map((c) => ({ value: c.id, label: c.name }));
+
+  // Deduplicated and company-filtered category options for modal form:
+  const modalCategories = form.companyId
+    ? categories.filter((c) => c.companyId === form.companyId)
+    : categories;
+  const uniqueFormCategories: { id: string; name: string }[] = [];
+  const seenFormNames = new Set<string>();
+  for (const cat of modalCategories) {
+    if (!seenFormNames.has(cat.name)) {
+      seenFormNames.add(cat.name);
+      uniqueFormCategories.push({ id: cat.id, name: cat.name });
+    }
+  }
+  const formCategoryOptions = uniqueFormCategories.map((c) => ({ value: c.id, label: c.name }));
 
   const exportExpenses = () => ({
     headers: [
@@ -216,7 +254,7 @@ export default function FinancePage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">{t("finance.selectCompany")}</label><select value={form.companyId} onChange={(e) => setForm({ ...form, companyId: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" required><option value="">{t("finance.selectCompany")}</option>{companies.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}</select></div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">{t("finance.category")}</label><select value={form.categoryId} onChange={(e) => selectCategory(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" required><option value="">{t("finance.selectCategory")}</option>{categoryOptions.map((opt) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}</select></div>
+              <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">{t("finance.category")}</label><select value={form.categoryId} onChange={(e) => selectCategory(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" required><option value="">{t("finance.selectCategory")}</option>{formCategoryOptions.map((opt) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}</select></div>
               <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">{t("common.amount")}</label><input type="number" placeholder={t("common.amount")} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" required min="0" step="0.01" /></div>
             </div>
             <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">{t("common.description")}</label><textarea placeholder={t("common.description")} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" rows={2} required /></div>
@@ -255,7 +293,7 @@ export default function FinancePage() {
           <div className="flex flex-col gap-3 border-b border-slate-200 p-4 md:flex-row md:items-center md:flex-wrap">
             <div className="w-full md:w-80 md:flex-none"><SearchInput value={search} onChange={setSearch} placeholder={t("finance.searchPlaceholder")} /></div>
             <FilterSelect value={companyFilter} onChange={(v) => { setCompanyFilter(v); setPage(1); }} options={companies.map((c) => ({ value: c.id, label: c.name }))} allLabel={`${t("common.company")} — ${t("common.all")}`} className="md:w-40" />
-            <FilterSelect value={categoryFilter} onChange={(v) => { setCategoryFilter(v); setPage(1); }} options={categoryOptions} allLabel={`${t("finance.categoryFilter")} — ${t("common.all")}`} className="md:w-44" />
+            <FilterSelect value={categoryFilter} onChange={(v) => { setCategoryFilter(v); setPage(1); }} options={categoryFilterOptions} allLabel={`${t("finance.categoryFilter")} — ${t("common.all")}`} className="md:w-44" />
             <DateRangeFilter from={dateFrom} to={dateTo} onFromChange={(v) => { setDateFrom(v); setPage(1); }} onToChange={(v) => { setDateTo(v); setPage(1); }} />
             {hasActiveFilters && (
               <button onClick={() => { setSearch(""); setCompanyFilter(""); setCategoryFilter(""); setDateFrom(""); setDateTo(""); }} className="text-sm text-gray-500 hover:text-gray-700 underline">
