@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
 import { calcTotals, dayKey, getWorkshopCompany, startOfDay } from "@/lib/workshop-daily";
 
+const WORKSHOP_CATEGORY_NAME = "يومية الورشة";
+
 const TX_INCLUDE = {
   category: { select: { id: true, name: true } },
 } as const;
@@ -55,15 +57,8 @@ export async function GET() {
       take: 10,
     });
 
-    const categories = await prisma.expenseCategory.findMany({
-      where: { companyId: company.id },
-      select: { id: true, name: true },
-      orderBy: { name: "asc" },
-    });
-
     return NextResponse.json({
       company,
-      categories,
       book: book
         ? {
             ...book,
@@ -106,7 +101,6 @@ export async function POST(request: Request) {
     const direction = body.direction === "IN" ? "IN" : body.direction === "OUT" ? "OUT" : null;
     const amount = Number(body.amount);
     const reason = typeof body.reason === "string" ? body.reason.trim() : "";
-    const categoryId = typeof body.categoryId === "string" && body.categoryId !== "" ? body.categoryId : null;
 
     if (!direction) {
       return NextResponse.json({ error: "نوع الحركة مطلوب (وارد أو صادر)", code: "DIRECTION_REQUIRED" }, { status: 400 });
@@ -118,15 +112,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "البيان مطلوب", code: "REASON_REQUIRED" }, { status: 400 });
     }
 
-    let categoryName: string | null = null;
-    if (categoryId) {
-      const category = await prisma.expenseCategory.findUnique({ where: { id: categoryId } });
-      if (!category || category.companyId !== company.id) {
-        return NextResponse.json({ error: "بند المصروفات غير موجود لشركة القطاعى", code: "CATEGORY_NOT_FOUND" }, { status: 400 });
-      }
-      categoryName = category.name;
-    } else if (direction === "OUT") {
-      return NextResponse.json({ error: "بند المصروفات مطلوب للصادر", code: "CATEGORY_REQUIRED" }, { status: 400 });
+    // The workshop daily form no longer asks for an expense category.
+    // OUT entries are auto-assigned to the workshop's own category so the
+    // accountant can confirm without extra input.
+    let category = direction === "OUT" ? await prisma.expenseCategory.findFirst({
+      where: { companyId: company.id, name: WORKSHOP_CATEGORY_NAME },
+    }) : null;
+    if (direction === "OUT" && !category) {
+      category = await prisma.expenseCategory.create({
+        data: { name: WORKSHOP_CATEGORY_NAME, companyId: company.id },
+      });
     }
 
     let book = await prisma.workshopDailyBook.findFirst({
@@ -150,7 +145,7 @@ export async function POST(request: Request) {
         companyId: company.id,
         direction,
         amount,
-        categoryId,
+        categoryId: category?.id ?? null,
         reason,
         createdBy: actorId,
       },
@@ -158,7 +153,7 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(
-      { ...tx, categoryName, bookDate: book.bookDate, pendingHint: true },
+      { ...tx, bookDate: book.bookDate, pendingHint: true },
       { status: 201 },
     );
   } catch {

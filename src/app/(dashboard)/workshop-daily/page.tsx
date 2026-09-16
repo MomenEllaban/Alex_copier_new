@@ -16,11 +16,6 @@ import SubmitButton from "@/components/SubmitButton";
 import PrinterLoader from "@/components/PrinterLoader";
 import { useConfirm, useToast } from "@/components/UIProvider";
 
-interface Category {
-  id: string;
-  name: string;
-}
-
 interface Tx {
   id: string;
   direction: "IN" | "OUT";
@@ -66,7 +61,6 @@ interface ClosedBook {
 interface DailyData {
   company: { id: string; name: string };
   book: Book | null;
-  categories: Category[];
   closedBooks: ClosedBook[];
 }
 
@@ -98,7 +92,6 @@ export default function WorkshopDailyPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [direction, setDirection] = useState<"IN" | "OUT">("OUT");
   const [amount, setAmount] = useState("");
-  const [categoryId, setCategoryId] = useState("");
   const [reason, setReason] = useState("");
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -152,7 +145,6 @@ export default function WorkshopDailyPage() {
   const resetAddForm = () => {
     setDirection("OUT");
     setAmount("");
-    setCategoryId("");
     setReason("");
     setFormError("");
   };
@@ -169,16 +161,12 @@ export default function WorkshopDailyPage() {
       setFormError(t("workshopDaily.reason") + "؟");
       return;
     }
-    if (direction === "OUT" && !categoryId) {
-      setFormError(t("workshopDaily.selectCategory"));
-      return;
-    }
     setSaving(true);
     try {
       const res = await fetch("/api/workshop-daily", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ direction, amount: value, categoryId: categoryId || undefined, reason: reason.trim() }),
+        body: JSON.stringify({ direction, amount: value, reason: reason.trim() }),
       });
       const json = await res.json().catch(() => null);
       if (!res.ok) {
@@ -514,18 +502,6 @@ export default function WorkshopDailyPage() {
           <div className="space-y-1.5">
             <label className="mb-1 block text-sm font-medium">{t("workshopDaily.amount")} (ج.م)</label>
             <input type="number" min="0" step="any" value={amount} onChange={(e) => setAmount(e.target.value)} dir="ltr" placeholder="200" className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
-          </div>
-          <div className="space-y-1.5">
-            <label className="mb-1 block text-sm font-medium">{t("workshopDaily.category")} {direction === "OUT" && <span className="text-red-500">*</span>}</label>
-            <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none">
-              <option value="">{t("workshopDaily.selectCategory")}</option>
-              {(data?.categories ?? []).map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-            {(data?.categories ?? []).length === 0 && (
-              <p className="text-xs text-amber-600">{t("workshopDaily.noCategoriesHint")}</p>
-            )}
           </div>
           <div className="space-y-1.5">
             <label className="mb-1 block text-sm font-medium">{t("workshopDaily.reason")}</label>
