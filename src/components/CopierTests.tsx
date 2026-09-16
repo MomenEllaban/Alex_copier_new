@@ -576,14 +576,14 @@ export default function CopierTests({ customerId, machines = [], defaultEngineer
         open={showHistory}
         onClose={() => setShowHistory(false)}
         title={`${t("copierTests.testsHistory")} (${tests.length})`}
-        wide
+        xl
       >
         {tests.length === 0 ? (
-          <p className="py-6 text-center text-sm text-gray-400">{t("copierTests.noTests")}</p>
+          <p className="py-8 text-center text-sm font-medium text-slate-400">{t("copierTests.noTests")}</p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-gray-200">
-            <table className="w-full min-w-[960px] text-sm">
-              <thead className="bg-gray-50">
+          <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-xs">
+            <table className="w-full min-w-[1020px] text-sm text-slate-700">
+              <thead className="bg-slate-100/90 text-slate-800">
                 <tr>
                   {[
                     t("copierTests.date"),
@@ -596,67 +596,89 @@ export default function CopierTests({ customerId, machines = [], defaultEngineer
                     t("copierTests.image"),
                     t("copierTests.notes"),
                   ].map((label, i) => (
-                    <th key={i} className="px-3 py-3 text-start text-xs font-semibold whitespace-nowrap text-gray-500">
+                    <th key={i} className="px-4 py-3.5 text-start text-xs font-bold uppercase tracking-wider text-slate-700 border-b border-slate-200 whitespace-nowrap">
                       {label}
                     </th>
                   ))}
                   {canDelete && (
-                    <th className="px-3 py-3 text-start text-xs font-semibold text-gray-500">
+                    <th className="px-4 py-3.5 text-center text-xs font-bold uppercase tracking-wider text-slate-700 border-b border-slate-200 whitespace-nowrap">
                       {t("copierTests.actions")}
                     </th>
                   )}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-slate-100 bg-white">
                 {tests.map((item) => (
-                  <tr key={item.id} className="align-top hover:bg-gray-50">
-                    <td className="px-3 py-3 whitespace-nowrap text-slate-700">
+                  <tr key={item.id} className="align-top hover:bg-slate-50/80 transition-colors">
+                    <td className="px-4 py-3.5 whitespace-nowrap font-medium text-slate-900 text-xs sm:text-sm">
                       {formatDate(item.testDate)}
                     </td>
-                    <td className="px-3 py-3 font-medium whitespace-nowrap text-slate-800">{item.engineer?.name || "—"}</td>
-                    <td className="px-3 py-3 whitespace-nowrap text-slate-700" dir="ltr">
-                      {item.machine?.serialNumber || "—"}
+                    <td className="px-4 py-3.5 font-semibold text-slate-800 whitespace-nowrap text-xs sm:text-sm">
+                      {item.engineer?.name || "—"}
                     </td>
-                    <td className="px-3 py-3 font-bold whitespace-nowrap text-violet-700">
-                      {formatNum(item.blackCounter ?? item.pageCount)}
-                    </td>
-                    <td className="px-3 py-3 font-bold whitespace-nowrap text-violet-700">
-                      {formatNum(item.colorCounter)}
-                    </td>
-                    <td className="max-w-[260px] px-3 py-3 text-slate-600" title={item.repairStatement || ""}>
-                      {item.repairStatement ? (
-                        <span className="line-clamp-2">{item.repairStatement}</span>
+                    <td className="px-4 py-3.5 whitespace-nowrap text-xs sm:text-sm" dir="ltr">
+                      {item.machine?.serialNumber ? (
+                        <span className="rounded-md bg-slate-100 px-2.5 py-1 font-mono text-slate-700 border border-slate-200/60">
+                          {item.machine.serialNumber}
+                        </span>
                       ) : (
-                        "—"
+                        <span className="text-slate-400">—</span>
                       )}
                     </td>
-                    <td className="px-3 py-3 font-bold whitespace-nowrap text-emerald-700">
-                      {item.collectedAmount != null ? formatNum(item.collectedAmount) : "—"}
+                    <td className="px-4 py-3.5 whitespace-nowrap text-xs sm:text-sm">
+                      <span className="inline-block rounded-md bg-slate-100 px-2.5 py-1 font-bold text-slate-900 border border-slate-200/80 shadow-2xs">
+                        {formatNum(item.blackCounter ?? item.pageCount)}
+                      </span>
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-4 py-3.5 whitespace-nowrap text-xs sm:text-sm">
+                      {item.colorCounter != null ? (
+                        <span className="inline-block rounded-md bg-violet-50 px-2.5 py-1 font-bold text-violet-700 border border-violet-200/70 shadow-2xs">
+                          {formatNum(item.colorCounter)}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
+                    <td className="min-w-[220px] max-w-[320px] px-4 py-3.5 text-xs sm:text-sm text-slate-700 leading-relaxed break-words whitespace-pre-line">
+                      {item.repairStatement || "—"}
+                    </td>
+                    <td className="px-4 py-3.5 whitespace-nowrap text-xs sm:text-sm">
+                      {item.collectedAmount != null && item.collectedAmount > 0 ? (
+                        <span className="inline-block rounded-md bg-emerald-50 px-2.5 py-1 font-bold text-emerald-700 border border-emerald-200">
+                          {formatNum(item.collectedAmount)}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3.5 whitespace-nowrap">
                       {item.imageUrl ? (
-                        <button onClick={() => setLightboxUrl(item.imageUrl as string)} title={t("copierTests.image")}>
+                        <button
+                          onClick={() => setLightboxUrl(item.imageUrl as string)}
+                          title={t("copierTests.image")}
+                          className="group relative inline-block overflow-hidden rounded-lg border-2 border-slate-200 shadow-2xs transition hover:border-violet-500 hover:shadow-md"
+                        >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={item.imageUrl}
                             alt={t("copierTests.testImage")}
-                            className="h-12 w-16 rounded-lg border border-gray-200 object-cover transition hover:opacity-80"
+                            className="h-12 w-16 object-cover transition group-hover:scale-105"
                           />
                         </button>
                       ) : (
-                        <span className="text-xs text-gray-400">{t("copierTests.noImage")}</span>
+                        <span className="text-xs text-slate-400">{t("copierTests.noImage")}</span>
                       )}
                     </td>
-                    <td className="max-w-[240px] px-3 py-3 text-slate-600" title={[item.spareParts, item.notes].filter(Boolean).join(" — ")}>
+                    <td className="min-w-[200px] max-w-[280px] px-4 py-3.5 text-xs sm:text-sm text-slate-600 leading-relaxed break-words whitespace-pre-line">
                       {[item.spareParts, item.notes].filter(Boolean).join(" — ") || "—"}
                     </td>
                     {canDelete && (
-                      <td className="px-3 py-3">
+                      <td className="px-4 py-3.5 text-center whitespace-nowrap">
                         <button
                           onClick={() => handleDelete(item.id)}
                           title={t("common.delete")}
                           aria-label={t("common.delete")}
-                          className="rounded-lg p-2 text-gray-400 transition hover:bg-red-50 hover:text-red-600"
+                          className="rounded-lg p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
                         >
                           <Trash2 size={16} />
                         </button>
