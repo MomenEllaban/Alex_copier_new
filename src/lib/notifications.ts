@@ -9,7 +9,17 @@ import {
 } from "@/lib/notification-recipients";
 
 export type NotificationPriority = "LOW" | "NORMAL" | "HIGH" | "CRITICAL";
-export type NotificationCategory = "GENERAL" | "SYSTEM" | "SERVICE_REQUEST" | "MACHINE" | "INVENTORY" | "PAYMENT" | "CONTRACT";
+export type NotificationCategory =
+  | "GENERAL"
+  | "SYSTEM"
+  | "SERVICE_REQUEST"
+  | "MACHINE"
+  | "INVENTORY"
+  | "PAYMENT"
+  | "CONTRACT"
+  | "HR"
+  | "PAYROLL"
+  | "LEAVE";
 export type NotificationType =
   | "SYSTEM"
   | "SERVICE_REQUEST_CREATED"
@@ -20,7 +30,16 @@ export type NotificationType =
   | "LOW_STOCK"
   | "PAYMENT_PENDING"
   | "PAYMENT_APPROVED"
-  | "PAYMENT_REJECTED";
+  | "PAYMENT_REJECTED"
+  | "LEAVE_REQUESTED"
+  | "LEAVE_APPROVED"
+  | "LEAVE_REJECTED"
+  | "OVERTIME_REQUESTED"
+  | "OVERTIME_APPROVED"
+  | "ADVANCE_REQUESTED"
+  | "ADVANCE_APPROVED"
+  | "PAYROLL_READY"
+  | "PAYROLL_APPROVED";
 
 export type NotificationMetadata = {
   [key: string]: string | number | boolean | null | NotificationMetadata | (string | number | boolean | null)[];

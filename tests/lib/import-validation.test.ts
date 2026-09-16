@@ -4,11 +4,20 @@ import {
   validateRecords,
   CUSTOMER_COLUMNS,
   MACHINE_COLUMNS,
+  SUPPLIER_COLUMNS,
   parseFlexibleDate,
 } from "@/lib/import-schemas";
 import { buildTemplateCsv } from "@/lib/csv";
 
 describe("import parsing", () => {
+  it("excludes customer companyName and whatsapp columns while retaining phone and supplier companyName", () => {
+    const customerKeys = CUSTOMER_COLUMNS.map((column) => column.key);
+    expect(customerKeys).not.toContain("companyName");
+    expect(customerKeys).not.toContain("whatsapp");
+    expect(customerKeys).toContain("phone");
+    expect(SUPPLIER_COLUMNS.map((column) => column.key)).toContain("companyName");
+  });
+
   it("maps Arabic header aliases to canonical keys", () => {
     const csv = "الاسم,الهاتف,المدينة\nمحمد أحمد,01001234567,الإسكندرية";
     const { records, errors } = parseCsvRecords(csv, "customers");

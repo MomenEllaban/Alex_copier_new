@@ -17,7 +17,6 @@ import { apiErrorMessage } from "@/lib/api-client";
 interface Customer {
   id: string;
   name: string;
-  companyName: string;
   phone: string;
   email: string;
   customerType: string;
@@ -66,7 +65,6 @@ export default function CustomerBalancesPage() {
   const filtered = withBalance.filter(
     (c) =>
       (matchesQuery(c.name, search) ||
-        matchesQuery(c.companyName, search) ||
         matchesQuery(c.email, search) ||
         (Boolean(c.phone) && c.phone.includes(search))) &&
       (!typeFilter || c.customerType === typeFilter) &&
@@ -119,7 +117,6 @@ export default function CustomerBalancesPage() {
   const getExport = () => ({
     headers: [
       t("customers.name"),
-      t("customers.companyName"),
       t("customers.phone"),
       t("customers.type"),
       t("customers.totalDebt"),
@@ -128,7 +125,6 @@ export default function CustomerBalancesPage() {
     ],
     rows: filtered.map((c) => [
       c.name,
-      c.companyName || "",
       c.phone || "",
       TYPE_LABELS[c.customerType] || c.customerType,
       String(c.totalDebt || 0),
@@ -260,7 +256,6 @@ export default function CustomerBalancesPage() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("customers.name")}</th>
-                    <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("customers.companyName")}</th>
                     <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("customers.phone")}</th>
                     <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("customers.totalDebt")}</th>
                     <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("customers.remaining")}</th>
@@ -272,7 +267,6 @@ export default function CustomerBalancesPage() {
                   {paged.map((c) => (
                     <tr key={c.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-sm font-medium">{c.name}</td>
-                      <td className="px-4 py-3 text-sm">{c.companyName || "—"}</td>
                       <td className="px-4 py-3 text-sm"><span dir="ltr">{c.phone || "—"}</span></td>
                       <td className="px-4 py-3 text-sm font-medium">
                         {c.totalDebt > 0 ? `${c.totalDebt.toLocaleString("ar-EG")} ج.م` : "—"}

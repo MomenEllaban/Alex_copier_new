@@ -8,9 +8,11 @@ interface FormModalProps {
   title: string;
   children: React.ReactNode;
   wide?: boolean;
+  /** Widest layout for data-heavy tables (e.g. tests history). */
+  xl?: boolean;
 }
 
-export default function FormModal({ open, onClose, title, children, wide }: FormModalProps) {
+export default function FormModal({ open, onClose, title, children, wide, xl }: FormModalProps) {
   if (!open) return null;
 
   return (
@@ -19,7 +21,7 @@ export default function FormModal({ open, onClose, title, children, wide }: Form
       onClick={onClose}
     >
       <div
-        className={`w-full ${wide ? "max-w-4xl" : "max-w-xl"} rounded-t-2xl sm:rounded-2xl bg-white p-5 sm:p-6 shadow-xl max-h-[92vh] overflow-y-auto sidebar-scroll`}
+        className={`w-full ${xl ? "max-w-[1152px]" : wide ? "max-w-4xl" : "max-w-xl"} rounded-t-2xl sm:rounded-2xl bg-white p-5 sm:p-6 shadow-xl max-h-[92vh] overflow-y-auto sidebar-scroll`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-5 flex items-center justify-between border-b border-slate-100 pb-4">

@@ -35,10 +35,8 @@ interface Company { id: string; name: string; nameAr?: string | null; }
 interface Customer {
   id: string;
   name: string;
-  companyName: string;
   contactPerson: string;
   phone: string;
-  whatsapp: string;
   email: string;
   address: string;
   city: string;
@@ -66,11 +64,9 @@ interface Customer {
 
 const emptyForm = {
   name: "",
-  companyName: "",
   companyId: "",
   contactPerson: "",
   phone: "",
-  whatsapp: "",
   email: "",
   address: "",
   city: "",
@@ -164,7 +160,6 @@ export default function CustomersPage() {
   const filtered = customers.filter(
     (c) =>
       (matchesQuery(c.name, search) ||
-        matchesQuery(c.companyName, search) ||
         matchesQuery(c.email, search) ||
         (Boolean(c.phone) && c.phone.includes(search))) &&
       (!typeFilter || c.customerType === typeFilter)
@@ -192,7 +187,6 @@ export default function CustomersPage() {
   const exportCustomers = () => ({
     headers: [
       t("customers.name"),
-      t("customers.companyName"),
       t("customers.phone"),
       t("customers.engineer"),
       t("customers.email"),
@@ -204,7 +198,6 @@ export default function CustomersPage() {
     ],
     rows: filtered.map((c) => [
       c.name,
-      c.companyName || "",
       c.phone || "",
       c.engineer?.name || "",
       c.email || "",
@@ -227,11 +220,9 @@ export default function CustomersPage() {
     setSelected(null);
     setForm({
       name: customer.name,
-      companyName: customer.companyName || "",
       companyId: "",
       contactPerson: customer.contactPerson || "",
       phone: customer.phone || "",
-      whatsapp: customer.whatsapp || "",
       email: customer.email || "",
       address: customer.address || "",
       city: customer.city || "",
@@ -526,10 +517,6 @@ export default function CustomersPage() {
             <input type="text" value={form.name} onChange={(e) => setField("name", e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" required />
           </div>
           <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-slate-700">{t("customers.companyName")}</label>
-            <input type="text" value={form.companyName} onChange={(e) => setField("companyName", e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-          <div className="space-y-1.5">
             <label className="block text-sm font-medium text-slate-700">{t("warehouses.company")}</label>
             <select value={form.companyId} onChange={(e) => setField("companyId", e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="">{t("common.selectOption")}</option>
@@ -545,10 +532,6 @@ export default function CustomersPage() {
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-slate-700">{t("customers.phone")}</label>
             <input type="text" value={form.phone} onChange={(e) => setField("phone", e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-          </div>
-          <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-slate-700">واتساب</label>
-            <input type="text" value={form.whatsapp} onChange={(e) => setField("whatsapp", e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-slate-700">{t("customers.email")}</label>
@@ -619,7 +602,6 @@ export default function CustomersPage() {
         {selected && (
           <>
             <div className="mb-4 grid grid-cols-1 gap-3 text-sm text-slate-700 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("customers.companyName")}</span><span className="mt-1 block font-medium text-slate-800">{selected.companyName || "—"}</span></div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("customers.contactPerson")}</span><span className="mt-1 block font-medium text-slate-800">{selected.contactPerson || "—"}</span></div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("customers.phone")}</span><span className="mt-1 block font-medium text-slate-800" dir="ltr">{selected.phone || "—"}</span></div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("customers.email")}</span><span className="mt-1 block font-medium text-slate-800">{selected.email || "—"}</span></div>
@@ -826,7 +808,7 @@ export default function CustomersPage() {
         open={!!testsCustomer}
         onClose={() => setTestsCustomer(null)}
         title={testsCustomer ? `${t("copierTests.title")} — ${testsCustomer.name}` : ""}
-        wide
+        xl
       >
         {testsCustomer && (
           <CopierTests customerId={testsCustomer.id} machines={testsCustomer.machines} defaultEngineerId={testsCustomer.engineerId ?? testsCustomer.engineer?.id ?? null} />
@@ -884,7 +866,6 @@ export default function CustomersPage() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("customers.name")}</th>
-                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("customers.companyName")}</th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("customers.phone")}</th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("customers.engineer")}</th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">الدين الكلي</th>
@@ -897,7 +878,6 @@ export default function CustomersPage() {
                 {paged.map((customer) => (
                   <tr key={customer.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => openDetails(customer.id)}>
                     <td className="px-4 py-3 text-sm font-medium">{customer.name}</td>
-                    <td className="px-4 py-3 text-sm">{customer.companyName || "—"}</td>
                     <td className="px-4 py-3 text-sm">{customer.phone || "—"}</td>
                     <td className="px-4 py-3 text-sm">{customer.engineer?.name ? (<span className="inline-flex rounded-full bg-violet-100 px-2 py-0.5 text-xs font-semibold text-violet-700">{customer.engineer.name}</span>) : (<span className="text-gray-400">—</span>)}</td>
                     <td className="px-4 py-3 text-sm font-medium">{customer.totalDebt > 0 ? `${customer.totalDebt.toLocaleString("ar-EG")} ج.م` : "—"}</td>

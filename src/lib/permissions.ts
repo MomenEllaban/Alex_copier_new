@@ -5,7 +5,9 @@ export type Role =
   | "MAINTENANCE_MANAGER"
   | "WORKSHOP_MANAGER"
   | "ENGINEER"
-  | "SALES_EMPLOYEE";
+  | "SALES_EMPLOYEE"
+  | "HR_MANAGER"
+  | "EMPLOYEE";
 
 export type Page =
   | "dashboard"
@@ -29,7 +31,16 @@ export type Page =
   | "investors"
   | "returns"
   | "tradeIns"
-  | "workshopDaily";
+  | "workshopDaily"
+  // HR pages
+  | "hrDashboard"
+  | "hrEmployees"
+  | "hrAttendance"
+  | "hrLeaves"
+  | "hrPayroll"
+  | "hrSettings"
+  | "hrReports"
+  | "hrSelfService";
 
 export const ROLE_PERMISSIONS: Record<Role, Page[]> = {
   // المدير العام — يشوف كل حاجة (ادمن)
@@ -38,6 +49,7 @@ export const ROLE_PERMISSIONS: Record<Role, Page[]> = {
     "serviceRequests", "contracts", "purchases", "sales",
     "inventory", "warehouses", "products", "workshop", "finance", "companies",
     "settlements", "reports", "settings", "suppliers", "investors", "returns", "tradeIns", "workshopDaily",
+    "hrDashboard", "hrEmployees", "hrAttendance", "hrLeaves", "hrPayroll", "hrSettings", "hrReports", "hrSelfService",
   ],
 
   // مدير الشركة — إدارة شاملة لشركته
@@ -46,33 +58,51 @@ export const ROLE_PERMISSIONS: Record<Role, Page[]> = {
     "serviceRequests", "contracts", "purchases", "sales",
     "inventory", "warehouses", "products", "workshop", "finance", "settlements",
     "reports", "suppliers", "returns", "tradeIns", "workshopDaily",
+    "hrDashboard", "hrEmployees", "hrAttendance", "hrLeaves", "hrPayroll", "hrSettings", "hrReports", "hrSelfService",
   ],
 
-  // المحاسب — المالية والفواتير والتقارير
+  // المحاسب — المالية والفواتير والتقارير + الرواتب
   ACCOUNTANT: [
     "dashboard", "purchases", "sales", "finance",
     "settlements", "reports", "companies", "returns", "workshopDaily",
+    "hrPayroll", "hrReports", "hrSelfService",
   ],
 
   // مدير الصيانة — طلبات الصيانة والمهندسين والورشة
   MAINTENANCE_MANAGER: [
     "dashboard", "serviceRequests", "engineers",
     "contracts", "workshop", "inventory", "warehouses", "products", "machines",
+    "hrSelfService",
   ],
 
   // مدير الورشة — الورشة والمخزون وengineers
   WORKSHOP_MANAGER: [
     "dashboard", "workshop", "inventory", "warehouses", "products", "engineers", "machines", "workshopDaily",
+    "hrSelfService",
   ],
 
   // المهندس — طلبات الصيانة المعينة عليه + عملاؤه المسندون إليه فقط
   ENGINEER: [
     "dashboard", "serviceRequests", "customers",
+    "hrSelfService",
   ],
 
   // موظف المبيعات — العملاء والمبيعات والعقود
   SALES_EMPLOYEE: [
     "dashboard", "customers", "sales", "contracts", "machines", "returns", "tradeIns",
+    "hrSelfService",
+  ],
+
+  // مدير الموارد البشرية — كل شاشات HR
+  HR_MANAGER: [
+    "dashboard",
+    "hrDashboard", "hrEmployees", "hrAttendance", "hrLeaves", "hrPayroll", "hrSettings", "hrReports", "hrSelfService",
+  ],
+
+  // موظف — الخدمة الذاتية فقط
+  EMPLOYEE: [
+    "dashboard",
+    "hrSelfService",
   ],
 };
 
@@ -86,6 +116,8 @@ export const ROLE_LABELS_AR: Record<Role, string> = {
   WORKSHOP_MANAGER: "مدير الورشة",
   ENGINEER: "مهندس",
   SALES_EMPLOYEE: "موظف مبيعات",
+  HR_MANAGER: "مدير الموارد البشرية",
+  EMPLOYEE: "موظف",
 };
 
 export function hasPageAccess(role: string | undefined, page: Page): boolean {

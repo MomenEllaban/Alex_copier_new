@@ -21,7 +21,6 @@ interface StatementRow {
 interface Statement {
   customerId: string;
   customerName: string;
-  companyName: string | null;
   phone: string | null;
   rows: StatementRow[];
   openingBalance: number;
@@ -170,7 +169,6 @@ export default function StatementPage({ params }: { params: Promise<{ token: str
                 {t("statement.generatedFor")} {data.customerName}
               </h1>
               <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-gray-500">
-                {data.companyName && <span>{data.companyName}</span>}
                 {data.phone && <span dir="ltr">{data.phone}</span>}
               </div>
             </div>

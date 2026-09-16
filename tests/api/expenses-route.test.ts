@@ -193,6 +193,7 @@ describe("PUT /api/expenses/[id]", () => {
     expect(arg.where.id).toBe("exp_1");
     expect(arg.data).toEqual({
       companyId: "cmp_1",
+      categoryId: null,
       category: "ايجار",
       description: "ايجار شهر اغسطس",
       amount: 2500,

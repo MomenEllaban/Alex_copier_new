@@ -286,12 +286,10 @@ export default function ServiceRequestsPage() {
             quickAddFields={[
               { key: "name", label: "اسم العميل", required: true },
               { key: "phone", label: "الهاتف", placeholder: "01xxxxxxxxx" },
-              { key: "companyName", label: "اسم الشركة" },
               { key: "email", label: "البريد الإلكتروني", type: "email" },
               { key: "address", label: "العنوان" },
               { key: "city", label: "المدينة" },
               { key: "customerType", label: "نوع العميل", type: "select", options: [{ value: "INDIVIDUAL", label: "فرد" }, { value: "COMPANY", label: "شركة" }] },
-              { key: "whatsapp", label: "واتساب" },
             ]}
             quickAddEndpoint="/api/customers"
             onQuickAddSuccess={(item) => {

@@ -19,6 +19,8 @@ enum UserRole {
   WORKSHOP_MANAGER
   ENGINEER
   SALES_EMPLOYEE
+  HR_MANAGER
+  EMPLOYEE
 }
 
 enum NotificationCategory {
@@ -29,6 +31,9 @@ enum NotificationCategory {
   INVENTORY
   PAYMENT
   CONTRACT
+  HR
+  PAYROLL
+  LEAVE
 }
 
 enum NotificationPriority {
@@ -49,6 +54,15 @@ enum NotificationType {
   PAYMENT_PENDING
   PAYMENT_APPROVED
   PAYMENT_REJECTED
+  LEAVE_REQUESTED
+  LEAVE_APPROVED
+  LEAVE_REJECTED
+  OVERTIME_REQUESTED
+  OVERTIME_APPROVED
+  ADVANCE_REQUESTED
+  ADVANCE_APPROVED
+  PAYROLL_READY
+  PAYROLL_APPROVED
 }
 
 model User {
@@ -70,6 +84,7 @@ model User {
   notifications       Notification[] @relation("UserNotifications")
   sentNotifications   Notification[] @relation("NotificationSender")
   engineer            Engineer?
+  employee            Employee?
   company             Company?       @relation(fields: [companyId], references: [id])
 }
 
@@ -150,6 +165,14 @@ model Company {
   payments              CustomerPayment[]
   workshopBooks         WorkshopDailyBook[]
   workshopTransactions  WorkshopTransaction[]
+  departments           Department[]
+  jobTitles             JobTitle[]
+  shifts                Shift[]
+  holidays              Holiday[]
+  employees             Employee[]
+  payrollPeriods        PayrollPeriod[]
+  payrollRuns           PayrollRun[]
+  salaryComponents      SalaryComponent[]
 }
 
 model Customer {
@@ -284,6 +307,7 @@ model Engineer {
   salesOrders     SalesOrder[]
   copierTests     CopierTest[]
   customers       Customer[]
+  employee        Employee?
 }
 
 model EngineerArea {
@@ -1263,4 +1287,449 @@ model CopierTest {
   machine  Machine? @relation(fields: [machineId], references: [id], onDelete: SetNull)
 
   @@index([customerId, testDate])
+}
+
+// ═══════════════════════════════════════════════════════════
+// PHASE 12 - HR, PAYROLL & ATTENDANCE MODULE
+// ═══════════════════════════════════════════════════════════
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  TRAINEE
+}
+
+enum EmploymentStatus {
+  ACTIVE
+  ON_LEAVE
+  SUSPENDED
+  TERMINATED
+  RESIGNED
+}
+
+enum ShiftType {
+  FIXED
+  FLEXIBLE
+  ROTATING
+}
+
+enum PunchSource {
+  FINGERPRINT_DEVICE
+  MOBILE_GPS
+  WEB_MANUAL
+  API_IMPORT
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  EARLY_LEAVE
+  HALF_DAY
+  ON_LEAVE
+  HOLIDAY
+  REST_DAY
+}
+
+enum LeaveTypeCategory {
+  ANNUAL
+  SICK
+  UNPAID
+  EMERGENCY
+  MATERNITY
+  PATERNITY
+  OTHER
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum AdvanceStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  DEDUCTING
+  COMPLETED
+}
+
+enum InstallmentPayStatus {
+  PENDING_PAY
+  PAID
+  CANCELLED
+}
+
+enum SalaryComponentType {
+  ALLOWANCE
+  DEDUCTION
+  BONUS
+  COMMISSION
+  PENALTY
+}
+
+enum CalculationType {
+  FIXED_AMOUNT
+  PERCENTAGE_OF_BASIC
+  DAILY_RATE
+  HOURLY_RATE
+}
+
+enum PayrollStatus {
+  DRAFT
+  CALCULATED
+  APPROVED
+  LOCKED
+}
+
+enum PayrollItemFlag {
+  NONE
+  NEGATIVE_NET
+  HIGH_DEDUCTION
+  MISSING_PUNCHES
+}
+
+model Department {
+  id          String     @id @default(cuid())
+  code        String
+  name        String
+  nameAr      String?
+  managerId   String?
+  companyId   String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  Company     Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  Employees   Employee[]
+
+  @@unique([companyId, code])
+}
+
+model JobTitle {
+  id          String     @id @default(cuid())
+  title       String
+  titleAr     String?
+  companyId   String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  Company     Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  Employees   Employee[]
+}
+
+model Shift {
+  id            String     @id @default(cuid())
+  name          String
+  shiftType     ShiftType  @default(FIXED)
+  startTime     String
+  endTime       String
+  gracePeriod   Int        @default(15)
+  halfDayMinutes Int       @default(240)
+  overtimeStart String?
+  companyId     String
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  Company       Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  Employees     Employee[]
+}
+
+model Holiday {
+  id        String   @id @default(cuid())
+  name      String
+  nameAr    String?
+  startDate DateTime
+  endDate   DateTime
+  companyId String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  Company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+model Employee {
+  id                     String           @id @default(cuid())
+  code                   String           @unique
+  fingerprintId          String?          @unique
+  fullName               String
+  fullNameAr             String?
+  nationalId             String?          @unique
+  phone                  String?
+  email                  String?
+  hireDate               DateTime
+  employmentType         EmploymentType   @default(FULL_TIME)
+  status                 EmploymentStatus @default(ACTIVE)
+  baseSalary             Float            @default(0)
+  currency               String           @default("EGP")
+  departmentId           String?
+  jobTitleId             String?
+  shiftId                String?
+  companyId              String
+  userId                 String?          @unique
+  engineerId             String?          @unique
+  notes                  String?
+  annualLeaveBalance     Float            @default(21)
+  sickLeaveBalance       Float            @default(7)
+  emergencyLeaveBalance  Float            @default(5)
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+
+  Company                Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  Department             Department?             @relation(fields: [departmentId], references: [id])
+  JobTitle               JobTitle?               @relation(fields: [jobTitleId], references: [id])
+  Shift                  Shift?                  @relation(fields: [shiftId], references: [id])
+  User                   User?                   @relation(fields: [userId], references: [id])
+  Engineer               Engineer?               @relation(fields: [engineerId], references: [id])
+  RawPunches             RawAttendancePunch[]
+  DailyAttendance        DailyAttendanceRecord[]
+  LeaveRequests          LeaveRequest[]
+  SalaryHistory          EmployeeSalaryHistory[]
+  SalaryComponents       EmployeeSalaryComponent[]
+  Advances               EmployeeAdvance[]
+  Loans                  EmployeeLoan[]
+  PayrollItems           PayrollItem[]
+  TraineeInfo            TraineeInfo?
+
+  @@index([companyId, status])
+}
+
+model RawAttendancePunch {
+  id            String      @id @default(cuid())
+  employeeId    String
+  punchTime     DateTime
+  source        PunchSource @default(FINGERPRINT_DEVICE)
+  deviceId      String?
+  rawPayload    String?
+  createdAt     DateTime    @default(now())
+  Employee      Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, punchTime])
+}
+
+model DailyAttendanceRecord {
+  id            String           @id @default(cuid())
+  employeeId    String
+  date          DateTime
+  firstIn       DateTime?
+  lastOut       DateTime?
+  workedMinutes Int              @default(0)
+  lateMinutes   Int              @default(0)
+  earlyLeaveMin Int              @default(0)
+  overtimeMin   Int              @default(0)
+  status        AttendanceStatus @default(PRESENT)
+  isManual      Boolean          @default(false)
+  notes         String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  Employee      Employee         @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, date])
+}
+
+model LeaveRequest {
+  id           String            @id @default(cuid())
+  employeeId   String
+  category     LeaveTypeCategory @default(ANNUAL)
+  startDate    DateTime
+  endDate      DateTime
+  daysCount    Float
+  reason       String
+  status       LeaveStatus       @default(PENDING)
+  approvedBy   String?
+  approvedAt   DateTime?
+  rejectReason String?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  Employee     Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, status])
+}
+
+model EmployeeSalaryHistory {
+  id             String    @id @default(cuid())
+  employeeId     String
+  oldBaseSalary  Float
+  newBaseSalary  Float
+  effectiveDate  DateTime
+  reason         String?
+  changedBy      String
+  createdAt      DateTime  @default(now())
+  Employee       Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+model SalaryComponent {
+  id              String                 @id @default(cuid())
+  name            String
+  type            SalaryComponentType
+  calcType        CalculationType        @default(FIXED_AMOUNT)
+  defaultValue    Float                  @default(0)
+  isTaxable       Boolean                @default(false)
+  isInsurance     Boolean                @default(false)
+  companyId       String
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  Company         Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  EmployeeLinks   EmployeeSalaryComponent[]
+  PayrollItemBreakdowns PayrollItemComponent[]
+}
+
+model EmployeeSalaryComponent {
+  id                String          @id @default(cuid())
+  employeeId        String
+  salaryComponentId String
+  overrideValue     Float?
+  isActive          Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  Employee          Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  SalaryComponent   SalaryComponent @relation(fields: [salaryComponentId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, salaryComponentId])
+}
+
+model EmployeeAdvance {
+  id            String        @id @default(cuid())
+  employeeId    String
+  amount        Float
+  requestDate   DateTime
+  reason        String
+  status        AdvanceStatus @default(PENDING)
+  approvedBy    String?
+  approvedAt    DateTime?
+  deductMonth   Int?
+  deductYear    Int?
+  payrollItemId String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  Employee      Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, status])
+}
+
+model EmployeeLoan {
+  id            String             @id @default(cuid())
+  employeeId    String
+  totalAmount   Float
+  installmentCount Int
+  monthlyAmount Float
+  startDate     DateTime
+  reason        String
+  status        AdvanceStatus      @default(PENDING)
+  approvedBy    String?
+  approvedAt    DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  Employee      Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  Installments  LoanInstallment[]
+}
+
+model LoanInstallment {
+  id            String               @id @default(cuid())
+  loanId        String
+  installmentNo Int
+  amount        Float
+  dueDate       DateTime
+  paidDate      DateTime?
+  status        InstallmentPayStatus @default(PENDING_PAY)
+  payrollItemId String?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  Loan          EmployeeLoan         @relation(fields: [loanId], references: [id], onDelete: Cascade)
+
+  @@index([loanId, status])
+}
+
+model PayrollPeriod {
+  id         String       @id @default(cuid())
+  month      Int
+  year       Int
+  startDate  DateTime
+  endDate    DateTime
+  companyId  String
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  Company    Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  PayrollRun PayrollRun[]
+
+  @@unique([companyId, month, year])
+}
+
+model PayrollRun {
+  id              String        @id @default(cuid())
+  periodId        String
+  status          PayrollStatus @default(DRAFT)
+  totalGross      Float         @default(0)
+  totalDeductions Float         @default(0)
+  totalNet        Float         @default(0)
+  employeeCount   Int           @default(0)
+  calculatedAt    DateTime?
+  calculatedBy    String?
+  approvedBy      String?
+  approvedAt      DateTime?
+  lockedBy        String?
+  lockedAt        DateTime?
+  journalEntryId  String?
+  notes           String?
+  companyId       String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  Period          PayrollPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  Company         Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  Items           PayrollItem[]
+
+  @@index([companyId, status])
+}
+
+model PayrollItem {
+  id              String                 @id @default(cuid())
+  payrollRunId    String
+  employeeId      String
+  basicSalary     Float                  @default(0)
+  totalEarnings   Float                  @default(0)
+  totalDeductions Float                  @default(0)
+  grossSalary     Float                  @default(0)
+  netSalary       Float                  @default(0)
+  workedDays      Int                    @default(0)
+  absentDays      Int                    @default(0)
+  lateDays        Int                    @default(0)
+  overtimeHours   Float                  @default(0)
+  flag            PayrollItemFlag        @default(NONE)
+  notes           String?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+  PayrollRun      PayrollRun             @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  Employee        Employee               @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  Components      PayrollItemComponent[]
+
+  @@unique([payrollRunId, employeeId])
+}
+
+model PayrollItemComponent {
+  id                String           @id @default(cuid())
+  payrollItemId     String
+  salaryComponentId String?
+  label             String
+  type              SalaryComponentType
+  amount            Float            @default(0)
+  createdAt         DateTime         @default(now())
+  PayrollItem       PayrollItem      @relation(fields: [payrollItemId], references: [id], onDelete: Cascade)
+  SalaryComponent   SalaryComponent? @relation(fields: [salaryComponentId], references: [id])
+
+  @@index([payrollItemId])
+}
+
+model TraineeInfo {
+  id                 String    @id @default(cuid())
+  employeeId         String    @unique
+  university         String?
+  faculty            String?
+  trainingStartDate  DateTime?
+  trainingEndDate    DateTime?
+  trainingSupervisor String?
+  trainingHours      Int       @default(0)
+  evaluation         String?
+  stipend            Float     @default(0)
+  certificateIssued  Boolean   @default(false)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  Employee           Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 }

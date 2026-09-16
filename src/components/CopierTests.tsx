@@ -582,38 +582,26 @@ export default function CopierTests({ customerId, machines = [], defaultEngineer
           <p className="py-6 text-center text-sm text-gray-400">{t("copierTests.noTests")}</p>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-gray-200">
-            <table className="w-full min-w-[900px] text-sm">
+            <table className="w-full min-w-[960px] text-sm">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">
-                    {t("copierTests.date")}
-                  </th>
-                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">
-                    {t("copierTests.engineer")}
-                  </th>
-                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">
-                    {t("copierTests.machine")}
-                  </th>
-                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">
-                    {t("copierTests.blackCounter")}
-                  </th>
-                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">
-                    {t("copierTests.colorCounter")}
-                  </th>
-                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">
-                    {t("copierTests.repairStatement")}
-                  </th>
-                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">
-                    {t("copierTests.collectedAmount")}
-                  </th>
-                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">
-                    {t("copierTests.image")}
-                  </th>
-                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">
-                    {t("copierTests.notes")}
-                  </th>
+                  {[
+                    t("copierTests.date"),
+                    t("copierTests.engineer"),
+                    t("copierTests.machine"),
+                    t("copierTests.blackCounter"),
+                    t("copierTests.colorCounter"),
+                    t("copierTests.repairStatement"),
+                    t("copierTests.collectedAmount"),
+                    t("copierTests.image"),
+                    t("copierTests.notes"),
+                  ].map((label, i) => (
+                    <th key={i} className="px-3 py-3 text-start text-xs font-semibold whitespace-nowrap text-gray-500">
+                      {label}
+                    </th>
+                  ))}
                   {canDelete && (
-                    <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">
+                    <th className="px-3 py-3 text-start text-xs font-semibold text-gray-500">
                       {t("copierTests.actions")}
                     </th>
                   )}
@@ -621,27 +609,31 @@ export default function CopierTests({ customerId, machines = [], defaultEngineer
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {tests.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-2 whitespace-nowrap text-slate-700">
+                  <tr key={item.id} className="align-top hover:bg-gray-50">
+                    <td className="px-3 py-3 whitespace-nowrap text-slate-700">
                       {formatDate(item.testDate)}
                     </td>
-                    <td className="px-4 py-2 font-medium text-slate-800">{item.engineer?.name || "—"}</td>
-                    <td className="px-4 py-2 text-slate-700" dir="ltr">
+                    <td className="px-3 py-3 font-medium whitespace-nowrap text-slate-800">{item.engineer?.name || "—"}</td>
+                    <td className="px-3 py-3 whitespace-nowrap text-slate-700" dir="ltr">
                       {item.machine?.serialNumber || "—"}
                     </td>
-                    <td className="px-4 py-2 font-bold text-violet-700">
+                    <td className="px-3 py-3 font-bold whitespace-nowrap text-violet-700">
                       {formatNum(item.blackCounter ?? item.pageCount)}
                     </td>
-                    <td className="px-4 py-2 font-bold text-violet-700">
+                    <td className="px-3 py-3 font-bold whitespace-nowrap text-violet-700">
                       {formatNum(item.colorCounter)}
                     </td>
-                    <td className="max-w-[220px] truncate px-4 py-2 text-slate-600">
-                      {item.repairStatement || "—"}
+                    <td className="max-w-[260px] px-3 py-3 text-slate-600" title={item.repairStatement || ""}>
+                      {item.repairStatement ? (
+                        <span className="line-clamp-2">{item.repairStatement}</span>
+                      ) : (
+                        "—"
+                      )}
                     </td>
-                    <td className="px-4 py-2 font-bold text-emerald-700">
+                    <td className="px-3 py-3 font-bold whitespace-nowrap text-emerald-700">
                       {item.collectedAmount != null ? formatNum(item.collectedAmount) : "—"}
                     </td>
-                    <td className="px-4 py-2">
+                    <td className="px-3 py-3">
                       {item.imageUrl ? (
                         <button onClick={() => setLightboxUrl(item.imageUrl as string)} title={t("copierTests.image")}>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -655,11 +647,11 @@ export default function CopierTests({ customerId, machines = [], defaultEngineer
                         <span className="text-xs text-gray-400">{t("copierTests.noImage")}</span>
                       )}
                     </td>
-                    <td className="max-w-[200px] truncate px-4 py-2 text-slate-600">
+                    <td className="max-w-[240px] px-3 py-3 text-slate-600" title={[item.spareParts, item.notes].filter(Boolean).join(" — ")}>
                       {[item.spareParts, item.notes].filter(Boolean).join(" — ") || "—"}
                     </td>
                     {canDelete && (
-                      <td className="px-4 py-2">
+                      <td className="px-3 py-3">
                         <button
                           onClick={() => handleDelete(item.id)}
                           title={t("common.delete")}

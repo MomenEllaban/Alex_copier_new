@@ -23,10 +23,8 @@ export type EntityKey = "customers" | "machines" | "suppliers";
 
 export const CUSTOMER_COLUMNS: ImportColumn[] = [
   { key: "name", labelAr: "الاسم", labelEn: "Name", aliases: ["الاسم", "اسم العميل", "name"], required: true, type: "text", sample: "محمد أحمد علي" },
-  { key: "companyName", labelAr: "اسم الشركة", labelEn: "Company name", aliases: ["اسم الشركة", "الشركة", "companyname"], type: "text", sample: "شركة النيل للأعمال" },
   { key: "contactPerson", labelAr: "جهة الاتصال", labelEn: "Contact person", aliases: ["جهة الاتصال", "contactperson"], type: "text", sample: "أ. سعيد" },
   { key: "phone", labelAr: "الهاتف", labelEn: "Phone", aliases: ["الهاتف", "التليفون", "الموبايل", "phone"], type: "text", sample: "01001234567" },
-  { key: "whatsapp", labelAr: "واتساب", labelEn: "WhatsApp", aliases: ["واتساب", "whatsapp"], type: "text", sample: "01001234567" },
   { key: "email", labelAr: "البريد الإلكتروني", labelEn: "Email", aliases: ["البريد الإلكتروني", "الايميل", "email"], type: "email", sample: "client@example.com" },
   { key: "address", labelAr: "العنوان", labelEn: "Address", aliases: ["العنوان", "address"], type: "text", sample: "شارع الجمهورية، محطة الرمل" },
   { key: "city", labelAr: "المدينة", labelEn: "City", aliases: ["المدينة", "city"], type: "text", sample: "الإسكندرية" },
