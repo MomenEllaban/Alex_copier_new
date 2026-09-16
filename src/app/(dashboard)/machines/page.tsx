@@ -34,6 +34,9 @@ interface Machine {
   notes: string;
   currentOwnerId: string;
   currentOwner: { name: string } | null;
+  deliveryBlack?: number | null;
+  deliveryColor?: number | null;
+  isPrinter?: boolean;
   createdAt: string;
 }
 
@@ -70,6 +73,9 @@ const emptyForm = {
   manufacturer: "",
   model: "",
   isColor: false,
+  isPrinter: false,
+  deliveryBlack: "",
+  deliveryColor: "",
   paperSize: "A4",
   purchaseDate: "",
   purchasePrice: "",
@@ -136,6 +142,8 @@ const { success: toastSuccess } = useToast();
       t("machines.serialNumber"),
       t("machines.manufacturer"),
       t("machines.model"),
+      t("machines.deliveryCounters"),
+      t("machines.printer"),
       t("machines.isColor"),
       t("machines.status"),
       t("machines.purchasePrice"),
@@ -146,6 +154,8 @@ const { success: toastSuccess } = useToast();
       m.serialNumber,
       m.manufacturer || "",
       m.model || "",
+      m.deliveryBlack ?? m.deliveryColor ?? null ? `${m.deliveryBlack ?? ""}/${m.deliveryColor ?? ""}` : "",
+      m.isPrinter ? t("machines.printer") : "",
       m.isColor ? t("common.yes") : t("common.no"),
       STATUS_LABELS[m.currentStatus] || m.currentStatus,
       m.purchasePrice != null ? String(m.purchasePrice) : "",
@@ -164,6 +174,8 @@ const { success: toastSuccess } = useToast();
         ...form,
         purchasePrice: form.purchasePrice ? parseFloat(form.purchasePrice) : null,
         purchaseDate: form.purchaseDate || null,
+        deliveryBlack: form.deliveryBlack !== "" ? parseInt(String(form.deliveryBlack), 10) : null,
+        deliveryColor: form.deliveryColor !== "" ? parseInt(String(form.deliveryColor), 10) : null,
         currentOwnerId: form.currentOwnerId || null,
       }),
     });
@@ -251,6 +263,20 @@ const { success: toastSuccess } = useToast();
             <SearchableSelect value={form.currentOwnerId} onChange={(v) => setField("currentOwnerId", v)} options={customers.map((c) => ({ value: c.id, label: c.name }))} placeholder="بدون مالك" />
           </div>
           <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-slate-700">{t("machines.deliveryCounters")}</label>
+            <div className="grid grid-cols-2 gap-2">
+              <input type="number" min="0" step="1" value={form.deliveryBlack} onChange={(e) => setField("deliveryBlack", e.target.value)} placeholder={t("copierTests.blackCounter")} dir="ltr" className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <input type="number" min="0" step="1" value={form.deliveryColor} onChange={(e) => setField("deliveryColor", e.target.value)} placeholder={t("copierTests.colorCounter")} dir="ltr" className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+          </div>
+          <div className="space-y-1.5">
+            <label className="block text-sm font-medium text-slate-700">{t("machines.printer")}</label>
+            <label className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2.5">
+              <input type="checkbox" checked={form.isPrinter} onChange={(e) => setField("isPrinter", e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+              <span className="text-sm">{t("common.yes")}</span>
+            </label>
+          </div>
+          <div className="space-y-1.5">
             <label className="block text-sm font-medium text-slate-700">{t("common.notes")}</label>
             <input type="text" value={form.notes} onChange={(e) => setField("notes", e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
@@ -316,6 +342,7 @@ const { success: toastSuccess } = useToast();
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("machines.serialNumber")}</th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("machines.manufacturer")}</th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("machines.model")}</th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("machines.deliveryCounters")}</th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("machines.status")}</th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">حجم الورق</th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">المالك الحالي</th>
@@ -326,9 +353,10 @@ const { success: toastSuccess } = useToast();
               <tbody className="divide-y divide-gray-200">
                 {paged.map((machine) => (
                   <tr key={machine.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm">{machine.serialNumber}</td>
+                    <td className="px-4 py-3 text-sm">{machine.serialNumber}{machine.isPrinter ? (<span className="ms-2 inline-flex rounded-full bg-slate-200 px-2 py-0.5 text-xs font-bold text-slate-700">{t("machines.printer")}</span>) : null}</td>
                     <td className="px-4 py-3 text-sm">{machine.manufacturer}</td>
                     <td className="px-4 py-3 text-sm">{machine.model}</td>
+                    <td className="px-4 py-3 text-sm whitespace-nowrap" dir="ltr">{machine.deliveryBlack != null || machine.deliveryColor != null ? `${machine.deliveryBlack ?? "—"} / ${machine.deliveryColor ?? "—"}` : "—"}</td>
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
@@ -391,6 +419,8 @@ const { success: toastSuccess } = useToast();
                 <section className="grid gap-4 md:grid-cols-4">
                   <Info label={t("machines.manufacturer")} value={selected.manufacturer || "—"} />
                   <Info label={t("machines.model")} value={selected.model || "—"} />
+                  <Info label={t("machines.deliveryCounters")} value={selected.deliveryBlack != null || selected.deliveryColor != null ? `${selected.deliveryBlack ?? "—"} / ${selected.deliveryColor ?? "—"}` : "—"} />
+                  <Info label={t("machines.printer")} value={selected.isPrinter ? t("common.yes") : t("common.no")} />
                   <Info label={t("machines.status")} value={STATUS_LABELS[selected.currentStatus] || selected.currentStatus} />
                   <Info label={t("machineDetails.currentMeter")} value={selected.meterReadings[0]?.reading?.toLocaleString() || "—"} />
                 </section>

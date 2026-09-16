@@ -53,6 +53,7 @@ interface Customer {
   lastPaymentDate: string | null;
   engineerId?: string | null;
   engineer?: { id: string; name: string } | null;
+  notes?: string | null;
   locations: CustomerLocation[];
   payments?: { id: string; amount: number; paymentDate: string; notes?: string | null; company?: { id: string; name: string } | null }[];
   createdAt: string;
@@ -81,6 +82,7 @@ const emptyForm = {
   totalDebt: "",
   remainingDebt: "",
   engineerId: "",
+  notes: "",
 };
 
 const TYPE_BADGES: Record<string, string> = {
@@ -241,6 +243,7 @@ export default function CustomersPage() {
       totalDebt: String(customer.totalDebt || ""),
       remainingDebt: String(customer.remainingDebt || ""),
       engineerId: customer.engineerId || "",
+      notes: customer.notes || "",
     });
     setEditingId(customer.id);
     setError("");
@@ -591,6 +594,10 @@ export default function CustomersPage() {
               ))}
             </select>
           </div>
+          <div className="space-y-1.5 md:col-span-2">
+            <label className="block text-sm font-medium text-slate-700">{t("common.notes")}</label>
+            <textarea value={form.notes} onChange={(e) => setField("notes", e.target.value)} rows={2} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+          </div>
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-slate-700">الدين الكلي (ج.م)</label>
             <input type="number" min="0" step="0.01" value={form.totalDebt} onChange={(e) => setField("totalDebt", e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0" />
@@ -617,6 +624,7 @@ export default function CustomersPage() {
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("customers.phone")}</span><span className="mt-1 block font-medium text-slate-800" dir="ltr">{selected.phone || "—"}</span></div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("customers.email")}</span><span className="mt-1 block font-medium text-slate-800">{selected.email || "—"}</span></div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("customers.engineer")}</span><span className="mt-1 block font-medium text-slate-800">{selected.engineer?.name || t("customers.noEngineer")}</span></div>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 md:col-span-2"><span className="block text-xs text-gray-500">{t("common.notes")}</span><span className="mt-1 block font-medium text-slate-800">{selected.notes || "—"}</span></div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("customers.address")}</span><span className="mt-1 block font-medium text-slate-800">{selected.address || "—"}</span></div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("customers.city")}</span><span className="mt-1 block font-medium text-slate-800">{selected.city || "—"}</span></div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("customers.governorate")}</span><span className="mt-1 block font-medium text-slate-800">{selected.governorate || "—"}</span></div>

@@ -241,7 +241,9 @@
     "RENTED": "مؤجر",
     "IN_WAREHOUSE": "في المستودع",
     "SCRAPPED": "مهمل",
-    "searchPlaceholder": "ابحث برقم التسلسل أو الماركة أو الموديل أو اسم العميل..."
+    "searchPlaceholder": "ابحث برقم التسلسل أو الماركة أو الموديل أو اسم العميل...",
+    "deliveryCounters": "عداد التسليم",
+    "printer": "برنتر"
   },
   "machineDetails": {
     "view": "عرض سجل دورة الحياة",
@@ -370,6 +372,7 @@
     "areasPlaceholder": "المناطق (مفصولة بفاصلة)",
     "searchPlaceholder": "ابحث بالاسم أو الهاتف أو البريد أو المهارة...",
     "linkedAccount": "حساب الدخول المرتبط",
+    "assignedCustomers": "عملاء مسندون",
     "workload": "طلبات مفتوحة",
     "selectedAccount": "بيانات الحساب المختار",
     "passwordHidden": "مخفي — يتم استخدام الحساب الحالي لتسجيل الدخول",

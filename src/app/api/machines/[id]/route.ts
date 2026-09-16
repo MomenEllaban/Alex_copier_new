@@ -68,6 +68,9 @@ export async function PUT(
       "model",
       "paperSize",
       "isColor",
+      "isPrinter",
+      "deliveryBlack",
+      "deliveryColor",
       "purchaseDate",
       "purchasePrice",
       "salePrice",
@@ -78,6 +81,10 @@ export async function PUT(
     const data: Record<string, unknown> = {};
     for (const key of allowed) {
       if (key in body) data[key] = body[key];
+    }
+    for (const key of ["deliveryBlack", "deliveryColor"] as const) {
+      if (data[key] != null && data[key] !== "") data[key] = Number(data[key]);
+      else if (key in data) data[key] = null;
     }
 
     const machine = await prisma.machine.update({

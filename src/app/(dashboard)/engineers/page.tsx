@@ -58,6 +58,7 @@ interface Engineer {
   skills: EngineerSkill[];
   user?: LinkedUser | null;
   openAssignedCount?: number;
+  assignedCustomersCount?: number;
   createdAt: string;
 }
 
@@ -236,6 +237,7 @@ export default function EngineersPage() {
       t("engineers.skills"),
       t("engineers.linkedAccount"),
       t("engineers.workload"),
+      t("engineers.assignedCustomers"),
       t("common.status"),
     ],
     rows: filtered.map((e) => [
@@ -249,6 +251,7 @@ export default function EngineersPage() {
       e.skills.map((s) => `${s.modelType} (${s.skillLevel})`).join("، "),
       e.user?.name || "",
       String(e.openAssignedCount ?? 0),
+      String(e.assignedCustomersCount ?? 0),
       e.isActive ? "نعم" : "لا",
     ]),
   });
@@ -412,6 +415,7 @@ export default function EngineersPage() {
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("engineers.transportAllowance")}</span><span className="mt-1 block font-medium text-slate-800">{selected.transportAllowance.toLocaleString()}</span></div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("engineers.commissionRate")}</span><span className="mt-1 block font-medium text-slate-800">{selected.commissionRate}%</span></div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("engineers.workload")}</span><span className="mt-1 block font-medium text-slate-800">{selected.openAssignedCount ?? 0}</span></div>
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("engineers.assignedCustomers")}</span><span className="mt-1 block font-medium text-slate-800">{selected.assignedCustomersCount ?? 0}</span></div>
             </div>
 
             {selected.areas.length > 0 && (
@@ -543,6 +547,7 @@ export default function EngineersPage() {
                 <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("engineers.transportAllowance")}</th>
                 <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("engineers.commissionRate")}</th>
                 <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("engineers.workload")}</th>
+                <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("engineers.assignedCustomers")}</th>
                 <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("engineers.linkedAccount")}</th>
                 <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("common.status")}</th>
                 <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("common.actions")}</th>
@@ -570,6 +575,11 @@ export default function EngineersPage() {
                             : "bg-gray-100 text-gray-700"
                       }`}>
                         {engineer.openAssignedCount ?? 0}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="inline-flex rounded-full bg-violet-100 px-2 py-1 text-xs font-bold text-violet-800">
+                        {engineer.assignedCustomersCount ?? 0}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">{engineer.user?.name || engineer.user?.email || "—"}</td>

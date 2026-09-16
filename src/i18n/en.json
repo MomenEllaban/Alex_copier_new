@@ -248,7 +248,9 @@
     "RENTED": "Rented",
     "IN_WAREHOUSE": "In Warehouse",
     "SCRAPPED": "Scrapped",
-    "searchPlaceholder": "Search by serial number, brand, model, or owner..."
+    "searchPlaceholder": "Search by serial number, brand, model, or owner...",
+    "deliveryCounters": "Delivery counters",
+    "printer": "Printer"
   },
   "machineDetails": {
     "view": "View lifecycle",
@@ -377,6 +379,7 @@
     "areasPlaceholder": "Areas (comma separated)",
     "searchPlaceholder": "Search by name, phone, email, or skill...",
     "linkedAccount": "Linked login account",
+    "assignedCustomers": "Assigned customers",
     "workload": "Open requests",
     "selectedAccount": "Selected account details",
     "passwordHidden": "Hidden — the existing account login is used",

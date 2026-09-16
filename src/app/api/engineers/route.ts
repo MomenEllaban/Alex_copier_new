@@ -16,6 +16,7 @@ export async function GET() {
         skills: true,
         user: { select: { id: true, name: true, email: true } },
         serviceRequests: { select: { id: true, status: true } },
+        _count: { select: { customers: true } },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -23,7 +24,9 @@ export async function GET() {
       engineers.map((e) => ({
         ...e,
         openAssignedCount: e.serviceRequests.filter((r) => OPEN_STATUSES.includes(r.status)).length,
+        assignedCustomersCount: e._count.customers,
         serviceRequests: undefined,
+        _count: undefined,
       })),
     );
   } catch (error) {

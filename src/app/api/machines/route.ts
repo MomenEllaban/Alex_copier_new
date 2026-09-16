@@ -34,6 +34,11 @@ export async function POST(request: Request) {
         const body = await request.json();
     const { currentOwnerId, companyId, ...data } = body;
 
+    for (const key of ["deliveryBlack", "deliveryColor"] as const) {
+      if (data[key] != null && data[key] !== "") data[key] = Number(data[key]);
+      else if (key in data) data[key] = null;
+    }
+
     if (currentOwnerId) {
       const owner = await prisma.customer.findUnique({ where: { id: currentOwnerId }, select: { id: true } });
       if (!owner) {
