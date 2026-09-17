@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
     company: { findFirst: vi.fn() },
     workshopDailyBook: { findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn(), update: vi.fn() },
     $transaction: vi.fn(),
-    workshopTransaction: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+    workshopTransaction: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn(), deleteMany: vi.fn() },
     expenseCategory: { findFirst: vi.fn(), create: vi.fn() },
     expense: { create: vi.fn(), findMany: vi.fn() },
     settlement: { create: vi.fn() },
@@ -24,6 +24,7 @@ vi.mock("@/lib/auth-helpers", () => ({
 }));
 
 import { GET as getDaily, POST as addTx } from "@/app/api/workshop-daily/route";
+import { PUT as editTx, DELETE as deleteTx } from "@/app/api/workshop-daily/[id]/route";
 import { POST as confirmTx } from "@/app/api/workshop-daily/[id]/confirm/route";
 import { POST as rejectTx } from "@/app/api/workshop-daily/[id]/reject/route";
 import { POST as closeDay } from "@/app/api/workshop-daily/close/route";
@@ -39,6 +40,24 @@ const jsonRequest = (body: unknown) =>
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+
+const methodRequest = (method: string, body?: unknown) =>
+  new Request("http://localhost/api/workshop-daily", {
+    method,
+    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+
+const txParams = (id: string) => ({ params: Promise.resolve({ id }) });
+
+const pendingTx = (overrides: Record<string, unknown> = {}) => ({
+  id: "tx_1",
+  companyId: "company3",
+  createdBy: "u_workshop",
+  status: "PENDING",
+  book: { status: "OPEN" },
+  ...overrides,
+});
 
 describe("workshop daily totals", () => {
   it("computes cashbox balance excluding rejected entries", () => {
@@ -297,5 +316,152 @@ describe("workshop daily API", () => {
     expect(arg.data.status).toBe("CLOSED");
     expect(arg.data.handoverAmount).toBe(800);
     expect(arg.data.handoverTo).toBe("الخزينة الرئيسية");
+  });
+
+  describe("edit and delete pending entries", () => {
+    it("PUT edits a pending entry and re-resolves the OUT category", async () => {
+      mocks.prisma.workshopTransaction.findUnique.mockResolvedValue(pendingTx());
+      mocks.prisma.expenseCategory.findFirst.mockResolvedValue({ id: "cat_ws", companyId: "company3", name: "يومية الورشة" });
+      const res = await editTx(
+        methodRequest("PUT", { direction: "OUT", amount: 350, reason: "مستلزمات محدثة" }),
+        txParams("tx_1"),
+      );
+      expect(res.status).toBe(200);
+      expect(mocks.prisma.workshopTransaction.updateMany).toHaveBeenCalledWith({
+        where: { id: "tx_1", status: "PENDING", book: { status: "OPEN" } },
+        data: { direction: "OUT", amount: 350, reason: "مستلزمات محدثة", categoryId: "cat_ws" },
+      });
+    });
+
+    it("PUT clears the category when switching an entry to IN", async () => {
+      mocks.prisma.workshopTransaction.findUnique.mockResolvedValue(pendingTx());
+      const res = await editTx(
+        methodRequest("PUT", { direction: "IN", amount: 100, reason: "تمويل" }),
+        txParams("tx_1"),
+      );
+      expect(res.status).toBe(200);
+      expect(mocks.prisma.expenseCategory.findFirst).not.toHaveBeenCalled();
+      expect(mocks.prisma.workshopTransaction.updateMany).toHaveBeenCalledWith({
+        where: { id: "tx_1", status: "PENDING", book: { status: "OPEN" } },
+        data: { direction: "IN", amount: 100, reason: "تمويل", categoryId: null },
+      });
+    });
+
+    it("PUT validates the amount and reason", async () => {
+      const res = await editTx(
+        methodRequest("PUT", { direction: "OUT", amount: 0, reason: "" }),
+        txParams("tx_1"),
+      );
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.code).toBe("AMOUNT_INVALID");
+      expect(mocks.prisma.workshopTransaction.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("PUT rejects entries that are not pending", async () => {
+      mocks.prisma.workshopTransaction.findUnique.mockResolvedValue(pendingTx({ status: "CONFIRMED" }));
+      const res = await editTx(
+        methodRequest("PUT", { direction: "OUT", amount: 10, reason: "x" }),
+        txParams("tx_1"),
+      );
+      expect(res.status).toBe(409);
+      const body = await res.json();
+      expect(body.code).toBe("ALREADY_HANDLED");
+      expect(mocks.prisma.workshopTransaction.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("PUT rejects entries on a closed book", async () => {
+      mocks.prisma.workshopTransaction.findUnique.mockResolvedValue(pendingTx({ book: { status: "CLOSED" } }));
+      const res = await editTx(
+        methodRequest("PUT", { direction: "OUT", amount: 10, reason: "x" }),
+        txParams("tx_1"),
+      );
+      expect(res.status).toBe(409);
+      const body = await res.json();
+      expect(body.code).toBe("BOOK_CLOSED");
+    });
+
+    it("PUT returns 404 for a missing entry", async () => {
+      mocks.prisma.workshopTransaction.findUnique.mockResolvedValue(null);
+      const res = await editTx(
+        methodRequest("PUT", { direction: "OUT", amount: 10, reason: "x" }),
+        txParams("tx_missing"),
+      );
+      expect(res.status).toBe(404);
+      const body = await res.json();
+      expect(body.code).toBe("WORKSHOP_TX_NOT_FOUND");
+    });
+
+    it("PUT forbids editing someone else's entry without a finance role", async () => {
+      mocks.prisma.workshopTransaction.findUnique.mockResolvedValue(pendingTx({ createdBy: "u_other" }));
+      const res = await editTx(
+        methodRequest("PUT", { direction: "OUT", amount: 10, reason: "x" }),
+        txParams("tx_1"),
+      );
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body.code).toBe("MODIFY_FORBIDDEN");
+      expect(mocks.prisma.workshopTransaction.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("PUT lets a finance user edit any pending entry", async () => {
+      mocks.requirePageAccess.mockResolvedValue(accountant);
+      mocks.prisma.workshopTransaction.findUnique.mockResolvedValue(pendingTx({ createdBy: "u_other" }));
+      mocks.prisma.expenseCategory.findFirst.mockResolvedValue({ id: "cat_ws", companyId: "company3", name: "يومية الورشة" });
+      const res = await editTx(
+        methodRequest("PUT", { direction: "OUT", amount: 10, reason: "تصحيح" }),
+        txParams("tx_1"),
+      );
+      expect(res.status).toBe(200);
+      expect(mocks.prisma.workshopTransaction.updateMany).toHaveBeenCalledOnce();
+    });
+
+    it("PUT reports a conflict when the entry is claimed before the write", async () => {
+      mocks.prisma.workshopTransaction.findUnique.mockResolvedValue(pendingTx());
+      mocks.prisma.expenseCategory.findFirst.mockResolvedValue({ id: "cat_ws", companyId: "company3", name: "يومية الورشة" });
+      mocks.prisma.workshopTransaction.updateMany.mockResolvedValue({ count: 0 });
+      const res = await editTx(
+        methodRequest("PUT", { direction: "OUT", amount: 10, reason: "x" }),
+        txParams("tx_1"),
+      );
+      expect(res.status).toBe(409);
+      const body = await res.json();
+      expect(body.code).toBe("ALREADY_HANDLED");
+    });
+
+    it("DELETE removes a pending entry the user created", async () => {
+      mocks.prisma.workshopTransaction.findUnique.mockResolvedValue(pendingTx());
+      mocks.prisma.workshopTransaction.deleteMany.mockResolvedValue({ count: 1 });
+      const res = await deleteTx(methodRequest("DELETE"), txParams("tx_1"));
+      expect(res.status).toBe(200);
+      expect(mocks.prisma.workshopTransaction.deleteMany).toHaveBeenCalledWith({
+        where: { id: "tx_1", status: "PENDING", book: { status: "OPEN" } },
+      });
+    });
+
+    it("DELETE forbids removing someone else's entry without a finance role", async () => {
+      mocks.prisma.workshopTransaction.findUnique.mockResolvedValue(pendingTx({ createdBy: "u_other" }));
+      const res = await deleteTx(methodRequest("DELETE"), txParams("tx_1"));
+      expect(res.status).toBe(403);
+      const body = await res.json();
+      expect(body.code).toBe("MODIFY_FORBIDDEN");
+      expect(mocks.prisma.workshopTransaction.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it("DELETE refuses confirmed entries", async () => {
+      mocks.prisma.workshopTransaction.findUnique.mockResolvedValue(pendingTx({ status: "CONFIRMED" }));
+      const res = await deleteTx(methodRequest("DELETE"), txParams("tx_1"));
+      expect(res.status).toBe(409);
+      const body = await res.json();
+      expect(body.code).toBe("ALREADY_HANDLED");
+      expect(mocks.prisma.workshopTransaction.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it("DELETE returns 404 for a missing entry", async () => {
+      mocks.prisma.workshopTransaction.findUnique.mockResolvedValue(null);
+      const res = await deleteTx(methodRequest("DELETE"), txParams("tx_missing"));
+      expect(res.status).toBe(404);
+      expect(mocks.prisma.workshopTransaction.deleteMany).not.toHaveBeenCalled();
+    });
   });
 });
