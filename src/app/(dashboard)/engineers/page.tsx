@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import ExportButton from "@/components/ExportButton";
 import PrinterLoader from "@/components/PrinterLoader";
-import { Pencil, Plus, Trash2, Package, Eye, Save, ScrollText, Link2 } from "lucide-react";
+import { Pencil, Plus, Trash2, Package, Eye, Save, ScrollText, Link2, Users, UserCheck, Wallet, ClipboardList } from "lucide-react";
 import { AddFormBoundary, useAutoAddForm } from "@/hooks/useAutoAddForm";
 import { useConfirm, useToast } from "@/components/UIProvider";
 import { apiErrorMessage } from "@/lib/api-client";
 import FormModal from "@/components/FormModal";
+import StatsCards from "@/components/StatsCards";
 import SubmitButton from "@/components/SubmitButton";
 import { DateTimeCell } from "@/components/DateTimeCell";
 import RefreshButton from "@/components/RefreshButton";
@@ -225,6 +226,17 @@ export default function EngineersPage() {
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
+  const stats = useMemo(() => {
+    const totalSalaries = engineers.reduce((sum, e) => sum + (e.baseSalary || 0), 0);
+    const openRequests = engineers.reduce((sum, e) => sum + (e.openAssignedCount || 0), 0);
+    return {
+      total: engineers.length,
+      active: engineers.filter((e) => e.isActive).length,
+      salaries: totalSalaries,
+      openRequests,
+    };
+  }, [engineers]);
+
   const exportEngineers = () => ({
     headers: [
       t("engineers.name"),
@@ -337,6 +349,16 @@ export default function EngineersPage() {
           <Plus size={16} />{t("engineers.addEngineer")}
         </button>
       </div>
+
+      <StatsCards
+        columns={4}
+        stats={[
+          { label: t("engineers.stats.total"), value: stats.total.toLocaleString("ar-EG"), icon: <Users size={18} />, tone: "sky" },
+          { label: t("engineers.stats.active"), value: stats.active.toLocaleString("ar-EG"), icon: <UserCheck size={18} />, tone: "green" },
+          { label: t("engineers.stats.salaries"), value: `${stats.salaries.toLocaleString("ar-EG")} ج.م`, icon: <Wallet size={18} />, tone: "purple" },
+          { label: t("engineers.stats.openRequests"), value: stats.openRequests.toLocaleString("ar-EG"), icon: <ClipboardList size={18} />, tone: "amber" },
+        ]}
+      />
 
       <FormModal open={showForm} onClose={() => { setShowForm(false); setEditingId(null); }} title={editingId ? t("engineers.editEngineer") : t("engineers.addEngineer")} wide>
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

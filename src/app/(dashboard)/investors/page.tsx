@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
@@ -8,10 +8,11 @@ import ExportButton from "@/components/ExportButton";
 import PrinterLoader from "@/components/PrinterLoader";
 import FormModal from "@/components/FormModal";
 import SubmitButton from "@/components/SubmitButton";
-import { Plus, Save, Trash2, X } from "lucide-react";
+import { Plus, Save, Trash2, X, Users, UserCheck, Percent } from "lucide-react";
 import { AddFormBoundary, useAutoAddForm } from "@/hooks/useAutoAddForm";
 import { useConfirm, useToast } from "@/components/UIProvider";
 import RefreshButton from "@/components/RefreshButton";
+import StatsCards from "@/components/StatsCards";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { notifyDataChanged } from "@/lib/data-events";
 
@@ -76,6 +77,11 @@ export default function InvestorsPage() {
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
+  const stats = useMemo(() => {
+    const ownership = investors.reduce((sum, i) => sum + (i.ownershipPct || 0), 0);
+    return { total: investors.length, active: investors.filter((i) => i.isActive).length, ownership };
+  }, [investors]);
+
   const exportInvestors = () => ({
     headers: [
       t("investors.name"),
@@ -134,6 +140,15 @@ export default function InvestorsPage() {
           </div>
           <button onClick={() => setShowForm(true)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"><Plus size={16} />{t("investors.addInvestor")}</button>
         </div>
+
+        <StatsCards
+          columns={3}
+          stats={[
+            { label: t("investors.stats.total"), value: stats.total.toLocaleString("ar-EG"), icon: <Users size={18} />, tone: "sky" },
+            { label: t("investors.stats.active"), value: stats.active.toLocaleString("ar-EG"), icon: <UserCheck size={18} />, tone: "green" },
+            { label: t("investors.stats.ownership"), value: `${stats.ownership.toLocaleString("ar-EG")}%`, icon: <Percent size={18} />, tone: "purple" },
+          ]}
+        />
 
         <FormModal open={showForm} onClose={() => setShowForm(false)} title={t("investors.addInvestor")}>
           <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">

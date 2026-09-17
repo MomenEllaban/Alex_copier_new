@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AddFormBoundary, useAutoAddForm } from "@/hooks/useAutoAddForm";
-import { Plus, RotateCcw, ArrowDownLeft, ArrowUpRight, Trash2, Pencil, Eye, Save } from "lucide-react";
+import { Plus, RotateCcw, Trash2, Pencil, Eye, Save, Undo2, BadgeCheck, Ban } from "lucide-react";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
 import FormModal from "@/components/FormModal";
@@ -16,6 +16,7 @@ import { DateTimeCell } from "@/components/DateTimeCell";
 import ExportButton from "@/components/ExportButton";
 import Pagination from "@/components/Pagination";
 import RefreshButton from "@/components/RefreshButton";
+import StatsCards from "@/components/StatsCards";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { notifyDataChanged } from "@/lib/data-events";
 
@@ -474,29 +475,15 @@ export default function ReturnsPage() {
         </button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-slate-500">{t("returns.totalReturns")}</p>
-            <RotateCcw className="text-violet-600" size={18} />
-          </div>
-          <p className="mt-3 text-2xl font-bold text-slate-900">{returns.length}</p>
-        </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-slate-500">{t("returns.salesReturns")}</p>
-            <ArrowDownLeft className="text-emerald-600" size={18} />
-          </div>
-          <p className="mt-3 text-2xl font-bold text-slate-900">{totals.saleReturns}</p>
-        </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-slate-500">{t("returns.totalValue")}</p>
-            <ArrowUpRight className="text-amber-600" size={18} />
-          </div>
-          <p className="mt-3 text-2xl font-bold text-slate-900">{totals.totalValue.toLocaleString()}</p>
-        </div>
-      </div>
+      <StatsCards
+        columns={4}
+        stats={[
+          { label: t("returns.totalReturns"), value: returns.length.toLocaleString("ar-EG"), icon: <Undo2 size={18} />, tone: "violet" },
+          { label: t("returns.salesReturns"), value: totals.saleReturns.toLocaleString("ar-EG"), icon: <BadgeCheck size={18} />, tone: "green" },
+          { label: t("returns.purchaseReturns"), value: totals.purchaseReturns.toLocaleString("ar-EG"), icon: <Ban size={18} />, tone: "rose" },
+          { label: t("returns.totalValue"), value: `${totals.totalValue.toLocaleString("ar-EG")} ج.م`, icon: <RotateCcw size={18} />, tone: "amber" },
+        ]}
+      />
 
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-200 p-4 lg:flex-row lg:items-center lg:flex-wrap">

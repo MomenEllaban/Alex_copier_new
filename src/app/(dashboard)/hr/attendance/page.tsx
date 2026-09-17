@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, useMemo } from "react";
 import { useI18n } from "@/i18n/context";
 import PrinterLoader from "@/components/PrinterLoader";
 import SearchInput from "@/components/SearchInput";
@@ -8,8 +8,9 @@ import FormModal from "@/components/FormModal";
 import SubmitButton from "@/components/SubmitButton";
 import ExportButton from "@/components/ExportButton";
 import RefreshButton from "@/components/RefreshButton";
+import StatsCards from "@/components/StatsCards";
 import { useToast } from "@/components/UIProvider";
-import { UserCheck, Calendar, Plus } from "lucide-react";
+import { UserCheck, Calendar, Plus, Users, Clock3, XCircle } from "lucide-react";
 
 interface Employee {
   id: string;
@@ -149,6 +150,15 @@ export default function AttendancePage() {
     return matchesSearch && matchesStatus;
   });
 
+  const stats = useMemo(() => {
+    return {
+      total: records.length,
+      present: records.filter((r) => r.status === "PRESENT").length,
+      late: records.filter((r) => r.status === "LATE").length,
+      absent: records.filter((r) => r.status === "ABSENT").length,
+    };
+  }, [records]);
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "PRESENT":
@@ -212,6 +222,16 @@ export default function AttendancePage() {
           </button>
         </div>
       </div>
+
+      <StatsCards
+        columns={4}
+        stats={[
+          { label: "سجلات اليوم", value: stats.total.toLocaleString("ar-EG"), icon: <Users size={18} />, tone: "sky" },
+          { label: "حاضرون", value: stats.present.toLocaleString("ar-EG"), icon: <UserCheck size={18} />, tone: "green" },
+          { label: "متأخرون", value: stats.late.toLocaleString("ar-EG"), icon: <Clock3 size={18} />, tone: "amber" },
+          { label: "غائبون", value: stats.absent.toLocaleString("ar-EG"), icon: <XCircle size={18} />, tone: "rose" },
+        ]}
+      />
 
       {/* Date Filter & Search */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-center gap-4 justify-between">

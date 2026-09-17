@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition, Suspense } from "react";
+import { useEffect, useState, useTransition, useMemo, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/context";
 import PrinterLoader from "@/components/PrinterLoader";
@@ -11,8 +11,9 @@ import FormModal from "@/components/FormModal";
 import SubmitButton from "@/components/SubmitButton";
 import ExportButton from "@/components/ExportButton";
 import RefreshButton from "@/components/RefreshButton";
+import StatsCards from "@/components/StatsCards";
 import { useConfirm, useToast } from "@/components/UIProvider";
-import { Plus, Eye, Pencil, Trash2, Users } from "lucide-react";
+import { Plus, Eye, Pencil, Trash2, Users, UserCheck, Wallet, Building2 } from "lucide-react";
 
 interface Department { id: string; name: string; nameAr?: string | null; }
 interface JobTitle { id: string; title: string; titleAr?: string | null; }
@@ -239,6 +240,17 @@ function EmployeesContent() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE) || 1;
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
+  const stats = useMemo(() => {
+    const totalBaseSalary = employees.reduce((sum, e) => sum + (e.baseSalary || 0), 0);
+    const departmentsCount = new Set(employees.filter((e) => e.departmentId).map((e) => e.departmentId)).size;
+    return {
+      total: employees.length,
+      active: employees.filter((e) => e.status === "ACTIVE").length,
+      totalBaseSalary,
+      departmentsCount,
+    };
+  }, [employees]);
+
   if (loading) return <PrinterLoader label="جاري تحميل قائمة الموظفين..." />;
 
   return (
@@ -279,6 +291,16 @@ function EmployeesContent() {
           </button>
         </div>
       </div>
+
+      <StatsCards
+        columns={4}
+        stats={[
+          { label: "إجمالي الموظفين", value: stats.total.toLocaleString("ar-EG"), icon: <Users size={18} />, tone: "sky" },
+          { label: "موظفون نشطون", value: stats.active.toLocaleString("ar-EG"), icon: <UserCheck size={18} />, tone: "green" },
+          { label: "إجمالي الرواتب الأساسية", value: `${stats.totalBaseSalary.toLocaleString("ar-EG")} ج.م`, icon: <Wallet size={18} />, tone: "emerald" },
+          { label: "الأقسام", value: stats.departmentsCount.toLocaleString("ar-EG"), icon: <Building2 size={18} />, tone: "purple" },
+        ]}
+      />
 
       {/* Search & Filters */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 grid grid-cols-1 sm:grid-cols-3 gap-4">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
@@ -12,8 +12,9 @@ import { useToast } from "@/components/UIProvider";
 import { apiErrorMessage } from "@/lib/api-client";
 import FormModal from "@/components/FormModal";
 import { DateTimeCell } from "@/components/DateTimeCell";
-import { RotateCcw, Save, X } from "lucide-react";
+import { RotateCcw, Save, X, Package, Wallet, CircleCheck, Tag } from "lucide-react";
 import RefreshButton from "@/components/RefreshButton";
+import StatsCards from "@/components/StatsCards";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { notifyDataChanged } from "@/lib/data-events";
 
@@ -70,6 +71,16 @@ export default function TradeInsPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const stats = useMemo(() => {
+    const totalValue = products.reduce((sum, p) => sum + (p.tradeInValue || 0), 0);
+    return {
+      total: products.length,
+      totalValue,
+      active: products.filter((p) => p.isActive).length,
+      classified: products.filter((p) => Boolean(p.condition)).length,
+    };
+  }, [products]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -129,12 +140,22 @@ export default function TradeInsPage() {
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-medium tracking-[0.2em] text-sky-600 uppercase">ERP</p>
-          <h1 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl lg:text-3xl">🔄 منتجات الاستبدال</h1>
+          <h1 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl lg:text-3xl">{t("tradeIns.title")}</h1>
         </div>
         <div className="flex items-center gap-2">
           <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">{filtered.length} منتج</span>
         </div>
       </div>
+
+      <StatsCards
+        columns={4}
+        stats={[
+          { label: t("tradeIns.total"), value: stats.total.toLocaleString("ar-EG"), icon: <Package size={18} />, tone: "sky" },
+          { label: t("tradeIns.totalValue"), value: `${stats.totalValue.toLocaleString("ar-EG")} ج.م`, icon: <Wallet size={18} />, tone: "emerald" },
+          { label: t("tradeIns.active"), value: stats.active.toLocaleString("ar-EG"), icon: <CircleCheck size={18} />, tone: "green" },
+          { label: t("tradeIns.classified"), value: stats.classified.toLocaleString("ar-EG"), icon: <Tag size={18} />, tone: "purple" },
+        ]}
+      />
 
       {/* Filters */}
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center">

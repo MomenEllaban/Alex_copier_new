@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AddFormBoundary, useAutoAddForm } from "@/hooks/useAutoAddForm";
 import { useSession } from "next-auth/react";
@@ -8,13 +8,14 @@ import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
-import { Save, Trash2, X } from "lucide-react";
+import { CheckCircle2, ClipboardList, Save, Trash2, TriangleAlert, X } from "lucide-react";
 import DateRangeFilter, { inDateRange } from "@/components/DateRangeFilter";
 import ExportButton from "@/components/ExportButton";
 import PrinterLoader from "@/components/PrinterLoader";
 import { DateTimeCell } from "@/components/DateTimeCell";
 import { useUrlParams, useSearchWithDefault } from "@/hooks/useUrlParams";
 import FormModal from "@/components/FormModal";
+import StatsCards from "@/components/StatsCards";
 import SelectWithAdd from "@/components/SelectWithAdd";
 import SearchableSelect from "@/components/SearchableSelect";
 import { useConfirm, useToast } from "@/components/UIProvider";
@@ -231,6 +232,17 @@ export default function ServiceRequestsPage() {
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
+  const stats = useMemo(() => {
+    const openStatuses = ["NEW", "ASSIGNED", "VISITED", "REASSIGNED", "NOT_RESOLVED"];
+    const urgentPriorities = ["URGENT", "EMERGENCY"];
+    return {
+      total: requests.length,
+      open: requests.filter((r) => openStatuses.includes(r.status)).length,
+      urgent: requests.filter((r) => urgentPriorities.includes(r.priority) && openStatuses.includes(r.status)).length,
+      resolved: requests.filter((r) => r.status === "RESOLVED").length,
+    };
+  }, [requests]);
+
   const exportRequests = () => ({
     headers: [
       t("serviceRequests.requestNumber"),
@@ -272,6 +284,16 @@ export default function ServiceRequestsPage() {
           </button>
         )}
       </div>
+
+      <StatsCards
+        columns={4}
+        stats={[
+          { label: t("serviceRequests.stats.total"), value: stats.total.toLocaleString("ar-EG"), icon: <ClipboardList size={18} />, tone: "sky" },
+          { label: t("serviceRequests.stats.open"), value: stats.open.toLocaleString("ar-EG"), icon: <ClipboardList size={18} />, tone: "blue" },
+          { label: t("serviceRequests.stats.urgent"), value: stats.urgent.toLocaleString("ar-EG"), icon: <TriangleAlert size={18} />, tone: "red" },
+          { label: t("serviceRequests.stats.resolved"), value: stats.resolved.toLocaleString("ar-EG"), icon: <CheckCircle2 size={18} />, tone: "green" },
+        ]}
+      />
 
       <FormModal open={showForm} onClose={() => setShowForm(false)} title={t("serviceRequests.newRequest")}>
         <form onSubmit={handleCreate} className="space-y-4">

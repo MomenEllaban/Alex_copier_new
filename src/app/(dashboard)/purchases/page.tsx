@@ -7,10 +7,11 @@ import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
 import DateRangeFilter, { inDateRange } from "@/components/DateRangeFilter";
-import { Eye, Pencil, Plus, Printer, Save, Trash2, X } from "lucide-react";
+import { Eye, Pencil, Plus, Printer, Save, ShoppingCart, Trash2, Truck, Wallet, ArrowLeftRight, X } from "lucide-react";
 import ExportButton from "@/components/ExportButton";
 import PrinterLoader from "@/components/PrinterLoader";
 import FormModal from "@/components/FormModal";
+import StatsCards from "@/components/StatsCards";
 import SelectWithAdd from "@/components/SelectWithAdd";
 import SearchableSelect from "@/components/SearchableSelect";
 import PrintMenu from "@/components/PrintMenu";
@@ -194,6 +195,19 @@ export default function PurchasesPage() {
   const icTotalPages = Math.max(1, Math.ceil(icFiltered.length / IC_PAGE_SIZE));
   const icSafePage = Math.min(icPage, icTotalPages);
   const icPaged = icFiltered.slice((icSafePage - 1) * IC_PAGE_SIZE, icSafePage * IC_PAGE_SIZE);
+
+  const stats = useMemo(() => {
+    const totalValue = orders.reduce((sum, o) => sum + (o.total || 0), 0);
+    const received = orders.filter((o) => o.status === "RECEIVED").length;
+    const pending = orders.filter((o) => o.status !== "RECEIVED" && o.status !== "CANCELLED").length;
+    return {
+      totalOrders: orders.length,
+      totalValue,
+      received,
+      pending,
+      icTotal: intercompanyInvoices.length,
+    };
+  }, [orders, intercompanyInvoices]);
 
   const exportPurchases = () => ({
     headers: [
@@ -434,6 +448,16 @@ export default function PurchasesPage() {
         </div>
         <button onClick={openCreateOrder} className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"><Plus size={16} />{t("purchases.addOrder")}</button>
       </div>
+
+      <StatsCards
+        columns={4}
+        stats={[
+          { label: t("purchases.stats.totalOrders"), value: stats.totalOrders.toLocaleString("ar-EG"), icon: <ShoppingCart size={18} />, tone: "sky" },
+          { label: t("purchases.stats.totalValue"), value: `${stats.totalValue.toLocaleString("ar-EG")} ج.م`, icon: <Wallet size={18} />, tone: "purple" },
+          { label: t("purchases.stats.received"), value: stats.received.toLocaleString("ar-EG"), icon: <Truck size={18} />, tone: "green" },
+          { label: t("purchases.stats.pending"), value: stats.pending.toLocaleString("ar-EG"), icon: <ShoppingCart size={18} />, tone: "amber" },
+        ]}
+      />
 
       <FormModal open={showForm} onClose={resetOrderForm} title={editingId ? "تعديل فاتورة شراء" : t("purchases.addOrder")} wide>
         <form onSubmit={handleCreate} className="space-y-5">

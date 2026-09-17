@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AddFormBoundary, useAutoAddForm } from "@/hooks/useAutoAddForm";
 import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
-import { Plus, Trash2, Upload, Save } from "lucide-react";
+import { Plus, Trash2, Upload, Save, Printer, Boxes, Hammer, BadgeCheck } from "lucide-react";
 import ExportButton from "@/components/ExportButton";
 import FormModal from "@/components/FormModal";
+import StatsCards from "@/components/StatsCards";
 import SearchableSelect from "@/components/SearchableSelect";
 import ImportDialog from "@/components/ImportDialog";
 import PrinterLoader from "@/components/PrinterLoader";
@@ -137,6 +138,16 @@ const { success: toastSuccess } = useToast();
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
+  const stats = useMemo(
+    () => ({
+      total: machines.length,
+      sold: machines.filter((m) => m.currentStatus === "SOLD").length,
+      inWarehouse: machines.filter((m) => m.currentStatus === "IN_WAREHOUSE").length,
+      underMaintenance: machines.filter((m) => m.currentStatus === "UNDER_MAINTENANCE").length,
+    }),
+    [machines]
+  );
+
   const exportMachines = () => ({
     headers: [
       t("machines.serialNumber"),
@@ -220,6 +231,16 @@ const { success: toastSuccess } = useToast();
           <Plus size={16} />{t("machines.addMachine")}
         </button>
       </div>
+
+      <StatsCards
+        columns={4}
+        stats={[
+          { label: t("machines.stats.total"), value: stats.total.toLocaleString("ar-EG"), icon: <Printer size={18} />, tone: "sky" },
+          { label: t("machines.stats.sold"), value: stats.sold.toLocaleString("ar-EG"), icon: <BadgeCheck size={18} />, tone: "green" },
+          { label: t("machines.stats.inWarehouse"), value: stats.inWarehouse.toLocaleString("ar-EG"), icon: <Boxes size={18} />, tone: "slate" },
+          { label: t("machines.stats.underMaintenance"), value: stats.underMaintenance.toLocaleString("ar-EG"), icon: <Hammer size={18} />, tone: "amber" },
+        ]}
+      />
 
       <FormModal open={showForm} onClose={() => setShowForm(false)} title={t("machines.addMachine")} wide>
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

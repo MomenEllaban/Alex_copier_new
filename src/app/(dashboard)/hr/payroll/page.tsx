@@ -7,8 +7,9 @@ import FormModal from "@/components/FormModal";
 import SubmitButton from "@/components/SubmitButton";
 import ExportButton from "@/components/ExportButton";
 import RefreshButton from "@/components/RefreshButton";
+import StatsCards from "@/components/StatsCards";
 import { useConfirm, useToast } from "@/components/UIProvider";
-import { Banknote, Calculator, Lock, Eye } from "lucide-react";
+import { Banknote, Calculator, Lock, Eye, Users, Wallet } from "lucide-react";
 
 interface Period {
   id: string;
@@ -203,6 +204,16 @@ export default function PayrollPage() {
           </button>
         </div>
       </div>
+
+      <StatsCards
+        columns={4}
+        stats={[
+          { label: "مسيرات الرواتب", value: runs.length.toLocaleString("ar-EG"), icon: <Banknote size={18} />, tone: "sky" },
+          { label: "الموظفون المشمولون", value: runs.reduce((sum, r) => sum + (r.employeeCount || 0), 0).toLocaleString("ar-EG"), icon: <Users size={18} />, tone: "green" },
+          { label: "إجمالي الرواتب (Gross)", value: `${runs.reduce((sum, r) => sum + (r.totalGross || 0), 0).toLocaleString("ar-EG")} ج.م`, icon: <Calculator size={18} />, tone: "amber" },
+          { label: "صافي الرواتب (Net)", value: `${runs.reduce((sum, r) => sum + (r.totalNet || 0), 0).toLocaleString("ar-EG")} ج.م`, icon: <Wallet size={18} />, tone: "emerald" },
+        ]}
+      />
 
       {/* Payroll Runs List */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">

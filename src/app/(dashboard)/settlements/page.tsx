@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AddFormBoundary, useAutoAddForm } from "@/hooks/useAutoAddForm";
 import { useSession } from "next-auth/react";
 import { useI18n } from "@/i18n/context";
@@ -10,7 +10,7 @@ import FilterSelect from "@/components/FilterSelect";
 import FormModal from "@/components/FormModal";
 import SelectWithAdd from "@/components/SelectWithAdd";
 import SearchableSelect from "@/components/SearchableSelect";
-import { CheckCircle2, Plus, Save, Trash2 } from "lucide-react";
+import { CheckCircle2, Plus, Save, Trash2, Wallet, Clock3, BadgeCheck } from "lucide-react";
 import DateRangeFilter, { inDateRange } from "@/components/DateRangeFilter";
 import ExportButton from "@/components/ExportButton";
 import { DateTimeCell } from "@/components/DateTimeCell";
@@ -20,6 +20,7 @@ import { useUrlParams, useSearchWithDefault } from "@/hooks/useUrlParams";
 import { apiErrorMessage } from "@/lib/api-client";
 import SubmitButton from "@/components/SubmitButton";
 import RefreshButton from "@/components/RefreshButton";
+import StatsCards from "@/components/StatsCards";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { notifyDataChanged } from "@/lib/data-events";
 
@@ -139,6 +140,22 @@ export default function SettlementsPage() {
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
+  const stats = useMemo(() => {
+    const netAmount = settlements.reduce(
+      (sum, s) => sum + (s.direction === "SUBTRACTION" ? -1 : 1) * (s.amount || 0),
+      0
+    );
+    const collected = settlements
+      .filter((s) => s.status === "VERIFIED")
+      .reduce((sum, s) => sum + (s.amount || 0), 0);
+    return {
+      total: settlements.length,
+      netAmount,
+      pending: settlements.filter((s) => s.status === "INITIAL").length,
+      collected,
+    };
+  }, [settlements]);
+
   const exportSettlements = () => ({
     headers: [
       t("settlements.number"),
@@ -176,6 +193,16 @@ export default function SettlementsPage() {
         </div>
         <button onClick={() => setShowForm(true)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"><Plus size={16} />{t("settlements.newSettlement")}</button>
       </div>
+
+      <StatsCards
+        columns={4}
+        stats={[
+          { label: t("settlements.stats.total"), value: stats.total.toLocaleString("ar-EG"), icon: <CheckCircle2 size={18} />, tone: "sky" },
+          { label: t("settlements.stats.netAmount"), value: `${stats.netAmount.toLocaleString("ar-EG")} ج.م`, icon: <Wallet size={18} />, tone: stats.netAmount >= 0 ? "emerald" : "rose" },
+          { label: t("settlements.stats.pending"), value: stats.pending.toLocaleString("ar-EG"), icon: <Clock3 size={18} />, tone: "amber" },
+          { label: t("settlements.stats.collected"), value: `${stats.collected.toLocaleString("ar-EG")} ج.م`, icon: <BadgeCheck size={18} />, tone: "green" },
+        ]}
+      />
 
       <FormModal open={showForm} onClose={() => setShowForm(false)} title={t("settlements.newSettlement")} wide>
         <form onSubmit={handleCreate} className="grid grid-cols-1 md:grid-cols-2 gap-4">

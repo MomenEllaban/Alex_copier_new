@@ -6,8 +6,9 @@ import PrinterLoader from "@/components/PrinterLoader";
 import FormModal from "@/components/FormModal";
 import SubmitButton from "@/components/SubmitButton";
 import RefreshButton from "@/components/RefreshButton";
+import StatsCards from "@/components/StatsCards";
 import { useToast } from "@/components/UIProvider";
-import { Building2, Plus, Briefcase } from "lucide-react";
+import { Building2, Plus, Briefcase, Users } from "lucide-react";
 
 interface Department {
   id: string;
@@ -156,6 +157,15 @@ export default function DepartmentsPage() {
           </button>
         </div>
       </div>
+
+      <StatsCards
+        columns={3}
+        stats={[
+          { label: "الأقسام", value: departments.length.toLocaleString("ar-EG"), icon: <Building2 size={18} />, tone: "sky" },
+          { label: "المسميات الوظيفية", value: jobTitles.length.toLocaleString("ar-EG"), icon: <Briefcase size={18} />, tone: "green" },
+          { label: "الموظفون", value: departments.reduce((sum, d) => sum + (d._count?.Employees || 0), 0).toLocaleString("ar-EG"), icon: <Users size={18} />, tone: "purple" },
+        ]}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Departments List */}

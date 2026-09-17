@@ -8,8 +8,9 @@ import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import { apiErrorMessage } from "@/lib/api-client";
 import { AddFormBoundary, useAutoAddForm } from "@/hooks/useAutoAddForm";
 import { useToast, useConfirm } from "@/components/UIProvider";
-import { FileText, Pencil, Plus, Save, Trash2, Eraser } from "lucide-react";
+import { FileText, Pencil, Plus, Save, Trash2, Eraser, Building2, TrendingUp, TrendingDown, Wallet } from "lucide-react";
 import FormModal from "@/components/FormModal";
+import StatsCards from "@/components/StatsCards";
 import SubmitButton from "@/components/SubmitButton";
 import RefreshButton from "@/components/RefreshButton";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
@@ -211,6 +212,16 @@ export default function CompaniesPage() {
           <Plus size={16} />{t("companies.addCompany")}
         </button>
       </div>
+
+      <StatsCards
+        columns={4}
+        stats={[
+          { label: t("companies.statsCount"), value: filtered.length.toLocaleString("ar-EG"), icon: <Building2 size={18} />, tone: "sky" },
+          { label: t("companies.revenue"), value: `${totalSales.toLocaleString("ar-EG")} ج.م`, icon: <TrendingUp size={18} />, tone: "green" },
+          { label: t("companies.expenses"), value: `${totalExpenses.toLocaleString("ar-EG")} ج.م`, icon: <TrendingDown size={18} />, tone: "red" },
+          { label: t("companies.netProfit"), value: `${totalNetProfit.toLocaleString("ar-EG")} ج.م`, icon: <Wallet size={18} />, tone: totalNetProfit >= 0 ? "emerald" : "rose" },
+        ]}
+      />
 
       {(error) && (
         <div

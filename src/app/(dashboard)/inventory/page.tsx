@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
@@ -10,10 +10,11 @@ import PrinterLoader from "@/components/PrinterLoader";
 import { useToast } from "@/components/UIProvider";
 import { useUrlParams, useSearchWithDefault } from "@/hooks/useUrlParams";
 import { apiErrorMessage } from "@/lib/api-client";
-import { Save } from "lucide-react";
+import { AlertTriangle, Boxes, Package, Save, Warehouse } from "lucide-react";
 import SubmitButton from "@/components/SubmitButton";
 import SearchableSelect from "@/components/SearchableSelect";
 import RefreshButton from "@/components/RefreshButton";
+import StatsCards from "@/components/StatsCards";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { notifyDataChanged } from "@/lib/data-events";
 
@@ -104,6 +105,12 @@ export default function InventoryPage() {
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
+  const stats = useMemo(() => {
+    const totalQty = inventory.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    const outOfStock = inventory.filter((item) => (item.quantity || 0) <= 0).length;
+    return { items: inventory.length, totalQty, warehouses: warehouses.length, outOfStock };
+  }, [inventory, warehouses]);
+
   const exportInventory = () => ({
     headers: [
       t("inventory.product"),
@@ -176,6 +183,16 @@ export default function InventoryPage() {
           {t("inventory.addStockMovement")}
         </button>
       </div>
+
+      <StatsCards
+        columns={4}
+        stats={[
+          { label: t("inventory.stats.items"), value: stats.items.toLocaleString("ar-EG"), icon: <Package size={18} />, tone: "sky" },
+          { label: t("inventory.stats.totalQty"), value: stats.totalQty.toLocaleString("ar-EG"), icon: <Boxes size={18} />, tone: "green" },
+          { label: t("inventory.stats.warehouses"), value: stats.warehouses.toLocaleString("ar-EG"), icon: <Warehouse size={18} />, tone: "purple" },
+          { label: t("inventory.stats.outOfStock"), value: stats.outOfStock.toLocaleString("ar-EG"), icon: <AlertTriangle size={18} />, tone: "amber" },
+        ]}
+      />
 
       {showForm && (
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
@@ -10,8 +10,9 @@ import PrinterLoader from "@/components/PrinterLoader";
 import FormModal from "@/components/FormModal";
 import SubmitButton from "@/components/SubmitButton";
 import { DateTimeCell } from "@/components/DateTimeCell";
-import { Save } from "lucide-react";
+import { Save, Hammer, SearchCheck, Wrench, CircleCheckBig } from "lucide-react";
 import RefreshButton from "@/components/RefreshButton";
+import StatsCards from "@/components/StatsCards";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { notifyDataChanged } from "@/lib/data-events";
 
@@ -74,6 +75,17 @@ export default function WorkshopPage() {
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
+  const stats = useMemo(() => {
+    const maintaining = machines.filter((m) => m.status === "UNDER_MAINTENANCE").length;
+    const inspecting = machines.filter((m) => m.status === "UNDER_INSPECTION").length;
+    return {
+      total: machines.length,
+      inspecting,
+      maintaining,
+      ready: machines.length - inspecting - maintaining,
+    };
+  }, [machines]);
+
   const exportWorkshop = () => ({
     headers: [
       t("machines.serialNumber"),
@@ -131,6 +143,16 @@ export default function WorkshopPage() {
           <h1 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl lg:text-3xl">{t("workshop.title")}</h1>
         </div>
       </div>
+
+      <StatsCards
+        columns={4}
+        stats={[
+          { label: t("workshop.stats.total"), value: stats.total.toLocaleString("ar-EG"), icon: <Hammer size={18} />, tone: "sky" },
+          { label: t("workshop.stats.inspecting"), value: stats.inspecting.toLocaleString("ar-EG"), icon: <SearchCheck size={18} />, tone: "amber" },
+          { label: t("workshop.stats.maintaining"), value: stats.maintaining.toLocaleString("ar-EG"), icon: <Wrench size={18} />, tone: "orange" },
+          { label: t("workshop.stats.ready"), value: stats.ready.toLocaleString("ar-EG"), icon: <CircleCheckBig size={18} />, tone: "green" },
+        ]}
+      />
 
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-200 p-4 md:flex-row md:items-center md:flex-wrap">

@@ -6,9 +6,10 @@ import { useSession } from "next-auth/react";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
 import PrinterLoader from "@/components/PrinterLoader";
+import StatsCards from "@/components/StatsCards";
 import { useConfirm } from "@/components/UIProvider";
 import { apiErrorMessage } from "@/lib/api-client";
-import { Plus, Pencil, Power, Eye, EyeOff, X, Trash2, Save, AlertTriangle } from "lucide-react";
+import { Plus, Pencil, Power, Eye, EyeOff, X, Trash2, Save, AlertTriangle, Users, UserCheck, Wrench, UserX } from "lucide-react";
 import SubmitButton from "@/components/SubmitButton";
 import FormModal from "@/components/FormModal";
 import { DateTimeCell } from "@/components/DateTimeCell";
@@ -249,6 +250,20 @@ setUsers((prev) => prev.filter((u) => u.id !== user.id));
   return (
     <div dir={dir}>
       <h1 className="text-xl sm:text-2xl font-bold mb-6">{t("users.title")}</h1>
+
+      {users.length > 0 && (
+        <div className="mb-6">
+          <StatsCards
+            columns={4}
+            stats={[
+              { label: t("settings.stats.totalUsers"), value: users.length.toLocaleString("ar-EG"), icon: <Users size={18} />, tone: "sky" },
+              { label: t("settings.stats.activeUsers"), value: users.filter((u) => u.isActive).length.toLocaleString("ar-EG"), icon: <UserCheck size={18} />, tone: "green" },
+              { label: t("settings.stats.engineers"), value: users.filter((u) => u.role === "ENGINEER").length.toLocaleString("ar-EG"), icon: <Wrench size={18} />, tone: "amber" },
+              { label: t("settings.stats.inactiveUsers"), value: users.filter((u) => !u.isActive).length.toLocaleString("ar-EG"), icon: <UserX size={18} />, tone: "rose" },
+            ]}
+          />
+        </div>
+      )}
 
       <div className="space-y-3">
           {banner && (

@@ -1,17 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
 import ExportButton from "@/components/ExportButton";
-import { Eye, Pencil, Plus, Save, Trash2 } from "lucide-react";
+import { Eye, Package, Printer, Pencil, Plus, Save, Trash2, Wrench } from "lucide-react";
 import PrinterLoader from "@/components/PrinterLoader";
 import { AddFormBoundary, useAutoAddForm } from "@/hooks/useAutoAddForm";
 import { useConfirm, useToast } from "@/components/UIProvider";
 import { apiErrorMessage } from "@/lib/api-client";
 import FormModal from "@/components/FormModal";
+import StatsCards from "@/components/StatsCards";
 import SubmitButton from "@/components/SubmitButton";
 import RefreshButton from "@/components/RefreshButton";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
@@ -134,6 +135,13 @@ export default function ProductsPage() {
       (!activeFilter || String(p.isActive) === activeFilter)
   );
   const hasActiveFilters = typeFilter !== "" || companyFilter !== "" || activeFilter !== "" || search !== "";
+
+  const stats = useMemo(() => ({
+    total: products.length,
+    machines: products.filter((p) => p.productType === "MACHINE").length,
+    spareParts: products.filter((p) => p.productType === "SPARE_PART").length,
+    stockQty: Object.values(inventoryByProduct).reduce((sum, qty) => sum + (qty || 0), 0),
+  }), [products, inventoryByProduct]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
@@ -270,6 +278,16 @@ export default function ProductsPage() {
           <Plus size={16} />{t("products.addProduct")}
         </button>
       </div>
+
+      <StatsCards
+        columns={4}
+        stats={[
+          { label: t("products.stats.total"), value: stats.total.toLocaleString("ar-EG"), icon: <Package size={18} />, tone: "sky" },
+          { label: t("products.stats.machines"), value: stats.machines.toLocaleString("ar-EG"), icon: <Printer size={18} />, tone: "blue" },
+          { label: t("products.stats.spareParts"), value: stats.spareParts.toLocaleString("ar-EG"), icon: <Wrench size={18} />, tone: "orange" },
+          { label: t("products.stats.stockQty"), value: stats.stockQty.toLocaleString("ar-EG"), icon: <Package size={18} />, tone: "green" },
+        ]}
+      />
 
       {error && (
         <div

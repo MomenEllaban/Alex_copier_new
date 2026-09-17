@@ -257,7 +257,13 @@
     "SCRAPPED": "Scrapped",
     "searchPlaceholder": "Search by serial number, brand, model, or owner...",
     "deliveryCounters": "Delivery counters",
-    "printer": "Printer"
+    "printer": "Printer",
+    "stats": {
+      "total": "Total Machines",
+      "sold": "Sold",
+      "inWarehouse": "In Warehouse",
+      "underMaintenance": "Under Maintenance"
+    }
   },
   "machineDetails": {
     "view": "View lifecycle",
@@ -365,6 +371,11 @@
     "totalPurchases": "Total Purchases",
     "ordersCount": "Invoices Count",
     "returnsTotal": "Total Returns",
+    "stats": {
+      "total": "Total Suppliers",
+      "active": "Active Suppliers",
+      "companies": "Supply Companies"
+    },
     "balanceDue": "Balance Due",
     "lastOrder": "Last Order",
     "backToSuppliers": "Back to suppliers",
@@ -395,7 +406,13 @@
     "accountLinked": "Account link updated",
     "deleteConfirm": "Are you sure you want to delete?",
     "salesHistory": "Sales History",
-    "editEngineer": "Edit Engineer"
+    "editEngineer": "Edit Engineer",
+    "stats": {
+      "total": "Total Engineers",
+      "active": "Active Engineers",
+      "salaries": "Total Salaries",
+      "openRequests": "Open Requests"
+    }
   },
   "investors": {
     "title": "Investors",
@@ -404,7 +421,12 @@
     "email": "Email",
     "ownershipPct": "Ownership %",
     "addInvestor": "Add Investor",
-    "searchPlaceholder": "Search by name, phone, or email..."
+    "searchPlaceholder": "Search by name, phone, or email...",
+    "stats": {
+      "total": "Total Investors",
+      "active": "Active",
+      "ownership": "Total Ownership %"
+    }
   },
   "serviceRequests": {
     "title": "Service Requests",
@@ -437,7 +459,13 @@
     "engineer": "Engineer",
     "searchPlaceholder": "Search by request no., customer, machine, or engineer...",
     "priorityFilter": "Priority",
-    "engineerFilter": "Engineer"
+    "engineerFilter": "Engineer",
+    "stats": {
+      "total": "Total Requests",
+      "open": "Open Requests",
+      "urgent": "Urgent / Emergency",
+      "resolved": "Resolved"
+    }
   },
   "contracts": {
     "title": "Contracts",
@@ -468,7 +496,13 @@
     "activate": "Activate",
     "coveredMachines": "Covered machines",
     "searchPlaceholder": "Search by contract no., customer, or type...",
-    "typeFilter": "Contract type"
+    "typeFilter": "Contract type",
+    "stats": {
+      "total": "Total Contracts",
+      "active": "Active Contracts",
+      "expiringSoon": "Expiring in 30 Days",
+      "activeValue": "Active Contracts Value"
+    }
   },
   "purchases": {
     "title": "Purchases",
@@ -511,7 +545,14 @@
     "itemsCount": "Items count",
     "grandTotal": "Order total",
     "addItemsFirst": "Add at least one row with a valid product, quantity and price",
-    "itemsLockedHint": "Items are locked because this order was received into stock — header fields only can be edited"
+    "itemsLockedHint": "Items are locked because this order was received into stock — header fields only can be edited",
+    "stats": {
+      "totalOrders": "Total Purchase Orders",
+      "totalValue": "Total Purchases",
+      "received": "Received",
+      "pending": "Pending / Draft",
+      "icTotal": "Inter-company Invoices"
+    }
   },
   "sales": {
     "title": "Sales",
@@ -562,7 +603,13 @@
     "editCategory": "Edit Category",
     "categoryName": "Category Name",
     "searchCategoryPlaceholder": "Search category name...",
-    "deleteCategoryConfirm": "Are you sure you want to delete this category?"
+    "deleteCategoryConfirm": "Are you sure you want to delete this category?",
+    "stats": {
+      "totalOrders": "Total Invoices",
+      "totalValue": "Total Sales",
+      "paid": "Fully Paid",
+      "unpaid": "Unpaid / Due"
+    }
   },
   "inventory": {
     "title": "Inventory",
@@ -582,7 +629,13 @@
     "ENGINEER_RETURN": "Engineer Return",
     "CONSUMED": "Consumed",
     "SCRAP": "Scrap",
-    "ADJUSTMENT": "Adjustment"
+    "ADJUSTMENT": "Adjustment",
+    "stats": {
+      "items": "Stock Items",
+      "totalQty": "Total Quantity",
+      "warehouses": "Warehouses",
+      "outOfStock": "Out of Stock"
+    }
   },
   "workshopDaily": {
     "title": "Workshop daily book",
@@ -641,7 +694,13 @@
     "scrapValue": "Scrap Value",
     "approvedBy": "Approved By",
     "reason": "Reason",
-    "purchaseDate": "Purchase Date"
+    "purchaseDate": "Purchase Date",
+    "stats": {
+      "total": "Total Machines",
+      "inspecting": "Under Inspection",
+      "maintaining": "Under Maintenance",
+      "ready": "Ready"
+    }
   },
   "finance": {
     "title": "Finance",
@@ -663,7 +722,13 @@
     "categoryName": "Category Name",
     "selectCategory": "Select Category",
     "searchCategoryPlaceholder": "Search category name...",
-    "deleteCategoryConfirm": "Are you sure you want to delete this category?"
+    "deleteCategoryConfirm": "Are you sure you want to delete this category?",
+    "stats": {
+      "count": "Total Expenses",
+      "total": "Total Amount",
+      "today": "Today",
+      "thisMonth": "This Month"
+    }
   },
   "settlements": {
     "title": "Settlements",
@@ -691,7 +756,13 @@
     "directionAddition": "Addition (+)",
     "directionSubtraction": "Subtraction (−)",
     "debtPreview": "Customer current debt",
-    "creditHint": "On verification the amount reduces the customer's debt; any excess becomes under-account credit"
+    "creditHint": "On verification the amount reduces the customer's debt; any excess becomes under-account credit",
+    "stats": {
+      "total": "Total Settlements",
+      "netAmount": "Net Amount",
+      "pending": "Pending Verification",
+      "collected": "Collected Amount"
+    }
   },
   "reports": {
     "title": "Reports",
@@ -758,6 +829,12 @@
     "noCompany": "No company",
     "showPassword": "Show password",
     "hidePassword": "Hide password",
+    "stats": {
+      "totalUsers": "Total Users",
+      "activeUsers": "Active Users",
+      "engineers": "Engineer Accounts",
+      "inactiveUsers": "Inactive Users"
+    },
     "colUser": "User",
     "colRole": "Role",
     "colCompany": "Company",
@@ -798,6 +875,7 @@
   "companies": {
     "title": "Companies",
     "overview": "Overview",
+    "statsCount": "Companies",
     "allCompanies": "All Companies",
     "totalAssets": "Total Assets",
     "totalRevenue": "Total Revenue",
@@ -849,7 +927,13 @@
     "date": "Date",
     "reference": "Reference",
     "notes": "Notes",
-    "entryDate": "Entry Date"
+    "entryDate": "Entry Date",
+    "stats": {
+      "total": "Total Warehouses",
+      "main": "Main Warehouses",
+      "items": "Items in Stock",
+      "companies": "Companies"
+    }
   },
   "products": {
     "title": "Products & Spare Parts",
@@ -865,7 +949,13 @@
     "retailPrice": "Retail price",
     "description": "Description",
     "deleteConfirm": "Are you sure you want to delete this product?",
-    "archivedNotice": "Product is referenced by records; it was archived instead of deleted"
+    "archivedNotice": "Product is referenced by records; it was archived instead of deleted",
+    "stats": {
+      "total": "Total Products",
+      "machines": "Machines",
+      "spareParts": "Spare Parts",
+      "stockQty": "Stock Quantity"
+    }
   },
   "errors": {
     "NAME_REQUIRED": "This field is required",
@@ -1031,5 +1121,12 @@
     "amountInvalid": "Collected amount must be a number greater than zero",
     "noImage": "No image",
     "testSavedWithSettlement": "Test saved, settlement created and accountant notified"
+  },
+  "tradeIns": {
+    "title": "Trade-In Products",
+    "total": "Total Products",
+    "totalValue": "Total Trade-In Value",
+    "active": "Active",
+    "classified": "Classified"
   }
 }

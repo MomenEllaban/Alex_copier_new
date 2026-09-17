@@ -250,7 +250,13 @@
     "SCRAPPED": "مهمل",
     "searchPlaceholder": "ابحث برقم التسلسل أو الماركة أو الموديل أو اسم العميل...",
     "deliveryCounters": "عداد التسليم",
-    "printer": "برنتر"
+    "printer": "برنتر",
+    "stats": {
+      "total": "إجمالي الأجهزة",
+      "sold": "مباع",
+      "inWarehouse": "في المستودع",
+      "underMaintenance": "تحت الصيانة"
+    }
   },
   "machineDetails": {
     "view": "عرض سجل دورة الحياة",
@@ -358,6 +364,11 @@
     "totalPurchases": "إجمالي المشتريات",
     "ordersCount": "عدد الفواتير",
     "returnsTotal": "إجمالي المرتجعات",
+    "stats": {
+      "total": "إجمالي الموردين",
+      "active": "موردون نشطون",
+      "companies": "شركات موردة"
+    },
     "balanceDue": "الرصيد المستحق",
     "lastOrder": "آخر عملية",
     "backToSuppliers": "رجوع للموردين",
@@ -388,7 +399,13 @@
     "accountLinked": "تم تحديث ربط الحساب",
     "deleteConfirm": "هل أنت متأكد من الحذف؟",
     "salesHistory": "سجل المبيعات",
-    "editEngineer": "تعديل المهندس"
+    "editEngineer": "تعديل المهندس",
+    "stats": {
+      "total": "إجمالي المهندسين",
+      "active": "مهندسون نشطون",
+      "salaries": "إجمالي الرواتب",
+      "openRequests": "طلبات مفتوحة"
+    }
   },
   "investors": {
     "title": "المستثمرون",
@@ -397,7 +414,12 @@
     "email": "البريد الإلكتروني",
     "ownershipPct": "نسبة الملكية",
     "addInvestor": "إضافة مستثمر",
-    "searchPlaceholder": "ابحث بالاسم أو الهاتف أو البريد..."
+    "searchPlaceholder": "ابحث بالاسم أو الهاتف أو البريد...",
+    "stats": {
+      "total": "إجمالي المستثمرين",
+      "active": "نشطون",
+      "ownership": "مجموع نسب الملكية"
+    }
   },
   "serviceRequests": {
     "title": "طلبات الخدمة",
@@ -430,7 +452,13 @@
     "engineer": "المهندس",
     "searchPlaceholder": "ابحث برقم الطلب أو العميل أو الجهاز أو المهندس...",
     "priorityFilter": "الأولوية",
-    "engineerFilter": "المهندس"
+    "engineerFilter": "المهندس",
+    "stats": {
+      "total": "إجمالي الطلبات",
+      "open": "طلبات مفتوحة",
+      "urgent": "عاجلة / طارئة",
+      "resolved": "تم حلها"
+    }
   },
   "contracts": {
     "title": "العقود",
@@ -461,7 +489,13 @@
     "activate": "تفعيل",
     "coveredMachines": "الأجهزة المشمولة بالعقد",
     "searchPlaceholder": "ابحث برقم العقد أو العميل أو النوع...",
-    "typeFilter": "نوع العقد"
+    "typeFilter": "نوع العقد",
+    "stats": {
+      "total": "إجمالي العقود",
+      "active": "عقود نشطة",
+      "expiringSoon": "تنتهي خلال 30 يوم",
+      "activeValue": "قيمة العقود النشطة"
+    }
   },
   "purchases": {
     "title": "المشتريات",
@@ -504,7 +538,14 @@
     "itemsCount": "عدد الأصناف",
     "grandTotal": "إجمالي الطلب",
     "addItemsFirst": "أضف صنفاً واحداً على الأقل بمنتج وكمية وسعر صحيح",
-    "itemsLockedHint": "البنود مثبّتة لأن الطلب تم استلامه ودخل المخزون — يمكن تعديل بيانات الترويسة فقط"
+    "itemsLockedHint": "البنود مثبّتة لأن الطلب تم استلامه ودخل المخزون — يمكن تعديل بيانات الترويسة فقط",
+    "stats": {
+      "totalOrders": "إجمالي أوامر الشراء",
+      "totalValue": "إجمالي المشتريات",
+      "received": "تم الاستلام",
+      "pending": "معلقة / مسودة",
+      "icTotal": "فواتير داخلية"
+    }
   },
   "sales": {
     "title": "المبيعات",
@@ -556,7 +597,13 @@
     "editCategory": "تعديل الفئة",
     "categoryName": "اسم الفئة",
     "searchCategoryPlaceholder": "ابحث باسم الفئة...",
-    "deleteCategoryConfirm": "هل أنت متأكد من حذف هذه الفئة؟"
+    "deleteCategoryConfirm": "هل أنت متأكد من حذف هذه الفئة؟",
+    "stats": {
+      "totalOrders": "إجمالي الفواتير",
+      "totalValue": "إجمالي المبيعات",
+      "paid": "مدفوعة بالكامل",
+      "unpaid": "غير مدفوعة / مطلوب تحصيل"
+    }
   },
   "inventory": {
     "title": "المخزون",
@@ -576,7 +623,13 @@
     "ENGINEER_RETURN": "مرتجع مهندس",
     "CONSUMED": "مستهلك",
     "SCRAP": "مهمل",
-    "ADJUSTMENT": "تسوية"
+    "ADJUSTMENT": "تسوية",
+    "stats": {
+      "items": "أصناف بالمخزون",
+      "totalQty": "إجمالي الكمية",
+      "warehouses": "مستودعات",
+      "outOfStock": "نفد المخزون"
+    }
   },
   "workshopDaily": {
     "title": "يومية الورشة",
@@ -635,7 +688,13 @@
     "scrapValue": "قيمة التلف",
     "approvedBy": "تم الاعتماد بواسطة",
     "reason": "السبب",
-    "purchaseDate": "تاريخ الشراء"
+    "purchaseDate": "تاريخ الشراء",
+    "stats": {
+      "total": "إجمالي الأجهزة",
+      "inspecting": "تحت الفحص",
+      "maintaining": "تحت الصيانة",
+      "ready": "جاهزة"
+    }
   },
   "finance": {
     "title": "المالية",
@@ -657,7 +716,13 @@
     "categoryName": "اسم الفئة",
     "selectCategory": "اختر الفئة",
     "searchCategoryPlaceholder": "ابحث باسم الفئة...",
-    "deleteCategoryConfirm": "هل أنت متأكد من حذف هذه الفئة؟"
+    "deleteCategoryConfirm": "هل أنت متأكد من حذف هذه الفئة؟",
+    "stats": {
+      "count": "عدد المصروفات",
+      "total": "إجمالي المصروفات",
+      "today": "مصروفات اليوم",
+      "thisMonth": "مصروفات هذا الشهر"
+    }
   },
   "settlements": {
     "title": "التسويات",
@@ -685,7 +750,13 @@
     "directionAddition": "إضافة (+)",
     "directionSubtraction": "طرح (−)",
     "debtPreview": "مديونية العميل حالياً",
-    "creditHint": "بعد الاعتماد يُخصم المبلغ من مديونية العميل، وأي فائض يتحول لرصيد تحت حسابه"
+    "creditHint": "بعد الاعتماد يُخصم المبلغ من مديونية العميل، وأي فائض يتحول لرصيد تحت حسابه",
+    "stats": {
+      "total": "إجمالي التسويات",
+      "netAmount": "صافي المبالغ",
+      "pending": "بانتظار التحقق",
+      "collected": "مبالغ محصّلة"
+    }
   },
   "reports": {
     "title": "التقارير",
@@ -752,6 +823,12 @@
     "noCompany": "بدون شركة",
     "showPassword": "إظهار كلمة المرور",
     "hidePassword": "إخفاء كلمة المرور",
+    "stats": {
+      "totalUsers": "إجمالي المستخدمين",
+      "activeUsers": "مستخدمون نشطون",
+      "engineers": "حسابات مهندسين",
+      "inactiveUsers": "مستخدمون مُوقّفون"
+    },
     "colUser": "المستخدم",
     "colRole": "الدور",
     "colCompany": "الشركة",
@@ -799,6 +876,7 @@
   "companies": {
     "title": "الشركات",
     "overview": "نظرة عامة",
+    "statsCount": "عدد الشركات",
     "allCompanies": "جميع الشركات",
     "totalAssets": "إجمالي الأصول",
     "totalRevenue": "إجمالي الإيرادات",
@@ -850,7 +928,13 @@
     "date": "التاريخ",
     "reference": "المرجع",
     "notes": "ملاحظات",
-    "entryDate": "تاريخ الإدخال"
+    "entryDate": "تاريخ الإدخال",
+    "stats": {
+      "total": "إجمالي المستودعات",
+      "main": "مستودعات رئيسية",
+      "items": "أصناف داخل المستودعات",
+      "companies": "شركات"
+    }
   },
   "products": {
     "title": "المنتجات وقطع الغيار",
@@ -866,7 +950,13 @@
     "retailPrice": "سعر البيع",
     "description": "الوصف",
     "deleteConfirm": "هل أنت متأكد من حذف هذا المنتج؟",
-    "archivedNotice": "المنتج مستخدم في سجلات، تم أرشفته بدلًا من حذفه"
+    "archivedNotice": "المنتج مستخدم في سجلات، تم أرشفته بدلًا من حذفه",
+    "stats": {
+      "total": "إجمالي المنتجات",
+      "machines": "ماكينات",
+      "spareParts": "قطع غيار",
+      "stockQty": "الكمية بالمخزون"
+    }
   },
   "errors": {
     "NAME_REQUIRED": "هذا الحقل مطلوب",
@@ -1032,5 +1122,12 @@
     "amountInvalid": "المبلغ المحصل يجب أن يكون رقمًا أكبر من صفر",
     "noImage": "بدون صورة",
     "testSavedWithSettlement": "تم حفظ الاختبار وإنشاء تسوية وتنبيه المحاسب"
+  },
+  "tradeIns": {
+    "title": "منتجات الاستبدال",
+    "total": "إجمالي المنتجات",
+    "totalValue": "إجمالي قيمة الاستبدال",
+    "active": "منتجات نشطة",
+    "classified": "منتجات مصنّفة"
   }
 }

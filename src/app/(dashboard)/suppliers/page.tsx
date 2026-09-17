@@ -1,17 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
 import ExportButton from "@/components/ExportButton";
-import { Eye, FileText, Pencil, Plus, Trash2, Upload, Save, Wallet } from "lucide-react";
+import { Eye, FileText, Pencil, Plus, Trash2, Upload, Save, Wallet, Truck, Users, Building2 } from "lucide-react";
 import ImportDialog from "@/components/ImportDialog";
 import PrinterLoader from "@/components/PrinterLoader";
 import { useConfirm, useToast } from "@/components/UIProvider";
 import FormModal from "@/components/FormModal";
+import StatsCards from "@/components/StatsCards";
 import SubmitButton from "@/components/SubmitButton";
 import { apiErrorMessage } from "@/lib/api-client";
 import { DateTimeCell } from "@/components/DateTimeCell";
@@ -98,6 +99,12 @@ export default function SuppliersPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const stats = useMemo(() => {
+    const active = suppliers.filter((s) => s.isActive).length;
+    const companiesCount = new Set(suppliers.filter((s) => s.companyId).map((s) => s.companyId)).size;
+    return { total: suppliers.length, active, companiesCount };
+  }, [suppliers]);
 
   const exportSuppliers = () => ({
     headers: [
@@ -227,6 +234,15 @@ export default function SuppliersPage() {
           </button>
         </div>
       </div>
+
+      <StatsCards
+        columns={3}
+        stats={[
+          { label: t("suppliers.stats.total"), value: stats.total.toLocaleString("ar-EG"), icon: <Truck size={18} />, tone: "sky" },
+          { label: t("suppliers.stats.active"), value: stats.active.toLocaleString("ar-EG"), icon: <Users size={18} />, tone: "green" },
+          { label: t("suppliers.stats.companies"), value: stats.companiesCount.toLocaleString("ar-EG"), icon: <Building2 size={18} />, tone: "purple" },
+        ]}
+      />
 
       {formError && (
         <div className="mb-4 flex items-center justify-between rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="status">

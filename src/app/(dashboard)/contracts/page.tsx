@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AddFormBoundary, useAutoAddForm } from "@/hooks/useAutoAddForm";
 import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
 import ExportButton from "@/components/ExportButton";
-import { Eye, Pencil, Plus, Save, Trash2 } from "lucide-react";
+import StatsCards from "@/components/StatsCards";
+import { BadgeCheck, Clock, Eye, FileText, Pencil, Plus, Save, Trash2, Wallet } from "lucide-react";
 import PrinterLoader from "@/components/PrinterLoader";
 import { useUrlParams, useSearchWithDefault } from "@/hooks/useUrlParams";
 import FormModal from "@/components/FormModal";
@@ -250,6 +251,19 @@ export default function ContractsPage() {
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
+  const stats = useMemo(() => {
+    const today = new Date();
+    const soon = new Date();
+    soon.setDate(soon.getDate() + 30);
+    const active = contracts.filter((c) => c.status === "ACTIVE");
+    const activeValue = active.reduce((sum, c) => sum + (c.value || 0), 0);
+    const expiringSoon = active.filter((c) => {
+      const end = new Date(c.endDate);
+      return end >= today && end <= soon;
+    }).length;
+    return { total: contracts.length, active: active.length, expiringSoon, activeValue };
+  }, [contracts]);
+
   const exportContracts = () => ({
     headers: [
       t("contracts.contractNumber"),
@@ -285,6 +299,16 @@ export default function ContractsPage() {
           <Plus size={16} />{t("contracts.addContract")}
         </button>
       </div>
+
+      <StatsCards
+        columns={4}
+        stats={[
+          { label: t("contracts.stats.total"), value: stats.total.toLocaleString("ar-EG"), icon: <FileText size={18} />, tone: "sky" },
+          { label: t("contracts.stats.active"), value: stats.active.toLocaleString("ar-EG"), icon: <BadgeCheck size={18} />, tone: "green" },
+          { label: t("contracts.stats.expiringSoon"), value: stats.expiringSoon.toLocaleString("ar-EG"), icon: <Clock size={18} />, tone: "amber" },
+          { label: t("contracts.stats.activeValue"), value: `${stats.activeValue.toLocaleString("ar-EG")} ج.م`, icon: <Wallet size={18} />, tone: "purple" },
+        ]}
+      />
 
       <FormModal open={showForm} onClose={() => { setShowForm(false); setEditingId(null); setForm({ customerId: "", contractType: "MAINTENANCE", startDate: "", endDate: "", value: "", amountPaid: "", paymentMethod: "CASH", billingCycle: "MONTHLY", notes: "", machineIds: [] }); }} title={editingId ? t("common.edit") : t("contracts.addContract")} wide>
         <form onSubmit={editingId ? handleUpdate : handleCreate} className="space-y-5">

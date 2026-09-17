@@ -1,17 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
 import ExportButton from "@/components/ExportButton";
-import { Pencil, Plus, Save, Trash2, Box, ArrowDownToLine, ArrowUpFromLine } from "lucide-react";
+import { Pencil, Plus, Save, Trash2, Box, ArrowDownToLine, ArrowUpFromLine, Warehouse as WarehouseIcon, Building2, Package } from "lucide-react";
 import PrinterLoader from "@/components/PrinterLoader";
 import { AddFormBoundary, useAutoAddForm } from "@/hooks/useAutoAddForm";
 import { useConfirm, useToast } from "@/components/UIProvider";
 import { apiErrorMessage } from "@/lib/api-client";
 import FormModal from "@/components/FormModal";
+import StatsCards from "@/components/StatsCards";
 import SubmitButton from "@/components/SubmitButton";
 import { DateTimeCell } from "@/components/DateTimeCell";
 import RefreshButton from "@/components/RefreshButton";
@@ -147,6 +148,17 @@ export default function WarehousesPage() {
   );
   const hasActiveFilters = companyFilter !== "" || search !== "";
 
+  const stats = useMemo(() => {
+    const items = warehouses.reduce((sum, w) => sum + (w._count?.inventory || 0), 0);
+    const companiesCount = new Set(warehouses.filter((w) => w.companyId).map((w) => w.companyId)).size;
+    return {
+      total: warehouses.length,
+      main: warehouses.filter((w) => w.isMain).length,
+      items,
+      companiesCount,
+    };
+  }, [warehouses]);
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
@@ -226,9 +238,20 @@ export default function WarehousesPage() {
           onClick={openCreate}
           className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"
         >
-          <Plus size={16} />{t("warehouses.addWarehouse")}
+<Plus size={16} />{t("warehouses.addWarehouse")}
         </button>
+
       </div>
+
+      <StatsCards
+        columns={4}
+        stats={[
+          { label: t("warehouses.stats.total"), value: stats.total.toLocaleString("ar-EG"), icon: <WarehouseIcon size={18} />, tone: "sky" },
+          { label: t("warehouses.stats.main"), value: stats.main.toLocaleString("ar-EG"), icon: <Building2 size={18} />, tone: "green" },
+          { label: t("warehouses.stats.items"), value: stats.items.toLocaleString("ar-EG"), icon: <Package size={18} />, tone: "purple" },
+          { label: t("warehouses.stats.companies"), value: stats.companiesCount.toLocaleString("ar-EG"), icon: <Box size={18} />, tone: "amber" },
+        ]}
+      />
 
       {error && (
         <div

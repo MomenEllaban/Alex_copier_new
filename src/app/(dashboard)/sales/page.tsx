@@ -1,15 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { AddFormBoundary, useAutoAddForm } from "@/hooks/useAutoAddForm";
 import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
 import DateRangeFilter, { inDateRange } from "@/components/DateRangeFilter";
-import { ArrowLeftRight, Eye, Pencil, Plus, RotateCcw, Save, Tags, Trash2, X } from "lucide-react";
+import { ArrowLeftRight, Eye, Pencil, Plus, Receipt, RotateCcw, Save, Tags, Trash2, Wallet, X } from "lucide-react";
 import ExportButton from "@/components/ExportButton";
+import StatsCards from "@/components/StatsCards";
 import PrinterLoader from "@/components/PrinterLoader";
 import { useConfirm, useToast } from "@/components/UIProvider";
 import { apiErrorMessage } from "@/lib/api-client";
@@ -206,6 +207,13 @@ export default function SalesPage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const stats = useMemo(() => {
+    const totalValue = orders.reduce((sum, o) => sum + (o.total || 0), 0);
+    const paid = orders.filter((o) => o.paymentStatus === "PAID").length;
+    const unpaid = orders.filter((o) => o.paymentStatus !== "PAID").length;
+    return { totalOrders: orders.length, totalValue, paid, unpaid };
+  }, [orders]);
 
   const companyStock = (companyId: string) => inventoryByProductPerCompany[companyId] ?? {};
   const companyProducts = (companyId: string) => {
@@ -586,6 +594,16 @@ export default function SalesPage() {
           <Link href="/sales/categories" className="inline-flex items-center justify-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"><Tags size={16} />{t("sales.salesCategories")}</Link>
         </div>
       </div>
+
+      <StatsCards
+        columns={4}
+        stats={[
+          { label: t("sales.stats.totalOrders"), value: stats.totalOrders.toLocaleString("ar-EG"), icon: <Receipt size={18} />, tone: "sky" },
+          { label: t("sales.stats.totalValue"), value: `${stats.totalValue.toLocaleString("ar-EG")} ج.م`, icon: <Wallet size={18} />, tone: "green" },
+          { label: t("sales.stats.paid"), value: stats.paid.toLocaleString("ar-EG"), icon: <Receipt size={18} />, tone: "blue" },
+          { label: t("sales.stats.unpaid"), value: stats.unpaid.toLocaleString("ar-EG"), icon: <Receipt size={18} />, tone: "amber" },
+        ]}
+      />
 
       <FormModal open={showForm} onClose={() => { setShowForm(false); setEditingId(null); }} title={editingId ? "تعديل فاتورة بيع" : formMode === "tradeIn" ? "إضافة فاتورة استبدال" : t("sales.addOrder")} wide>
         <form onSubmit={handleCreate} className="space-y-5">

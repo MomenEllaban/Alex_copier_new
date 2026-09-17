@@ -1,17 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { signOut } from "next-auth/react";
 import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
 import DateRangeFilter, { inDateRange } from "@/components/DateRangeFilter";
-import { Eye, Pencil, Plus, Save, Tags, Trash2, X } from "lucide-react";
+import { Eye, Pencil, Plus, Receipt, Save, Tags, CalendarDays, Wallet, Trash2, X } from "lucide-react";
 import ExportButton from "@/components/ExportButton";
 import PrinterLoader from "@/components/PrinterLoader";
 import { AddFormBoundary } from "@/hooks/useAutoAddForm";
 import FormModal from "@/components/FormModal";
+import StatsCards from "@/components/StatsCards";
 import SubmitButton from "@/components/SubmitButton";
 import { DateTimeCell } from "@/components/DateTimeCell";
 import { useConfirm, useToast } from "@/components/UIProvider";
@@ -106,6 +107,19 @@ export default function FinancePage() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const stats = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const currentMonth = today.slice(0, 7);
+    const total = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
+    const todayTotal = expenses
+      .filter((e) => (e.date || e.createdAt).slice(0, 10) === today)
+      .reduce((sum, e) => sum + (e.amount || 0), 0);
+    const monthTotal = expenses
+      .filter((e) => (e.date || e.createdAt).slice(0, 7) === currentMonth)
+      .reduce((sum, e) => sum + (e.amount || 0), 0);
+    return { count: expenses.length, total, today: todayTotal, month: monthTotal };
+  }, [expenses]);
 
   // Deduplicated category options for table filter:
   const filterCategories = companyFilter
@@ -242,6 +256,16 @@ export default function FinancePage() {
             <button onClick={() => router.push("/expenses/categories")} className="inline-flex items-center justify-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-4 py-2.5 text-sm font-semibold text-orange-700 transition hover:bg-orange-100"><Tags size={16} />{t("finance.expenseCategories")}</button>
           </div>
         </div>
+
+        <StatsCards
+          columns={4}
+          stats={[
+            { label: t("finance.stats.count"), value: stats.count.toLocaleString("ar-EG"), icon: <Receipt size={18} />, tone: "sky" },
+            { label: t("finance.stats.total"), value: `${stats.total.toLocaleString("ar-EG")} ج.م`, icon: <Wallet size={18} />, tone: "purple" },
+            { label: t("finance.stats.today"), value: `${stats.today.toLocaleString("ar-EG")} ج.م`, icon: <CalendarDays size={18} />, tone: "amber" },
+            { label: t("finance.stats.thisMonth"), value: `${stats.month.toLocaleString("ar-EG")} ج.م`, icon: <CalendarDays size={18} />, tone: "green" },
+          ]}
+        />
 
         {formError && (
           <div className="mb-4 flex items-center justify-between rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="status">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, useMemo } from "react";
 import { useI18n } from "@/i18n/context";
 import PrinterLoader from "@/components/PrinterLoader";
 import SearchInput from "@/components/SearchInput";
@@ -8,6 +8,7 @@ import FormModal from "@/components/FormModal";
 import SubmitButton from "@/components/SubmitButton";
 import ExportButton from "@/components/ExportButton";
 import RefreshButton from "@/components/RefreshButton";
+import StatsCards from "@/components/StatsCards";
 import { useConfirm, useToast } from "@/components/UIProvider";
 import { Calendar, Plus, CheckCircle2, XCircle, Clock } from "lucide-react";
 
@@ -186,6 +187,15 @@ export default function LeavesPage() {
     return matchesSearch && matchesStatus;
   });
 
+  const stats = useMemo(() => {
+    return {
+      total: leaves.length,
+      pending: leaves.filter((l) => l.status === "PENDING").length,
+      approved: leaves.filter((l) => l.status === "APPROVED").length,
+      rejected: leaves.filter((l) => l.status === "REJECTED").length,
+    };
+  }, [leaves]);
+
   const getLeaveTypeLabel = (cat: string) => {
     switch (cat) {
       case "ANNUAL": return "سنوية (Annual)";
@@ -239,6 +249,16 @@ export default function LeavesPage() {
           </button>
         </div>
       </div>
+
+      <StatsCards
+        columns={4}
+        stats={[
+          { label: "إجمالي الطلبات", value: stats.total.toLocaleString("ar-EG"), icon: <Calendar size={18} />, tone: "sky" },
+          { label: "معلقة", value: stats.pending.toLocaleString("ar-EG"), icon: <Clock size={18} />, tone: "amber" },
+          { label: "مقبولة", value: stats.approved.toLocaleString("ar-EG"), icon: <CheckCircle2 size={18} />, tone: "green" },
+          { label: "مرفوضة", value: stats.rejected.toLocaleString("ar-EG"), icon: <XCircle size={18} />, tone: "rose" },
+        ]}
+      />
 
       {/* Filter Bar */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-4">
