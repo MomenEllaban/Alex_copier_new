@@ -553,7 +553,7 @@ export default function ReturnsPage() {
                     <td className="px-4 py-3">{item.company?.nameAr || item.company?.name || "—"}</td>
                     <td className="px-4 py-3">{item.product?.name || "—"}</td>
                     <td className="px-4 py-3">{item.customer?.name || item.supplier?.name || "—"}</td>
-                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500 text-end"><span dir="ltr">{item.salesOrder?.id?.slice(0, 8) || item.purchaseOrder?.id?.slice(0, 8) || "—"}</span></td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs text-gray-500"><span dir="ltr">{item.salesOrder?.id?.slice(0, 8) || item.purchaseOrder?.id?.slice(0, 8) || "—"}</span></td>
                     <td className="whitespace-nowrap px-4 py-3 font-medium">{item.quantity}</td>
                     <td className="whitespace-nowrap px-4 py-3">{item.unitPrice.toLocaleString()}</td>
                     <td className="whitespace-nowrap px-4 py-3 font-semibold">{item.total.toLocaleString()}</td>

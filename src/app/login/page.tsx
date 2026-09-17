@@ -94,10 +94,10 @@ export default function LoginPage() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full pr-10 pl-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-right text-base sm:text-sm"
+                    className="w-full ps-10 pe-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-start text-base sm:text-sm"
                     placeholder="example@alex-copier.com"
                   />
-                  <Mail size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <Mail size={18} className="absolute start-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 </div>
               </div>
 
@@ -110,10 +110,10 @@ export default function LoginPage() {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full pr-10 pl-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-right text-base sm:text-sm"
+                    className="w-full ps-10 pe-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-start text-base sm:text-sm"
                     placeholder="••••••••"
                   />
-                  <Lock size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <Lock size={18} className="absolute start-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 </div>
               </div>
 
@@ -155,7 +155,7 @@ export default function LoginPage() {
                 key={account.email}
                 onClick={() => handleTestLogin(account.email, account.password)}
                 disabled={loading}
-                className="w-full flex items-center gap-4 bg-white/5 hover:bg-white/10 backdrop-blur-sm border border-white/10 rounded-xl p-4 transition-all text-right disabled:opacity-50 group"
+                className="w-full flex items-center gap-4 bg-white/5 hover:bg-white/10 backdrop-blur-sm border border-white/10 rounded-xl p-4 transition-all text-start disabled:opacity-50 group"
               >
                 <div className="w-11 h-11 bg-white/10 rounded-full flex items-center justify-center flex-shrink-0 group-hover:bg-white/20 transition-colors">
                   <User size={20} className="text-white" />

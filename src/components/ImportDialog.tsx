@@ -97,8 +97,8 @@ export default function ImportDialog({ open, onClose, entity, title, onImported 
         <table className="w-full text-xs border border-gray-200 mb-4">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-2 py-1.5 text-right">{t("common.column")}</th>
-              <th className="px-2 py-1.5 text-right">{t("common.description")}</th>
+              <th className="px-2 py-1.5 text-start">{t("common.column")}</th>
+              <th className="px-2 py-1.5 text-start">{t("common.description")}</th>
               <th className="px-2 py-1.5 text-center">{t("common.required")}</th>
             </tr>
           </thead>

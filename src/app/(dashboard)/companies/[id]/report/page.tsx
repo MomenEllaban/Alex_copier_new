@@ -198,10 +198,10 @@ const paymentStatusLabel = (status: string) => {
 
 const SubtotalRow = ({ label, value, colSpan, color }: { label: string; value: number; colSpan: number; color?: string }) => (
   <tr className="border-t-2 border-slate-300 bg-slate-50 font-bold">
-    <td colSpan={colSpan} className="px-4 py-3 text-sm text-right">
+    <td colSpan={colSpan} className="px-4 py-3 text-sm text-start">
       {label}
     </td>
-    <td className={`px-4 py-3 text-sm text-left ${color ?? ""}`}>
+    <td className={`px-4 py-3 text-sm text-end ${color ?? ""}`}>
       {moneyFormatter.format(value)}
     </td>
   </tr>
@@ -498,31 +498,31 @@ export default function CompanyReportPage() {
                   <tbody>
                     <tr className="border-b border-gray-100">
                       <td className="px-5 py-3 text-sm text-gray-600">إيرادات المبيعات</td>
-                      <td className="px-5 py-3 text-sm font-bold text-green-700 text-left">{moneyFormatter.format(report.incomeStatement.salesRevenue)}</td>
+                      <td className="px-5 py-3 text-sm font-bold text-green-700 text-end">{moneyFormatter.format(report.incomeStatement.salesRevenue)}</td>
                     </tr>
                     <tr className="border-b border-gray-100">
                       <td className="px-5 py-3 text-sm text-gray-600">تكلفة المشتريات</td>
-                      <td className="px-5 py-3 text-sm font-bold text-blue-700 text-left">{moneyFormatter.format(-report.incomeStatement.purchasesCost)}</td>
+                      <td className="px-5 py-3 text-sm font-bold text-blue-700 text-end">{moneyFormatter.format(-report.incomeStatement.purchasesCost)}</td>
                     </tr>
                     {report.incomeStatement.salesReturns > 0 && (
                       <tr className="border-b border-gray-100">
                         <td className="px-5 py-3 text-sm text-gray-600">مرتجعات المبيعات</td>
-                        <td className="px-5 py-3 text-sm font-bold text-red-700 text-left">{moneyFormatter.format(-report.incomeStatement.salesReturns)}</td>
+                        <td className="px-5 py-3 text-sm font-bold text-red-700 text-end">{moneyFormatter.format(-report.incomeStatement.salesReturns)}</td>
                       </tr>
                     )}
                     {report.incomeStatement.settlementsCollected !== 0 && (
                       <tr className="border-b border-gray-100">
                         <td className="px-5 py-3 text-sm text-gray-600">التسويات (صافي)</td>
-                        <td className={`px-5 py-3 text-sm font-bold text-left ${report.incomeStatement.settlementsCollected >= 0 ? "text-green-700" : "text-red-600"}`}>{moneyFormatter.format(report.incomeStatement.settlementsCollected)}</td>
+                        <td className={`px-5 py-3 text-sm font-bold text-end ${report.incomeStatement.settlementsCollected >= 0 ? "text-green-700" : "text-red-600"}`}>{moneyFormatter.format(report.incomeStatement.settlementsCollected)}</td>
                       </tr>
                     )}
                     <tr className="border-b border-gray-100">
                       <td className="px-5 py-3 text-sm text-gray-600">المصروفات</td>
-                      <td className="px-5 py-3 text-sm font-bold text-orange-700 text-left">{moneyFormatter.format(-report.incomeStatement.expenses)}</td>
+                      <td className="px-5 py-3 text-sm font-bold text-orange-700 text-end">{moneyFormatter.format(-report.incomeStatement.expenses)}</td>
                     </tr>
                     <tr className="border-t-2 border-slate-300 bg-slate-50 font-bold">
                       <td className="px-5 py-3 text-sm">صافي الربح / الخسارة</td>
-                      <td className={`px-5 py-3 text-sm text-left ${report.incomeStatement.netProfit >= 0 ? "text-green-700" : "text-red-600"}`}>
+                      <td className={`px-5 py-3 text-sm text-end ${report.incomeStatement.netProfit >= 0 ? "text-green-700" : "text-red-600"}`}>
                         {moneyFormatter.format(report.incomeStatement.netProfit)}
                       </td>
                     </tr>
@@ -539,15 +539,15 @@ export default function CompanyReportPage() {
                   <tbody>
                     <tr className="border-b border-gray-100">
                       <td className="px-5 py-2 text-sm text-gray-600">مدفوعات العملاء (تحصيلات معتمدة)</td>
-                      <td className="px-5 py-2 text-sm font-bold text-green-700 text-left">{moneyFormatter.format(report.cashPosition.settlementsVerified)}</td>
+                      <td className="px-5 py-2 text-sm font-bold text-green-700 text-end">{moneyFormatter.format(report.cashPosition.settlementsVerified)}</td>
                     </tr>
                     <tr className="border-b border-gray-100">
                       <td className="px-5 py-2 text-sm text-gray-600">نقد من المبيعات</td>
-                      <td className="px-5 py-2 text-sm font-bold text-green-700 text-left">{moneyFormatter.format(report.cashPosition.cashFromSales)}</td>
+                      <td className="px-5 py-2 text-sm font-bold text-green-700 text-end">{moneyFormatter.format(report.cashPosition.cashFromSales)}</td>
                     </tr>
                     <tr className="border-b border-gray-100">
                       <td className="px-5 py-2 text-sm font-semibold text-gray-700">اجمالي الداخل</td>
-                      <td className="px-5 py-2 text-sm font-bold text-green-700 text-left">{moneyFormatter.format(report.cashPosition.cashIn)}</td>
+                      <td className="px-5 py-2 text-sm font-bold text-green-700 text-end">{moneyFormatter.format(report.cashPosition.cashIn)}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -556,15 +556,15 @@ export default function CompanyReportPage() {
                   <tbody>
                     <tr className="border-b border-gray-100">
                       <td className="px-5 py-2 text-sm text-gray-600">المصروفات النقدية</td>
-                      <td className="px-5 py-2 text-sm font-bold text-orange-700 text-left">{moneyFormatter.format(-report.cashPosition.expenses)}</td>
+                      <td className="px-5 py-2 text-sm font-bold text-orange-700 text-end">{moneyFormatter.format(-report.cashPosition.expenses)}</td>
                     </tr>
                     <tr className="border-b border-gray-100">
                       <td className="px-5 py-2 text-sm text-gray-600">المشتريات النقدية (مستلمة)</td>
-                      <td className="px-5 py-2 text-sm font-bold text-orange-700 text-left">{moneyFormatter.format(-report.cashPosition.cashForPurchases)}</td>
+                      <td className="px-5 py-2 text-sm font-bold text-orange-700 text-end">{moneyFormatter.format(-report.cashPosition.cashForPurchases)}</td>
                     </tr>
                     <tr className="border-b border-gray-100">
                       <td className="px-5 py-2 text-sm font-semibold text-gray-700">اجمالي الخارج</td>
-                      <td className="px-5 py-2 text-sm font-bold text-orange-700 text-left">{moneyFormatter.format(-report.cashPosition.cashOut)}</td>
+                      <td className="px-5 py-2 text-sm font-bold text-orange-700 text-end">{moneyFormatter.format(-report.cashPosition.cashOut)}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -587,9 +587,9 @@ export default function CompanyReportPage() {
                   <table className="w-full min-w-[500px]">
                     <thead>
                       <tr className="bg-slate-50">
-                        <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">العميل</th>
-                        <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">الهاتف</th>
-                        <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">المبلغ المستحق</th>
+                        <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">العميل</th>
+                        <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">الهاتف</th>
+                        <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">المبلغ المستحق</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -617,12 +617,12 @@ export default function CompanyReportPage() {
                 <table className="w-full min-w-[700px]">
                   <thead>
                     <tr className="bg-slate-50">
-                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">التاريخ</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">رقم الطلب</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">العميل</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">طريقة الدفع</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">الاجمالي</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">حالة الدفع</th>
+                      <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">التاريخ</th>
+                      <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">رقم الطلب</th>
+                      <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">العميل</th>
+                      <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">طريقة الدفع</th>
+                      <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">الاجمالي</th>
+                      <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">حالة الدفع</th>
                       <th className="px-4 py-3"></th>
                     </tr>
                   </thead>
@@ -654,10 +654,10 @@ export default function CompanyReportPage() {
                                 <table className="w-full min-w-[500px]">
                                   <thead>
                                     <tr>
-                                      <th className="px-3 py-1.5 text-right text-xs font-medium text-gray-400">المنتج</th>
-                                      <th className="px-3 py-1.5 text-right text-xs font-medium text-gray-400">الكمية</th>
-                                      <th className="px-3 py-1.5 text-right text-xs font-medium text-gray-400">سعر الوحدة</th>
-                                      <th className="px-3 py-1.5 text-right text-xs font-medium text-gray-400">الاجمالي</th>
+                                      <th className="px-3 py-1.5 text-start text-xs font-medium text-gray-400">المنتج</th>
+                                      <th className="px-3 py-1.5 text-start text-xs font-medium text-gray-400">الكمية</th>
+                                      <th className="px-3 py-1.5 text-start text-xs font-medium text-gray-400">سعر الوحدة</th>
+                                      <th className="px-3 py-1.5 text-start text-xs font-medium text-gray-400">الاجمالي</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -700,10 +700,10 @@ export default function CompanyReportPage() {
                 <table className="w-full min-w-[600px]">
                   <thead>
                     <tr className="bg-slate-50">
-                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">التاريخ</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">رقم الطلب</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">المورد</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">الاجمالي</th>
+                      <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">التاريخ</th>
+                      <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">رقم الطلب</th>
+                      <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">المورد</th>
+                      <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">الاجمالي</th>
                       <th className="px-4 py-3"></th>
                     </tr>
                   </thead>
@@ -733,10 +733,10 @@ export default function CompanyReportPage() {
                                 <table className="w-full min-w-[500px]">
                                   <thead>
                                     <tr>
-                                      <th className="px-3 py-1.5 text-right text-xs font-medium text-gray-400">المنتج</th>
-                                      <th className="px-3 py-1.5 text-right text-xs font-medium text-gray-400">الكمية</th>
-                                      <th className="px-3 py-1.5 text-right text-xs font-medium text-gray-400">سعر الوحدة</th>
-                                      <th className="px-3 py-1.5 text-right text-xs font-medium text-gray-400">الاجمالي</th>
+                                      <th className="px-3 py-1.5 text-start text-xs font-medium text-gray-400">المنتج</th>
+                                      <th className="px-3 py-1.5 text-start text-xs font-medium text-gray-400">الكمية</th>
+                                      <th className="px-3 py-1.5 text-start text-xs font-medium text-gray-400">سعر الوحدة</th>
+                                      <th className="px-3 py-1.5 text-start text-xs font-medium text-gray-400">الاجمالي</th>
                                     </tr>
                                   </thead>
                                   <tbody>
@@ -779,10 +779,10 @@ export default function CompanyReportPage() {
                 <table className="w-full min-w-[500px]">
                   <thead>
                     <tr className="bg-slate-50">
-                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">التاريخ</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">الفئة</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">الوصف</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">المبلغ</th>
+                      <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">التاريخ</th>
+                      <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">الفئة</th>
+                      <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">الوصف</th>
+                      <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">المبلغ</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -817,11 +817,11 @@ export default function CompanyReportPage() {
                 <table className="w-full min-w-[550px]">
                   <thead>
                     <tr className="bg-slate-50">
-                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">التاريخ</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">رقم التسوية</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">المبلغ</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">محصلها</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">الحالة</th>
+                      <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">التاريخ</th>
+                      <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">رقم التسوية</th>
+                      <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">المبلغ</th>
+                      <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">محصلها</th>
+                      <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">الحالة</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -857,11 +857,11 @@ export default function CompanyReportPage() {
                 <table className="w-full min-w-[600px]">
                   <thead>
                     <tr className="bg-slate-50">
-                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">التاريخ</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">النوع</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">الطرف الآخر</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">الاجمالي</th>
-                      <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">السبب</th>
+                      <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">التاريخ</th>
+                      <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">النوع</th>
+                      <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">الطرف الآخر</th>
+                      <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">الاجمالي</th>
+                      <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">السبب</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -956,11 +956,11 @@ function LedgerTable({ ledger, t }: { ledger: LedgerEntry[]; t: (key: string) =>
           <table className="w-full min-w-[720px]">
             <thead>
               <tr className="bg-slate-50">
-                <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">{t("common.date")}</th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">{t("reports.type")}</th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">{t("reports.description")}</th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">{t("reports.in")}</th>
-                <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">{t("reports.out")}</th>
+                <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("common.date")}</th>
+                <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.type")}</th>
+                <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.description")}</th>
+                <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.in")}</th>
+                <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.out")}</th>
               </tr>
             </thead>
             <tbody>
@@ -995,9 +995,9 @@ function LedgerTable({ ledger, t }: { ledger: LedgerEntry[]; t: (key: string) =>
             {ledger.length > 0 && (
               <tfoot>
                 <tr className="border-t-2 border-slate-300 bg-slate-50 font-bold">
-                  <td colSpan={3} className="px-4 py-3 text-sm text-right">الإجمالي</td>
-                  <td className="px-4 py-3 text-sm text-left text-green-700">{moneyFormatter.format(totalIn)}</td>
-                  <td className="px-4 py-3 text-sm text-left text-red-700">{moneyFormatter.format(totalOut)}</td>
+                  <td colSpan={3} className="px-4 py-3 text-sm text-start">الإجمالي</td>
+                  <td className="px-4 py-3 text-sm text-end text-green-700">{moneyFormatter.format(totalIn)}</td>
+                  <td className="px-4 py-3 text-sm text-end text-red-700">{moneyFormatter.format(totalOut)}</td>
                 </tr>
               </tfoot>
             )}
