@@ -649,7 +649,7 @@ export default function PurchasesPage() {
               <tbody className="divide-y divide-gray-200">
                 {paged.map((order) => (
                   <tr key={order.id} className="hover:bg-gray-50">
-                    <td className="whitespace-nowrap px-4 py-3 text-sm font-medium"><span dir="ltr">{order.id.slice(0, 8)}</span></td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-end"><span dir="ltr">{order.id.slice(0, 8)}</span></td>
                     <td className="px-4 py-3 text-sm">{order.company?.name || companies.find(c => c.id === order.companyId)?.name || "—"}</td>
                     <td className="px-4 py-3 text-sm">{order.supplier?.name || "—"}</td>
                     <td className="whitespace-nowrap px-4 py-3">
@@ -719,7 +719,7 @@ export default function PurchasesPage() {
               <tbody className="divide-y divide-gray-200">
                 {icPaged.map((ic) => (
                   <tr key={ic.id} className="hover:bg-gray-50">
-                    <td className="whitespace-nowrap px-4 py-3 text-sm font-medium"><span dir="ltr">{ic.invoiceNumber}</span></td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-end"><span dir="ltr">{ic.invoiceNumber}</span></td>
                     <td className="px-4 py-3 text-sm">{ic.fromCompany?.name || "—"}</td>
                     <td className="px-4 py-3 text-sm">{ic.toCompany?.name || "—"}</td>
                     <td className="max-w-[220px] truncate px-4 py-3 text-sm">{ic.items && ic.items.length ? ic.items.map((x) => x.product?.name).join("، ") : "—"}</td>

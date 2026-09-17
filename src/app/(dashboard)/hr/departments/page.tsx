@@ -178,9 +178,9 @@ export default function DepartmentsPage() {
             <table className="w-full text-right text-sm">
               <thead className="bg-gray-50 text-gray-700 border-b border-gray-200">
                 <tr>
-                  <th className="p-2.5 font-semibold">كود القسم</th>
-                  <th className="p-2.5 font-semibold">اسم القسم (عربي/إنجليزي)</th>
-                  <th className="p-2.5 font-semibold">عدد الموظفين</th>
+                  <th className="p-2.5 font-semibold text-start">كود القسم</th>
+                  <th className="p-2.5 font-semibold text-start">اسم القسم (عربي/إنجليزي)</th>
+                  <th className="p-2.5 font-semibold text-start">عدد الموظفين</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -221,9 +221,9 @@ export default function DepartmentsPage() {
             <table className="w-full text-right text-sm">
               <thead className="bg-gray-50 text-gray-700 border-b border-gray-200">
                 <tr>
-                  <th className="p-2.5 font-semibold">الكود</th>
-                  <th className="p-2.5 font-semibold">المسمى الوظيفي</th>
-                  <th className="p-2.5 font-semibold">القسم التابع</th>
+                  <th className="p-2.5 font-semibold text-start">الكود</th>
+                  <th className="p-2.5 font-semibold text-start">المسمى الوظيفي</th>
+                  <th className="p-2.5 font-semibold text-start">القسم التابع</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">

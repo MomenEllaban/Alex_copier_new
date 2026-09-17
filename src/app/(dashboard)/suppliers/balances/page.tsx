@@ -263,7 +263,7 @@ export default function SupplierBalancesPage() {
                     <tr key={supplier.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-sm font-medium">{supplier.name}</td>
                       <td className="px-4 py-3 text-sm">{supplier.company?.name || "—"}</td>
-                      <td className="px-4 py-3 text-sm"><span dir="ltr">{supplier.phone || "—"}</span></td>
+                      <td className="px-4 py-3 text-sm text-end"><span dir="ltr">{supplier.phone || "—"}</span></td>
                       <td className="px-4 py-3 text-sm">{row?.ordersCount || 0}</td>
                       <td className="px-4 py-3 text-sm font-medium">
                         {(row?.totalPurchases || 0).toLocaleString("ar-EG")} ج.م

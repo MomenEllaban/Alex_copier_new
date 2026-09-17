@@ -377,7 +377,7 @@ const { success: toastSuccess } = useToast();
                     <td className="px-4 py-3 text-sm">{machine.serialNumber}{machine.isPrinter ? (<span className="ms-2 inline-flex rounded-full bg-slate-200 px-2 py-0.5 text-xs font-bold text-slate-700">{t("machines.printer")}</span>) : null}</td>
                     <td className="px-4 py-3 text-sm">{machine.manufacturer}</td>
                     <td className="px-4 py-3 text-sm">{machine.model}</td>
-                    <td className="px-4 py-3 text-sm whitespace-nowrap" dir="ltr">{machine.deliveryBlack != null || machine.deliveryColor != null ? `${machine.deliveryBlack ?? "—"} / ${machine.deliveryColor ?? "—"}` : "—"}</td>
+                    <td className="px-4 py-3 text-sm whitespace-nowrap text-end" dir="ltr">{machine.deliveryBlack != null || machine.deliveryColor != null ? `${machine.deliveryBlack ?? "—"} / ${machine.deliveryColor ?? "—"}` : "—"}</td>
                     <td className="px-4 py-3">
                       <span
                         className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${

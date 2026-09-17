@@ -267,7 +267,7 @@ export default function CustomerBalancesPage() {
                   {paged.map((c) => (
                     <tr key={c.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-sm font-medium">{c.name}</td>
-                      <td className="px-4 py-3 text-sm"><span dir="ltr">{c.phone || "—"}</span></td>
+                      <td className="px-4 py-3 text-sm text-end"><span dir="ltr">{c.phone || "—"}</span></td>
                       <td className="px-4 py-3 text-sm font-medium">
                         {c.totalDebt > 0 ? `${c.totalDebt.toLocaleString("ar-EG")} ج.م` : "—"}
                       </td>
