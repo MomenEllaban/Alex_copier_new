@@ -293,9 +293,9 @@ export default function InventoryPage() {
             <table className="w-full min-w-[560px]">
               <thead className="bg-slate-50">
                 <tr>
-                  <th className="text-right px-4 py-3 text-sm font-semibold text-slate-600">{t("inventory.product")}</th>
-                  <th className="text-right px-4 py-3 text-sm font-semibold text-slate-600">{t("inventory.warehouse")}</th>
-                  <th className="text-right px-4 py-3 text-sm font-semibold text-slate-600">{t("inventory.quantity")}</th>
+                  <th className="text-start px-4 py-3 text-sm font-semibold text-slate-600">{t("inventory.product")}</th>
+                  <th className="text-start px-4 py-3 text-sm font-semibold text-slate-600">{t("inventory.warehouse")}</th>
+                  <th className="text-start px-4 py-3 text-sm font-semibold text-slate-600">{t("inventory.quantity")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">

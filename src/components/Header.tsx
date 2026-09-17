@@ -325,7 +325,7 @@ export default function Header({ title }: { title: string }) {
             <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
               <User size={16} className="text-white" />
             </div>
-            <div className="text-right min-w-0">
+            <div className="text-start min-w-0">
               <p className="text-sm font-medium text-gray-700 leading-tight truncate max-w-[100px] sm:max-w-none">{userName}</p>
               {roleLabel && <p className="text-xs text-gray-400 leading-tight">{roleLabel}</p>}
             </div>

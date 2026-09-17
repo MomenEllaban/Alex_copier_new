@@ -359,7 +359,7 @@ export default function Dashboard() {
             <p className="text-gray-400 text-sm">{t("common.noData")}</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-right min-w-[640px]">
+              <table className="w-full min-w-[640px]">
                 <thead>
                   <tr className="border-b border-gray-200 text-gray-500 text-sm">
                     <th className="pb-2 px-2 font-medium text-start">
@@ -453,61 +453,63 @@ export default function Dashboard() {
           {data.engineerWorkload.length === 0 ? (
             <p className="text-gray-400 text-sm">{t("common.noData")}</p>
           ) : (
-            <table className="w-full text-right">
-              <thead>
-                <tr className="border-b border-gray-200 text-gray-500 text-sm">
-                  <th className="pb-2 font-medium text-start">
-                    {t("dashboard.engineer")}
-                  </th>
-                  <th className="pb-2 font-medium text-start">
-                    {t("dashboard.assignedOpen")}
-                  </th>
-                  <th className="pb-2 font-medium text-start">
-                    {t("dashboard.visitsCol")}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.engineerWorkload.slice(0, 10).map((row) => {
-                  const total = row.openAssigned + row.visitsThisMonth;
-                  const pressure = total / maxLoad;
-                  const barColor =
-                    row.openAssigned >= 5
-                      ? "bg-red-500"
-                      : row.openAssigned >= 3
-                        ? "bg-amber-500"
-                        : "bg-blue-500";
-                  return (
-                    <tr
-                      key={row.engineerId}
-                      className="border-b border-gray-50 last:border-0"
-                    >
-                      <td className="py-2 font-medium whitespace-nowrap">
-                        {row.name}
-                      </td>
-                      <td className="py-2">
-                        <div className="flex items-center gap-2">
-                          <div className="w-full max-w-[120px] h-2 bg-gray-100 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full ${barColor}`}
-                              style={{
-                                width: `${Math.max(4, Math.round(pressure * 100))}%`,
-                              }}
-                            />
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[480px]">
+                <thead>
+                  <tr className="border-b border-gray-200 text-gray-500 text-sm">
+                    <th className="pb-2 font-medium text-start">
+                      {t("dashboard.engineer")}
+                    </th>
+                    <th className="pb-2 font-medium text-start">
+                      {t("dashboard.assignedOpen")}
+                    </th>
+                    <th className="pb-2 font-medium text-start">
+                      {t("dashboard.visitsCol")}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.engineerWorkload.slice(0, 10).map((row) => {
+                    const total = row.openAssigned + row.visitsThisMonth;
+                    const pressure = total / maxLoad;
+                    const barColor =
+                      row.openAssigned >= 5
+                        ? "bg-red-500"
+                        : row.openAssigned >= 3
+                          ? "bg-amber-500"
+                          : "bg-blue-500";
+                    return (
+                      <tr
+                        key={row.engineerId}
+                        className="border-b border-gray-50 last:border-0"
+                      >
+                        <td className="py-2 font-medium whitespace-nowrap">
+                          {row.name}
+                        </td>
+                        <td className="py-2">
+                          <div className="flex items-center gap-2">
+                            <div className="w-full max-w-[120px] h-2 bg-gray-100 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full ${barColor}`}
+                                style={{
+                                  width: `${Math.max(4, Math.round(pressure * 100))}%`,
+                                }}
+                              />
+                            </div>
+                            <span className="font-bold">
+                              {fmt(row.openAssigned)}
+                            </span>
                           </div>
-                          <span className="font-bold">
-                            {fmt(row.openAssigned)}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-2 text-gray-600">
-                        {fmt(row.visitsThisMonth)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        </td>
+                        <td className="py-2 text-gray-600">
+                          {fmt(row.visitsThisMonth)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </div>
@@ -520,7 +522,7 @@ export default function Dashboard() {
           <p className="text-gray-400 text-sm">{t("common.noData")}</p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-right min-w-[720px]">
+            <table className="w-full min-w-[720px]">
               <thead>
                 <tr className="border-b border-gray-200 text-gray-500 text-sm">
                   <th className="pb-2 px-2 font-medium text-start">#</th>

@@ -337,7 +337,7 @@ export default function SettlementsPage() {
                 <tbody className="divide-y divide-gray-200">
                   {paged.map((s) => (
                     <tr key={s.id} className="hover:bg-gray-50">
-                      <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-end"><span dir="ltr">{s.settlementNumber}</span></td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm font-medium"><span dir="ltr">{s.settlementNumber}</span></td>
                       <td className="px-4 py-3 text-sm">{s.company.name}</td>
                       <td className="px-4 py-3 text-sm">
                         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${s.direction === "SUBTRACTION" ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}>

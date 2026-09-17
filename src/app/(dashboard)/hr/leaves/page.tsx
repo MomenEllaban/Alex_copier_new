@@ -282,7 +282,7 @@ export default function LeavesPage() {
       {/* Leaves Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-right text-sm">
+          <table className="w-full min-w-[720px] text-sm">
             <thead className="bg-gray-50 text-gray-700 border-b border-gray-200">
               <tr>
                 <th className="p-3 font-semibold text-start">الموظف</th>

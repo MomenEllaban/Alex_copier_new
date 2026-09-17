@@ -185,7 +185,7 @@ export default function ReportsPage() {
                 <button
                   type="button"
                   onClick={() => setExpanded((prev) => (prev === card.key ? null : card.key))}
-                  className="w-full p-5 text-right"
+                  className="w-full p-5 text-start"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-center gap-3">
@@ -219,12 +219,12 @@ export default function ReportsPage() {
                           <table className="w-full min-w-[700px]">
                             <thead>
                               <tr className="bg-white">
-                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">{t("reports.contractNumber")}</th>
-                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">{t("reports.customer")}</th>
-                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">{t("reports.type")}</th>
-                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">{t("reports.value")}</th>
-                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">{t("common.status")}</th>
-                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">{t("reports.estimatedProfit")}</th>
+                                <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.contractNumber")}</th>
+                                <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.customer")}</th>
+                                <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.type")}</th>
+                                <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.value")}</th>
+                                <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("common.status")}</th>
+                                <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.estimatedProfit")}</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -275,11 +275,11 @@ export default function ReportsPage() {
                           <table className="w-full min-w-[800px]">
                             <thead>
                               <tr className="bg-white">
-                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">{t("engineers.name")}</th>
-                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">{t("engineers.areas")}</th>
-                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">{t("engineers.skills")}</th>
-                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">{t("dashboard.openRequests")}</th>
-                                <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">{t("reports.customerSatisfaction")}</th>
+                                <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("engineers.name")}</th>
+                                <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("engineers.areas")}</th>
+                                <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("engineers.skills")}</th>
+                                <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("dashboard.openRequests")}</th>
+                                <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.customerSatisfaction")}</th>
                               </tr>
                             </thead>
                             <tbody>
@@ -343,10 +343,10 @@ export default function ReportsPage() {
                         <table className="w-full min-w-[600px]">
                           <thead>
                             <tr className="bg-white">
-                              <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">{t("machines.serialNumber")}</th>
-                              <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">{t("machines.model")}</th>
-                              <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">{t("common.status")}</th>
-                              <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">{t("machineDetails.location")}</th>
+                              <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("machines.serialNumber")}</th>
+                              <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("machines.model")}</th>
+                              <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("common.status")}</th>
+                              <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("machineDetails.location")}</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -377,10 +377,10 @@ export default function ReportsPage() {
                         <table className="w-full min-w-[600px]">
                           <thead>
                             <tr className="bg-white">
-                              <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">{t("machines.serialNumber")}</th>
-                              <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">{t("machines.model")}</th>
-                              <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">{t("common.date")}</th>
-                              <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">{t("common.status")}</th>
+                              <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("machines.serialNumber")}</th>
+                              <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("machines.model")}</th>
+                              <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("common.date")}</th>
+                              <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("common.status")}</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -432,9 +432,9 @@ export default function ReportsPage() {
                         <table className="w-full min-w-[700px]">
                           <thead>
                             <tr className="bg-white">
-                              <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">{t("common.date")}</th>
-                              <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">{t("reports.customer")}</th>
-                              <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">{t("reports.value")}</th>
+                              <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("common.date")}</th>
+                              <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.customer")}</th>
+                              <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.value")}</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -462,8 +462,8 @@ export default function ReportsPage() {
                         <table className="w-full min-w-[600px]">
                           <thead>
                             <tr className="bg-white">
-                              <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">{t("products.name")}</th>
-                              <th className="px-4 py-3 text-right text-sm font-medium text-gray-500">{t("reports.type")}</th>
+                              <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("products.name")}</th>
+                              <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.type")}</th>
                             </tr>
                           </thead>
                           <tbody>

@@ -583,8 +583,8 @@ export default function EngineersPage() {
                     onClick={() => openEngineerDetail(engineer)}
                   >
                     <td className="px-4 py-3 text-sm font-medium whitespace-nowrap">{engineer.name}</td>
-                    <td className="px-4 py-3 text-sm whitespace-nowrap text-end" dir="ltr">{engineer.email || engineer.user?.email || "—"}</td>
-                    <td className="px-4 py-3 text-sm whitespace-nowrap text-end"><span dir="ltr">{engineer.phone || "—"}</span></td>
+                    <td className="px-4 py-3 text-sm whitespace-nowrap"><span dir="ltr">{engineer.email || engineer.user?.email || "—"}</span></td>
+                    <td className="px-4 py-3 text-sm whitespace-nowrap"><span dir="ltr">{engineer.phone || "—"}</span></td>
                     <td className="px-4 py-3 text-sm">{engineer.baseSalary.toLocaleString()}</td>
                     <td className="px-4 py-3 text-sm">{engineer.transportAllowance.toLocaleString()}</td>
                     <td className="px-4 py-3 text-sm">{engineer.commissionRate}%</td>
