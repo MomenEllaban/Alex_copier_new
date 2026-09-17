@@ -677,7 +677,10 @@
     "closedNext": "اتقفل اليوم واتسلم المبلغ — اليوم الجديد يبدأ من الصفر مع أول حركة",
     "confirmPrompt": "تأكيد هذه الحركة؟ الصادر سيُسجَّل كمصروف في حسابات شركة القطاعى",
     "closeBlockedPending": "لا يمكن الإقفال — أكّد أو ارفض الحركات المعلقة أولاً",
-    "exportFilename": "workshop-daily"
+    "exportFilename": "workshop-daily",
+    "editTransaction": "تعديل الحركة",
+    "deletePrompt": "حذف هذه الحركة نهائيًا؟ لا يمكن التراجع عن هذا الإجراء.",
+    "editedNext": "تم تعديل الحركة — لا تزال معلقة بانتظار التأكيد"
   },
   "workshop": {
     "title": "الورشة",
@@ -1003,7 +1006,13 @@
     "FETCH_FAILED": "حدث خطأ أثناء تحميل البيانات",
     "CREATE_FAILED": "حدث خطأ أثناء الإضافة",
     "UPDATE_FAILED": "حدث خطأ أثناء التحديث",
-    "DELETE_FAILED": "حدث خطأ أثناء الحذف"
+    "DELETE_FAILED": "حدث خطأ أثناء الحذف",
+    "ALREADY_HANDLED": "تم التعامل مع هذه الحركة بالفعل",
+    "BOOK_CLOSED": "اليوم مقفول — لا يمكن التعديل أو الحذف",
+    "MODIFY_FORBIDDEN": "يمكنك تعديل أو حذف الحركات المعلقة التي أضفتها فقط",
+    "DIRECTION_REQUIRED": "نوع الحركة مطلوب (وارد أو صادر)",
+    "REASON_REQUIRED": "البيان مطلوب",
+    "WORKSHOP_TX_NOT_FOUND": "الحركة غير موجودة"
   },
   "statement": {
     "title": "كشف حساب العميل",

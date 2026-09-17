@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
-import { ArrowDownCircle, ArrowUpCircle, Lock, Plus, Wallet, X } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Lock, Pencil, Plus, Trash2, Wallet, X } from "lucide-react";
 import { useI18n } from "@/i18n/context";
 import { apiErrorMessage } from "@/lib/api-client";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
@@ -22,6 +22,7 @@ interface Tx {
   amount: number;
   reason: string;
   status: "PENDING" | "CONFIRMED" | "REJECTED";
+  createdBy: string;
   category?: { id: string; name: string } | null;
   createdByName?: string | null;
   confirmedByName?: string | null;
@@ -79,7 +80,8 @@ export default function WorkshopDailyPage() {
   const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
 
   const role = (session?.user as { role?: string } | undefined)?.role ?? "";
-  const canConfirm = FINANCE_ROLES.includes(role);
+  const currentUserId = session?.user?.id ?? "";
+  const isFinance = FINANCE_ROLES.includes(role);
 
   const [data, setData] = useState<DailyData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -89,7 +91,8 @@ export default function WorkshopDailyPage() {
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 15;
 
-  const [showAdd, setShowAdd] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [editingTx, setEditingTx] = useState<Tx | null>(null);
   const [direction, setDirection] = useState<"IN" | "OUT">("OUT");
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
@@ -142,14 +145,32 @@ export default function WorkshopDailyPage() {
     new Date(iso).toLocaleTimeString(locale === "ar" ? "ar-EG" : "en-GB", { hour: "2-digit", minute: "2-digit" });
   const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(locale === "ar" ? "ar-EG" : "en-GB");
 
-  const resetAddForm = () => {
+  const canModify = (tx: Tx) => tx.status === "PENDING" && (isFinance || tx.createdBy === currentUserId);
+
+  const openAddForm = () => {
+    setEditingTx(null);
     setDirection("OUT");
     setAmount("");
     setReason("");
     setFormError("");
+    setShowForm(true);
   };
 
-  const handleAdd = async (e: React.FormEvent) => {
+  const openEditForm = (tx: Tx) => {
+    setEditingTx(tx);
+    setDirection(tx.direction);
+    setAmount(String(tx.amount));
+    setReason(tx.reason);
+    setFormError("");
+    setShowForm(true);
+  };
+
+  const closeForm = () => {
+    setShowForm(false);
+    setEditingTx(null);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
     const value = Number(amount);
@@ -161,10 +182,11 @@ export default function WorkshopDailyPage() {
       setFormError(t("workshopDaily.reason") + "؟");
       return;
     }
+    const editing = editingTx;
     setSaving(true);
     try {
-      const res = await fetch("/api/workshop-daily", {
-        method: "POST",
+      const res = await fetch(editing ? `/api/workshop-daily/${editing.id}` : "/api/workshop-daily", {
+        method: editing ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ direction, amount: value, reason: reason.trim() }),
       });
@@ -173,14 +195,30 @@ export default function WorkshopDailyPage() {
         setFormError(apiErrorMessage(json, t));
         return;
       }
-      setShowAdd(false);
-      resetAddForm();
+      closeForm();
       refresh();
       notifyDataChanged(["workshop"]);
       toastSuccess(t("common.success"));
-      toastInfo(t("workshopDaily.addedNext"));
+      toastInfo(t(editing ? "workshopDaily.editedNext" : "workshopDaily.addedNext"));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async (tx: Tx) => {
+    if (!(await confirmAction({ title: t("common.delete"), message: t("workshopDaily.deletePrompt") }))) return;
+    try {
+      const res = await fetch(`/api/workshop-daily/${tx.id}`, { method: "DELETE" });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        toastError(apiErrorMessage(json, t));
+        return;
+      }
+      refresh();
+      notifyDataChanged(["workshop"]);
+      toastSuccess(t("common.success"));
+    } catch {
+      toastError(t("common.error"));
     }
   };
 
@@ -276,7 +314,7 @@ export default function WorkshopDailyPage() {
         </div>
         <div className="ms-auto flex gap-2">
           <button
-            onClick={() => { resetAddForm(); setShowAdd(true); }}
+            onClick={openAddForm}
             disabled={!!data?.book?.isOldDay}
             className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
           >
@@ -397,45 +435,64 @@ export default function WorkshopDailyPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {paged.map((tx) => (
-                      <tr key={tx.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm whitespace-nowrap text-slate-600">{fmtTime(tx.createdAt)}</td>
-                        <td className="px-4 py-3 text-sm">
-                          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold whitespace-nowrap ${tx.direction === "IN" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                            {tx.direction === "IN" ? <ArrowUpCircle size={12} className="shrink-0" /> : <ArrowDownCircle size={12} className="shrink-0" />}
-                            {tx.direction === "IN" ? t("workshopDaily.in") : t("workshopDaily.out")}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-slate-700">{tx.category?.name || "—"}</td>
-                        <td className="max-w-[260px] truncate px-4 py-3 text-sm text-slate-800" title={tx.rejectReason || tx.reason}>
-                          {tx.reason}
-                          {tx.status === "REJECTED" && tx.rejectReason && (
-                            <span className="block truncate text-xs text-red-500">{tx.rejectReason}</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 text-sm font-bold whitespace-nowrap text-slate-900"><span dir="ltr">{fmtMoney(tx.amount)}</span></td>
-                        <td className="px-4 py-3 text-sm">
-                          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-bold whitespace-nowrap ${STATUS_STYLES[tx.status]}`}>
-                            {tx.status === "PENDING" ? t("workshopDaily.pending") : tx.status === "CONFIRMED" ? t("workshopDaily.confirmed") : t("workshopDaily.rejected")}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-slate-600">{tx.createdByName || "—"}</td>
-                        <td className="px-4 py-3">
-                          {canConfirm && tx.status === "PENDING" ? (
-                            <div className="flex gap-1">
-                              <button onClick={() => handleConfirm(tx)} className="rounded-lg border border-green-200 bg-green-50 px-2.5 py-1.5 text-xs font-medium text-green-700 transition hover:bg-green-100">
-                                {t("workshopDaily.confirm")}
-                              </button>
-                              <button onClick={() => { setRejectTarget(tx); setRejectReason(""); setRejectError(""); }} className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-100">
-                                {t("workshopDaily.reject")}
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-gray-400">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
+                    {paged.map((tx) => {
+                      const showConfirm = isFinance && tx.status === "PENDING";
+                      const showModify = canModify(tx);
+                      const hasActions = showConfirm || showModify;
+                      return (
+                        <tr key={tx.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 text-sm whitespace-nowrap text-slate-600">{fmtTime(tx.createdAt)}</td>
+                          <td className="px-4 py-3 text-sm">
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold whitespace-nowrap ${tx.direction === "IN" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                              {tx.direction === "IN" ? <ArrowUpCircle size={12} className="shrink-0" /> : <ArrowDownCircle size={12} className="shrink-0" />}
+                              {tx.direction === "IN" ? t("workshopDaily.in") : t("workshopDaily.out")}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-700">{tx.category?.name || "—"}</td>
+                          <td className="max-w-[260px] truncate px-4 py-3 text-sm text-slate-800" title={tx.rejectReason || tx.reason}>
+                            {tx.reason}
+                            {tx.status === "REJECTED" && tx.rejectReason && (
+                              <span className="block truncate text-xs text-red-500">{tx.rejectReason}</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm font-bold whitespace-nowrap text-slate-900"><span dir="ltr">{fmtMoney(tx.amount)}</span></td>
+                          <td className="px-4 py-3 text-sm">
+                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-bold whitespace-nowrap ${STATUS_STYLES[tx.status]}`}>
+                              {tx.status === "PENDING" ? t("workshopDaily.pending") : tx.status === "CONFIRMED" ? t("workshopDaily.confirmed") : t("workshopDaily.rejected")}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-600">{tx.createdByName || "—"}</td>
+                          <td className="px-4 py-3">
+                            {hasActions ? (
+                              <div className="flex flex-wrap items-center gap-1">
+                                {showConfirm && (
+                                  <>
+                                    <button onClick={() => handleConfirm(tx)} className="rounded-lg border border-green-200 bg-green-50 px-2.5 py-1.5 text-xs font-medium text-green-700 transition hover:bg-green-100">
+                                      {t("workshopDaily.confirm")}
+                                    </button>
+                                    <button onClick={() => { setRejectTarget(tx); setRejectReason(""); setRejectError(""); }} className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-100">
+                                      {t("workshopDaily.reject")}
+                                    </button>
+                                  </>
+                                )}
+                                {showModify && (
+                                  <>
+                                    <button onClick={() => openEditForm(tx)} className="rounded-lg p-1.5 text-gray-400 transition hover:bg-blue-50 hover:text-blue-600" title={t("common.edit")} aria-label={t("common.edit")}>
+                                      <Pencil size={16} className="shrink-0" />
+                                    </button>
+                                    <button onClick={() => handleDelete(tx)} className="rounded-lg p-1.5 text-gray-400 transition hover:bg-red-50 hover:text-red-600" title={t("common.delete")} aria-label={t("common.delete")}>
+                                      <Trash2 size={16} className="shrink-0" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-xs text-gray-400">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -477,8 +534,8 @@ export default function WorkshopDailyPage() {
         </>
       )}
 
-      <FormModal open={showAdd} onClose={() => setShowAdd(false)} title={t("workshopDaily.addTransaction")}>
-        <form onSubmit={handleAdd} className="space-y-3">
+      <FormModal open={showForm} onClose={closeForm} title={editingTx ? t("workshopDaily.editTransaction") : t("workshopDaily.addTransaction")}>
+        <form onSubmit={handleSubmit} className="space-y-3">
           {formError && (
             <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</div>
           )}
@@ -508,7 +565,7 @@ export default function WorkshopDailyPage() {
             <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t("workshopDaily.reasonPlaceholder")} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
           </div>
           <div className="flex justify-end gap-2 pt-1">
-            <button type="button" onClick={() => setShowAdd(false)} className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">{t("common.cancel")}</button>
+            <button type="button" onClick={closeForm} className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">{t("common.cancel")}</button>
             <SubmitButton loading={saving} label={t("common.save")} loadingLabel={t("common.saving")} className="bg-blue-600 text-white hover:bg-blue-700" />
           </div>
         </form>

@@ -25,7 +25,7 @@ export async function POST(
         include: { book: true, category: true },
       });
       if (!tx) {
-        return NextResponse.json({ error: "الحركة غير موجودة", code: "NOT_FOUND" }, { status: 404 });
+        return NextResponse.json({ error: "الحركة غير موجودة", code: "WORKSHOP_TX_NOT_FOUND" }, { status: 404 });
       }
       if (tx.status !== "PENDING") {
         return NextResponse.json({ error: "هذه الحركة تم التعامل معها من قبل", code: "ALREADY_HANDLED" }, { status: 409 });

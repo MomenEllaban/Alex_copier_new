@@ -683,7 +683,10 @@
     "closedNext": "Day closed and handed over — the new day starts from zero",
     "confirmPrompt": "Confirm this entry? Outgoing will post as an expense",
     "closeBlockedPending": "Cannot close — confirm or reject pending entries first",
-    "exportFilename": "workshop-daily"
+    "exportFilename": "workshop-daily",
+    "editTransaction": "Edit entry",
+    "deletePrompt": "Delete this entry permanently? This cannot be undone.",
+    "editedNext": "Entry updated — still pending confirmation"
   },
   "workshop": {
     "title": "Workshop",
@@ -1002,7 +1005,13 @@
     "FETCH_FAILED": "Failed to load data",
     "CREATE_FAILED": "Failed to create record",
     "UPDATE_FAILED": "Failed to update record",
-    "DELETE_FAILED": "Failed to delete record"
+    "DELETE_FAILED": "Failed to delete record",
+    "ALREADY_HANDLED": "This entry has already been handled",
+    "BOOK_CLOSED": "The day is closed — editing or deleting is not allowed",
+    "MODIFY_FORBIDDEN": "You can only edit or delete your own pending entries",
+    "DIRECTION_REQUIRED": "Entry type is required (incoming or outgoing)",
+    "REASON_REQUIRED": "Description is required",
+    "WORKSHOP_TX_NOT_FOUND": "Entry not found"
   },
   "statement": {
     "title": "Customer Statement",
