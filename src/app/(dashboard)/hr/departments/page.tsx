@@ -27,7 +27,7 @@ interface JobTitle {
 }
 
 export default function DepartmentsPage() {
-  const { t } = useI18n();
+  const { t, dir } = useI18n();
   const { success: toastSuccess, error: toastError } = useToast();
 
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -54,7 +54,7 @@ export default function DepartmentsPage() {
       if (jRes.ok) setJobTitles(await jRes.json());
     } catch (err) {
       console.error("Error loading departments & job titles:", err);
-      toastError("فشل تحميل بيانات الأقسام والمسميات الوظيفية");
+      toastError(t("hr.departments.toastLoadFailed"));
     } finally {
       setLoading(false);
     }
@@ -69,7 +69,7 @@ export default function DepartmentsPage() {
     setFormError("");
 
     if (!deptForm.code || !deptForm.name) {
-      setFormError("كود واسم القسم مطلوبان");
+      setFormError(t("hr.departments.deptValid"));
       return;
     }
 
@@ -82,14 +82,14 @@ export default function DepartmentsPage() {
         });
 
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "فشل إضافة القسم");
+        if (!res.ok) throw new Error(data.error || t("hr.departments.toastDeptAddFailed"));
 
-        toastSuccess("تم إضافة القسم بنجاح");
+        toastSuccess(t("hr.departments.toastDeptAdded"));
         setShowDeptModal(false);
         setDeptForm({ code: "", name: "", nameAr: "" });
         fetchData();
       } catch (err: any) {
-        setFormError(err.message || "حدث خطأ في الإضافة");
+        setFormError(err.message || t("hr.departments.toastAddError"));
       }
     });
   };
@@ -99,7 +99,7 @@ export default function DepartmentsPage() {
     setFormError("");
 
     if (!jobForm.code || !jobForm.title) {
-      setFormError("كود والمسمى الوظيفي مطلوبان");
+      setFormError(t("hr.departments.jobValid"));
       return;
     }
 
@@ -112,31 +112,31 @@ export default function DepartmentsPage() {
         });
 
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "فشل إضافة المسمى الوظيفي");
+        if (!res.ok) throw new Error(data.error || t("hr.departments.toastJobAddFailed"));
 
-        toastSuccess("تم إضافة المسمى الوظيفي بنجاح");
+        toastSuccess(t("hr.departments.toastJobAdded"));
         setShowJobModal(false);
         setJobForm({ code: "", title: "", titleAr: "", departmentId: "" });
         fetchData();
       } catch (err: any) {
-        setFormError(err.message || "حدث خطأ في الإضافة");
+        setFormError(err.message || t("hr.departments.toastAddError"));
       }
     });
   };
 
-  if (loading) return <PrinterLoader label="جاري تحميل الأقسام والمسميات الوظيفية..." />;
+  if (loading) return <PrinterLoader label={t("hr.departments.loading")} />;
 
   return (
-    <div className="space-y-6">
+    <div dir={dir} className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Building2 className="text-blue-600" size={28} />
-            الأقسام والمسميات الوظيفية
+            <Building2 className="text-blue-600 shrink-0" size={28} />
+            {t("hr.departments.title")}
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            الهيكل التنظيمي للشركة وإدارة مسميات الوظائف والأقسام.
+            {t("hr.departments.subtitle")}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -145,15 +145,15 @@ export default function DepartmentsPage() {
             onClick={() => { setFormError(""); setShowDeptModal(true); }}
             className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2.5 rounded-lg shadow-sm transition-colors text-sm"
           >
-            <Plus size={18} />
-            إضافة قسم
+            <Plus size={18} className="shrink-0" />
+            {t("hr.departments.addDept")}
           </button>
           <button
             onClick={() => { setFormError(""); setShowJobModal(true); }}
             className="inline-flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-medium px-4 py-2.5 rounded-lg shadow-sm transition-colors text-sm"
           >
-            <Plus size={18} />
-            إضافة مسمى وظيفي
+            <Plus size={18} className="shrink-0" />
+            {t("hr.departments.addJobTitle")}
           </button>
         </div>
       </div>
@@ -161,9 +161,9 @@ export default function DepartmentsPage() {
       <StatsCards
         columns={3}
         stats={[
-          { label: "الأقسام", value: departments.length.toLocaleString("ar-EG"), icon: <Building2 size={18} />, tone: "sky" },
-          { label: "المسميات الوظيفية", value: jobTitles.length.toLocaleString("ar-EG"), icon: <Briefcase size={18} />, tone: "green" },
-          { label: "الموظفون", value: departments.reduce((sum, d) => sum + (d._count?.Employees || 0), 0).toLocaleString("ar-EG"), icon: <Users size={18} />, tone: "purple" },
+          { label: t("hr.departments.statDepartments"), value: departments.length.toLocaleString("en-US"), icon: <Building2 size={18} />, tone: "sky" },
+          { label: t("hr.departments.statJobTitles"), value: jobTitles.length.toLocaleString("en-US"), icon: <Briefcase size={18} />, tone: "green" },
+          { label: t("hr.departments.statEmployees"), value: departments.reduce((sum, d) => sum + (d._count?.Employees || 0), 0).toLocaleString("en-US"), icon: <Users size={18} />, tone: "purple" },
         ]}
       />
 
@@ -171,36 +171,36 @@ export default function DepartmentsPage() {
         {/* Departments List */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
           <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2 border-b border-gray-100 pb-3">
-            <Building2 className="text-blue-600" size={20} />
-            أقسام الشركة
+            <Building2 className="text-blue-600 shrink-0" size={20} />
+            {t("hr.departments.deptSection")}
           </h2>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[520px] text-sm">
               <thead className="bg-gray-50 text-gray-700 border-b border-gray-200">
                 <tr>
-                  <th className="p-2.5 font-semibold text-start">كود القسم</th>
-                  <th className="p-2.5 font-semibold text-start">اسم القسم (عربي/إنجليزي)</th>
-                  <th className="p-2.5 font-semibold text-start">عدد الموظفين</th>
+                  <th className="p-2.5 font-semibold text-start">{t("hr.departments.deptCodeTh")}</th>
+                  <th className="p-2.5 font-semibold text-start">{t("hr.departments.deptNameTh")}</th>
+                  <th className="p-2.5 font-semibold text-start">{t("hr.departments.deptCountTh")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {departments.length === 0 ? (
                   <tr>
                     <td colSpan={3} className="p-6 text-center text-gray-500">
-                      لا توجد أقسام مسجلة. اضغط "إضافة قسم" للبدء.
+                      {t("hr.departments.noDepts")}
                     </td>
                   </tr>
                 ) : (
                   departments.map((d) => (
                     <tr key={d.id} className="hover:bg-gray-50">
-                      <td className="p-2.5 font-bold text-gray-900">{d.code}</td>
+                      <td className="p-2.5 font-bold text-gray-900"><span dir="ltr">{d.code}</span></td>
                       <td className="p-2.5">
                         <div className="font-semibold text-gray-900">{d.nameAr || d.name}</div>
                         {d.nameAr && <div className="text-xs text-gray-500">{d.name}</div>}
                       </td>
                       <td className="p-2.5">
-                        <span className="bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded text-xs">
-                          {d._count?.Employees || 0} موظف
+                        <span className="bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded text-xs whitespace-nowrap">
+                          {d._count?.Employees || 0} {t("hr.departments.empWord")}
                         </span>
                       </td>
                     </tr>
@@ -214,35 +214,35 @@ export default function DepartmentsPage() {
         {/* Job Titles List */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
           <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2 border-b border-gray-100 pb-3">
-            <Briefcase className="text-emerald-600" size={20} />
-            المسميات الوظيفية
+            <Briefcase className="text-emerald-600 shrink-0" size={20} />
+            {t("hr.departments.jobSection")}
           </h2>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[520px] text-sm">
               <thead className="bg-gray-50 text-gray-700 border-b border-gray-200">
                 <tr>
-                  <th className="p-2.5 font-semibold text-start">الكود</th>
-                  <th className="p-2.5 font-semibold text-start">المسمى الوظيفي</th>
-                  <th className="p-2.5 font-semibold text-start">القسم التابع</th>
+                  <th className="p-2.5 font-semibold text-start">{t("hr.departments.jobCodeTh")}</th>
+                  <th className="p-2.5 font-semibold text-start">{t("hr.departments.jobTitleTh")}</th>
+                  <th className="p-2.5 font-semibold text-start">{t("hr.departments.jobDeptTh")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {jobTitles.length === 0 ? (
                   <tr>
                     <td colSpan={3} className="p-6 text-center text-gray-500">
-                      لا توجد مسميات وظيفية مسجلة.
+                      {t("hr.departments.noJobs")}
                     </td>
                   </tr>
                 ) : (
                   jobTitles.map((j) => (
                     <tr key={j.id} className="hover:bg-gray-50">
-                      <td className="p-2.5 font-bold text-gray-900">{j.code}</td>
+                      <td className="p-2.5 font-bold text-gray-900"><span dir="ltr">{j.code}</span></td>
                       <td className="p-2.5">
                         <div className="font-semibold text-gray-900">{j.titleAr || j.title}</div>
                         {j.titleAr && <div className="text-xs text-gray-500">{j.title}</div>}
                       </td>
                       <td className="p-2.5 text-gray-600">
-                        {j.Department?.nameAr || j.Department?.name || "عام"}
+                        {j.Department?.nameAr || j.Department?.name || t("hr.departments.general")}
                       </td>
                     </tr>
                   ))
@@ -258,7 +258,7 @@ export default function DepartmentsPage() {
         <FormModal
           open={showDeptModal}
           onClose={() => setShowDeptModal(false)}
-          title="إضافة قسم جديد"
+          title={t("hr.departments.deptModalTitle")}
         >
           <form onSubmit={handleCreateDept} className="space-y-4">
             {formError && (
@@ -268,37 +268,37 @@ export default function DepartmentsPage() {
             )}
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">كود القسم *</label>
+              <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.departments.deptCodeLabel")}</label>
               <input
                 type="text"
                 required
                 value={deptForm.code}
                 onChange={(e) => setDeptForm({ ...deptForm, code: e.target.value })}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
-                placeholder="مثال: HR, IT, ENG, MKT"
+                placeholder={t("hr.departments.deptCodePlaceholder")}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">اسم القسم (بالإنجليزي/العام) *</label>
+              <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.departments.deptNameLabel")}</label>
               <input
                 type="text"
                 required
                 value={deptForm.name}
                 onChange={(e) => setDeptForm({ ...deptForm, name: e.target.value })}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
-                placeholder="Human Resources"
+                placeholder={t("hr.departments.deptNamePlaceholder")}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">اسم القسم (بالعربي)</label>
+              <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.departments.deptNameArLabel")}</label>
               <input
                 type="text"
                 value={deptForm.nameAr}
                 onChange={(e) => setDeptForm({ ...deptForm, nameAr: e.target.value })}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
-                placeholder="الموارد البشرية"
+                placeholder={t("hr.departments.deptNameArPlaceholder")}
               />
             </div>
 
@@ -308,9 +308,9 @@ export default function DepartmentsPage() {
                 onClick={() => setShowDeptModal(false)}
                 className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
               >
-                إلغاء
+                {t("common.cancel")}
               </button>
-              <SubmitButton loading={isPending} label="حفظ القسم" />
+              <SubmitButton loading={isPending} label={t("hr.departments.saveDept")} />
             </div>
           </form>
         </FormModal>
@@ -321,7 +321,7 @@ export default function DepartmentsPage() {
         <FormModal
           open={showJobModal}
           onClose={() => setShowJobModal(false)}
-          title="إضافة مسمى وظيفي جديد"
+          title={t("hr.departments.jobModalTitle")}
         >
           <form onSubmit={handleCreateJob} className="space-y-4">
             {formError && (
@@ -331,48 +331,48 @@ export default function DepartmentsPage() {
             )}
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">كود المسمى الوظيفي *</label>
+              <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.departments.jobCodeLabel")}</label>
               <input
                 type="text"
                 required
                 value={jobForm.code}
                 onChange={(e) => setJobForm({ ...jobForm, code: e.target.value })}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500"
-                placeholder="مثال: MGR, ENG, ACC"
+                placeholder={t("hr.departments.jobCodePlaceholder")}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">المسمى الوظيفي (إنجليزي) *</label>
+              <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.departments.jobTitleLabel")}</label>
               <input
                 type="text"
                 required
                 value={jobForm.title}
                 onChange={(e) => setJobForm({ ...jobForm, title: e.target.value })}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500"
-                placeholder="Senior Maintenance Engineer"
+                placeholder={t("hr.departments.jobTitlePlaceholder")}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">المسمى الوظيفي (عربي)</label>
+              <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.departments.jobTitleArLabel")}</label>
               <input
                 type="text"
                 value={jobForm.titleAr}
                 onChange={(e) => setJobForm({ ...jobForm, titleAr: e.target.value })}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500"
-                placeholder="مهندس صيانة أول"
+                placeholder={t("hr.departments.jobTitleArPlaceholder")}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">القسم التابع له</label>
+              <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.departments.jobDeptLabel")}</label>
               <select
                 value={jobForm.departmentId}
                 onChange={(e) => setJobForm({ ...jobForm, departmentId: e.target.value })}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500"
               >
-                <option value="">بدون قسم (عام)</option>
+                <option value="">{t("hr.departments.noDept")}</option>
                 {departments.map((d) => (
                   <option key={d.id} value={d.id}>
                     {d.nameAr || d.name}
@@ -387,9 +387,9 @@ export default function DepartmentsPage() {
                 onClick={() => setShowJobModal(false)}
                 className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
               >
-                إلغاء
+                {t("common.cancel")}
               </button>
-              <SubmitButton loading={isPending} label="حفظ المسمى" className="bg-emerald-600 hover:bg-emerald-700 text-white" />
+              <SubmitButton loading={isPending} label={t("hr.departments.saveJob")} className="bg-emerald-600 hover:bg-emerald-700 text-white" />
             </div>
           </form>
         </FormModal>

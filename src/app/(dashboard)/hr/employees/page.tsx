@@ -41,7 +41,7 @@ interface Employee {
 }
 
 function EmployeesContent() {
-  const { t } = useI18n();
+  const { t, dir, locale } = useI18n();
   const searchParams = useSearchParams();
   const router = useRouter();
   const confirmAction = useConfirm();
@@ -95,7 +95,7 @@ function EmployeesContent() {
       if (compRes.ok) setCompanies(await compRes.json());
     } catch (err) {
       console.error("Error loading employees:", err);
-      toastError("فشل تحميل بيانات الموظفين");
+      toastError(t("hr.employees.toastLoadFailed"));
     } finally {
       setLoading(false);
     }
@@ -164,7 +164,7 @@ function EmployeesContent() {
     setFormError("");
 
     if (!formData.fullName || !formData.code || !formData.hireDate) {
-      setFormError("الرجاء ملء الأكواد والاسم وتاريخ التعيين بشكل صحيح");
+      setFormError(t("hr.employees.validRequired"));
       return;
     }
 
@@ -186,32 +186,32 @@ function EmployeesContent() {
 
         const data = await res.json();
         if (!res.ok) {
-          throw new Error(data.error || "حدث خطأ أثناء حفظ الموظف");
+          throw new Error(data.error || t("hr.employees.toastSaveError"));
         }
 
-        toastSuccess(editingEmployee ? "تم تعديل بيانات الموظف بنجاح" : "تم إضافة الموظف بنجاح");
+        toastSuccess(editingEmployee ? t("hr.employees.toastUpdated") : t("hr.employees.toastAdded"));
         setShowModal(false);
         fetchData();
       } catch (err: any) {
-        setFormError(err.message || "خطأ غير متوقع");
+        setFormError(err.message || t("hr.employees.toastUnexpected"));
       }
     });
   };
 
   const handleDelete = async (id: string) => {
     const ok = await confirmAction({
-      title: "حذف الموظف",
-      message: "هل أنت تأكد من رغبتك في حذف هذا الموظف؟ لن يمكنك التراجع.",
+      title: t("hr.employees.deleteTitle"),
+      message: t("hr.employees.deleteConfirm"),
     });
     if (!ok) return;
 
     try {
       const res = await fetch(`/api/hr/employees/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("فشل حذف الموظف");
-      toastSuccess("تم حذف الموظف بنجاح");
+      if (!res.ok) throw new Error(t("hr.employees.toastDeleteFailed"));
+      toastSuccess(t("hr.employees.toastDeleted"));
       fetchData();
     } catch (err: any) {
-      toastError(err.message || "حدث خطأ في الحذف");
+      toastError(err.message || t("hr.employees.toastDeleteError"));
     }
   };
 
@@ -240,19 +240,19 @@ function EmployeesContent() {
     };
   }, [employees]);
 
-  if (loading) return <PrinterLoader label="جاري تحميل قائمة الموظفين..." />;
+  if (loading) return <PrinterLoader label={t("hr.employees.loading")} />;
 
   return (
-    <div className="space-y-6">
+    <div dir={dir} className="space-y-6">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Users className="text-blue-600" size={28} />
-            إدارة الموظفين
+            <Users className="text-blue-600 shrink-0" size={28} />
+            {t("hr.employees.title")}
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            عرض وتحديث وإضافة الموظفين ورقم البصمة والرواتب الأساسية.
+            {t("hr.employees.subtitle")}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -260,7 +260,7 @@ function EmployeesContent() {
           <ExportButton
             filename="employees_export"
             getExport={() => ({
-              headers: ["كود الموظف", "الاسم", "رقم البصمة", "المسمى الوظيفي", "الراتب الأساسي", "الحالة"],
+              headers: [t("hr.employees.exportCode"), t("hr.employees.exportName"), t("hr.employees.exportFingerprint"), t("hr.employees.exportJobTitle"), t("hr.employees.exportBaseSalary"), t("hr.employees.exportStatus")],
               rows: filtered.map((e) => [
                 e.code,
                 e.fullNameAr || e.fullName,
@@ -275,8 +275,8 @@ function EmployeesContent() {
             onClick={openAddModal}
             className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2.5 rounded-lg shadow-sm transition-colors text-sm"
           >
-            <Plus size={18} />
-            إضافة موظف
+            <Plus size={18} className="shrink-0" />
+            {t("hr.employees.addButton")}
           </button>
         </div>
       </div>
@@ -284,10 +284,10 @@ function EmployeesContent() {
       <StatsCards
         columns={4}
         stats={[
-          { label: "إجمالي الموظفين", value: stats.total.toLocaleString("ar-EG"), icon: <Users size={18} />, tone: "sky" },
-          { label: "موظفون نشطون", value: stats.active.toLocaleString("ar-EG"), icon: <UserCheck size={18} />, tone: "green" },
-          { label: "إجمالي الرواتب الأساسية", value: `${stats.totalBaseSalary.toLocaleString("ar-EG")} ج.م`, icon: <Wallet size={18} />, tone: "emerald" },
-          { label: "المسميات الوظيفية", value: stats.jobTitlesCount.toLocaleString("ar-EG"), icon: <Briefcase size={18} />, tone: "purple" },
+          { label: t("hr.employees.statTotal"), value: stats.total.toLocaleString("en-US"), icon: <Users size={18} />, tone: "sky" },
+          { label: t("hr.employees.statActive"), value: stats.active.toLocaleString("en-US"), icon: <UserCheck size={18} />, tone: "green" },
+          { label: t("hr.employees.statBaseTotal"), value: `${stats.totalBaseSalary.toLocaleString("en-US")} ${t("hr.currency")}`, icon: <Wallet size={18} />, tone: "emerald" },
+          { label: t("hr.employees.statTitles"), value: stats.jobTitlesCount.toLocaleString("en-US"), icon: <Briefcase size={18} />, tone: "purple" },
         ]}
       />
 
@@ -296,17 +296,17 @@ function EmployeesContent() {
         <SearchInput
           value={search}
           onChange={(v) => { setSearch(v); setPage(1); }}
-          placeholder="بحث باسم الموظف، الكود، أو رقم البصمة..."
+          placeholder={t("hr.employees.searchPlaceholder")}
         />
         <FilterSelect
           value={statusFilter}
           onChange={(v) => { setStatusFilter(v); setPage(1); }}
-          allLabel="جميع الحالات"
+          allLabel={t("hr.employees.allStatuses")}
           options={[
-            { label: "نشط (Active)", value: "ACTIVE" },
-            { label: "في إجازة (On Leave)", value: "ON_LEAVE" },
-            { label: "موقوف (Suspended)", value: "SUSPENDED" },
-            { label: "مستقيل / منهى (Terminated)", value: "TERMINATED" },
+            { label: t("hr.employees.statusActive"), value: "ACTIVE" },
+            { label: t("hr.employees.statusOnLeave"), value: "ON_LEAVE" },
+            { label: t("hr.employees.statusSuspended"), value: "SUSPENDED" },
+            { label: t("hr.employees.statusTerminated"), value: "TERMINATED" },
           ]}
         />
       </div>
@@ -317,30 +317,30 @@ function EmployeesContent() {
           <table className="w-full min-w-[760px] text-sm">
             <thead className="bg-gray-50 text-gray-700 border-b border-gray-200">
               <tr>
-                <th className="p-3 font-semibold text-start">الكود / البصمة</th>
-                <th className="p-3 font-semibold text-start">اسم الموظف</th>
-                <th className="p-3 font-semibold text-start">المسمى الوظيفي</th>
-                <th className="p-3 font-semibold text-start">الهاتف / الرقم القومي</th>
-                <th className="p-3 font-semibold text-start">الراتب الأساسي</th>
-                <th className="p-3 font-semibold text-start">الحالة</th>
-                <th className="p-3 font-semibold text-center">الإجراءات</th>
+                <th className="p-3 font-semibold text-start">{t("hr.employees.thCodeFp")}</th>
+                <th className="p-3 font-semibold text-start">{t("hr.employees.thName")}</th>
+                <th className="p-3 font-semibold text-start">{t("hr.employees.thJobTitle")}</th>
+                <th className="p-3 font-semibold text-start">{t("hr.employees.thPhoneNid")}</th>
+                <th className="p-3 font-semibold text-start">{t("hr.employees.thBaseSalary")}</th>
+                <th className="p-3 font-semibold text-start">{t("hr.employees.thStatus")}</th>
+                <th className="p-3 font-semibold text-center">{t("hr.employees.thActions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {paginated.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-gray-500">
-                    لا يوجد موظفون مطابقون للشروط الحالية.
+                    {t("hr.employees.noMatch")}
                   </td>
                 </tr>
               ) : (
                 paginated.map((emp) => (
                   <tr key={emp.id} className="hover:bg-gray-50 transition-colors">
                     <td className="p-3">
-                      <div className="font-bold text-gray-900">{emp.code}</div>
+                      <div className="font-bold text-gray-900"><span dir="ltr">{emp.code}</span></div>
                       {emp.fingerprintId && (
-                        <div className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded inline-block mt-0.5">
-                          بصمة #{emp.fingerprintId}
+                        <div className="text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded inline-block mt-0.5 whitespace-nowrap">
+                          {t("hr.employees.fingerprintBadgePrefix")}<span dir="ltr">{emp.fingerprintId}</span>
                         </div>
                       )}
                     </td>
@@ -349,18 +349,18 @@ function EmployeesContent() {
                       {emp.fullNameAr && <div className="text-xs text-gray-500">{emp.fullNameAr}</div>}
                     </td>
                     <td className="p-3">
-                      <div className="text-gray-900 font-medium">{emp.JobTitle?.titleAr || emp.JobTitle?.title || "بدون مسمى"}</div>
+                      <div className="text-gray-900 font-medium">{emp.JobTitle?.titleAr || emp.JobTitle?.title || t("hr.employees.noTitle")}</div>
                     </td>
                     <td className="p-3">
-                      <div className="text-gray-900">{emp.phone || "-"}</div>
-                      <div className="text-xs text-gray-400">{emp.nationalId || "-"}</div>
+                      <div className="text-gray-900"><span dir="ltr">{emp.phone || "-"}</span></div>
+                      <div className="text-xs text-gray-400"><span dir="ltr">{emp.nationalId || "-"}</span></div>
                     </td>
                     <td className="p-3 font-semibold text-emerald-700">
-                      {(emp.baseSalary || 0).toLocaleString()} ج.م
+                      {(emp.baseSalary || 0).toLocaleString("en-US")} {t("hr.currency")}
                     </td>
                     <td className="p-3">
                       <span
-                        className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold ${
+                        className={`inline-block px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
                           emp.status === "ACTIVE"
                             ? "bg-emerald-100 text-emerald-800"
                             : emp.status === "ON_LEAVE"
@@ -369,12 +369,12 @@ function EmployeesContent() {
                         }`}
                       >
                         {emp.status === "ACTIVE"
-                          ? "نشط"
+                          ? t("hr.employees.badgeActive")
                           : emp.status === "ON_LEAVE"
-                          ? "إجازة"
+                          ? t("hr.employees.badgeOnLeave")
                           : emp.status === "SUSPENDED"
-                          ? "موقوف"
-                          : "منهى الخدمة"}
+                          ? t("hr.employees.badgeSuspended")
+                          : t("hr.employees.badgeTerminated")}
                       </span>
                     </td>
                     <td className="p-3 text-center">
@@ -382,21 +382,21 @@ function EmployeesContent() {
                         <button
                           onClick={() => setSelectedEmployee(emp)}
                           className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="عرض التفاصيل"
+                          title={t("hr.employees.actionView")}
                         >
                           <Eye size={18} />
                         </button>
                         <button
                           onClick={() => openEditModal(emp)}
                           className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                          title="تعديل الموظف"
+                          title={t("hr.employees.actionEdit")}
                         >
                           <Pencil size={18} />
                         </button>
                         <button
                           onClick={() => handleDelete(emp.id)}
                           className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                          title="حذف"
+                          title={t("hr.employees.actionDelete")}
                         >
                           <Trash2 size={18} />
                         </button>
@@ -420,7 +420,7 @@ function EmployeesContent() {
         <FormModal
           open={showModal}
           onClose={() => setShowModal(false)}
-          title={editingEmployee ? "تعديل بيانات الموظف" : "إضافة موظف جديد"}
+          title={editingEmployee ? t("hr.employees.editTitle") : t("hr.employees.addTitle")}
           xl
         >
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -432,7 +432,7 @@ function EmployeesContent() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">كود الموظف *</label>
+                <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.employees.labelCode")}</label>
                 <input
                   type="text"
                   required
@@ -443,24 +443,24 @@ function EmployeesContent() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">رقم البصمة (Fingerprint ID)</label>
+                <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.employees.labelFingerprint")}</label>
                 <input
                   type="text"
                   value={formData.fingerprintId}
                   onChange={(e) => setFormData({ ...formData, fingerprintId: e.target.value })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
-                  placeholder="مثال: 101"
+                  placeholder={t("hr.employees.fingerprintPlaceholder")}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">الشركة المسجل بها *</label>
+                <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.employees.labelCompany")}</label>
                 <select
                   value={formData.companyId}
                   onChange={(e) => setFormData({ ...formData, companyId: e.target.value })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="">اختر الشركة...</option>
+                  <option value="">{t("hr.employees.selectCompany")}</option>
                   {companies.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.name}
@@ -470,7 +470,7 @@ function EmployeesContent() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">الاسم الكامل (إنجليزي/عام) *</label>
+                <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.employees.labelFullName")}</label>
                 <input
                   type="text"
                   required
@@ -481,7 +481,7 @@ function EmployeesContent() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">الاسم باللغة العربية</label>
+                <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.employees.labelFullNameAr")}</label>
                 <input
                   type="text"
                   value={formData.fullNameAr}
@@ -491,7 +491,7 @@ function EmployeesContent() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">الرقم القومي / الهوية</label>
+                <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.employees.labelNationalId")}</label>
                 <input
                   type="text"
                   value={formData.nationalId}
@@ -501,7 +501,7 @@ function EmployeesContent() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">رقم الهاتف</label>
+                <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.employees.labelPhone")}</label>
                 <input
                   type="text"
                   value={formData.phone}
@@ -511,7 +511,7 @@ function EmployeesContent() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">البريد الإلكتروني</label>
+                <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.employees.labelEmail")}</label>
                 <input
                   type="email"
                   value={formData.email}
@@ -521,7 +521,7 @@ function EmployeesContent() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">تاريخ التعيين *</label>
+                <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.employees.labelHireDate")}</label>
                 <input
                   type="date"
                   required
@@ -532,13 +532,13 @@ function EmployeesContent() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">المسمى الوظيفي</label>
+                <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.employees.labelJobTitle")}</label>
                 <select
                   value={formData.jobTitleId}
                   onChange={(e) => setFormData({ ...formData, jobTitleId: e.target.value })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="">بدون مسمى</option>
+                  <option value="">{t("hr.employees.noTitle")}</option>
                   {jobTitles.map((j) => (
                     <option key={j.id} value={j.id}>
                       {j.titleAr || j.title}
@@ -548,7 +548,7 @@ function EmployeesContent() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">الراتب الأساسي (ج.م) *</label>
+                <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.employees.labelBaseSalary")}</label>
                 <input
                   type="number"
                   min="0"
@@ -561,36 +561,36 @@ function EmployeesContent() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">نوع التوظيف</label>
+                <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.employees.labelEmploymentType")}</label>
                 <select
                   value={formData.employmentType}
                   onChange={(e) => setFormData({ ...formData, employmentType: e.target.value })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="FULL_TIME">دوام كامل (Full-Time)</option>
-                  <option value="PART_TIME">دوام جزئي (Part-Time)</option>
-                  <option value="CONTRACT">عقد مؤقت (Contract)</option>
-                  <option value="TRAINEE">متدرب (Trainee)</option>
+                  <option value="FULL_TIME">{t("hr.employees.empFullTime")}</option>
+                  <option value="PART_TIME">{t("hr.employees.empPartTime")}</option>
+                  <option value="CONTRACT">{t("hr.employees.empContract")}</option>
+                  <option value="TRAINEE">{t("hr.employees.empTrainee")}</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">حالة العمل</label>
+                <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.employees.labelWorkStatus")}</label>
                 <select
                   value={formData.status}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
                 >
-                  <option value="ACTIVE">نشط (Active)</option>
-                  <option value="ON_LEAVE">في إجازة (On Leave)</option>
-                  <option value="SUSPENDED">موقوف عن العمل (Suspended)</option>
-                  <option value="TERMINATED">منهى الخدمة (Terminated)</option>
+                  <option value="ACTIVE">{t("hr.employees.statusActiveForm")}</option>
+                  <option value="ON_LEAVE">{t("hr.employees.statusOnLeaveForm")}</option>
+                  <option value="SUSPENDED">{t("hr.employees.statusSuspendedForm")}</option>
+                  <option value="TERMINATED">{t("hr.employees.statusTerminatedForm")}</option>
                 </select>
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">ملاحظات / بيانات إضافية</label>
+              <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.employees.labelNotes")}</label>
               <textarea
                 rows={2}
                 value={formData.notes}
@@ -605,9 +605,9 @@ function EmployeesContent() {
                 onClick={() => setShowModal(false)}
                 className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
               >
-                إلغاء
+                {t("common.cancel")}
               </button>
-              <SubmitButton loading={isPending} label={editingEmployee ? "تحديث الموظف" : "إضافة الموظف"} />
+              <SubmitButton loading={isPending} label={editingEmployee ? t("hr.employees.saveUpdate") : t("hr.employees.saveAdd")} />
             </div>
           </form>
         </FormModal>
@@ -618,43 +618,43 @@ function EmployeesContent() {
         <FormModal
           open={!!selectedEmployee}
           onClose={() => setSelectedEmployee(null)}
-          title={`تفاصيل الموظف: ${selectedEmployee.fullName}`}
+          title={`${t("hr.employees.detailTitlePrefix")}${selectedEmployee.fullName}`}
           wide
         >
           <div className="space-y-4 text-sm">
             <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200">
               <div>
-                <span className="text-xs text-gray-500 block">الكود الوظيفي</span>
-                <span className="font-bold text-gray-900">{selectedEmployee.code}</span>
+                <span className="text-xs text-gray-500 block">{t("hr.employees.detailCode")}</span>
+                <span className="font-bold text-gray-900"><span dir="ltr">{selectedEmployee.code}</span></span>
               </div>
               <div>
-                <span className="text-xs text-gray-500 block">رقم جهاز البصمة</span>
-                <span className="font-bold text-blue-600">{selectedEmployee.fingerprintId || "غير معرف"}</span>
+                <span className="text-xs text-gray-500 block">{t("hr.employees.detailFingerprint")}</span>
+                <span className="font-bold text-blue-600"><span dir="ltr">{selectedEmployee.fingerprintId || t("hr.employees.detailUnknown")}</span></span>
               </div>
               <div>
-                <span className="text-xs text-gray-500 block">المسمى الوظيفي</span>
+                <span className="text-xs text-gray-500 block">{t("hr.employees.detailJobTitle")}</span>
                 <span className="font-bold text-gray-900">{selectedEmployee.JobTitle?.titleAr || selectedEmployee.JobTitle?.title || "-"}</span>
               </div>
               <div>
-                <span className="text-xs text-gray-500 block">تاريخ التعيين</span>
-                <span className="font-bold text-gray-900">{new Date(selectedEmployee.hireDate).toLocaleDateString("ar-EG")}</span>
+                <span className="text-xs text-gray-500 block">{t("hr.employees.detailHireDate")}</span>
+                <span className="font-bold text-gray-900">{new Date(selectedEmployee.hireDate).toLocaleDateString(locale === "ar" ? "ar-EG" : "en-GB")}</span>
               </div>
               <div>
-                <span className="text-xs text-gray-500 block">الراتب الأساسي</span>
-                <span className="font-bold text-emerald-700">{selectedEmployee.baseSalary.toLocaleString()} ج.م</span>
+                <span className="text-xs text-gray-500 block">{t("hr.employees.detailBaseSalary")}</span>
+                <span className="font-bold text-emerald-700">{selectedEmployee.baseSalary.toLocaleString("en-US")} {t("hr.currency")}</span>
               </div>
             </div>
 
             <div className="space-y-2">
-              <h4 className="font-bold text-gray-900 text-xs">معلومات الاتصال والهوية</h4>
-              <p className="text-gray-700"><strong>الهاتف:</strong> {selectedEmployee.phone || "غير مسجل"}</p>
-              <p className="text-gray-700"><strong>البريد:</strong> {selectedEmployee.email || "غير مسجل"}</p>
-              <p className="text-gray-700"><strong>الرقم القومي:</strong> {selectedEmployee.nationalId || "غير مسجل"}</p>
+              <h4 className="font-bold text-gray-900 text-xs">{t("hr.employees.detailContact")}</h4>
+              <p className="text-gray-700"><strong>{t("hr.employees.detailPhone")}</strong> <span dir="ltr">{selectedEmployee.phone || t("hr.employees.detailNotRegistered")}</span></p>
+              <p className="text-gray-700"><strong>{t("hr.employees.detailEmail")}</strong> <span dir="ltr">{selectedEmployee.email || t("hr.employees.detailNotRegistered")}</span></p>
+              <p className="text-gray-700"><strong>{t("hr.employees.detailNationalId")}</strong> <span dir="ltr">{selectedEmployee.nationalId || t("hr.employees.detailNotRegistered")}</span></p>
             </div>
 
             {selectedEmployee.notes && (
               <div className="p-3 bg-amber-50 rounded-lg text-xs text-amber-900 border border-amber-200">
-                <strong>ملاحظات:</strong> {selectedEmployee.notes}
+                <strong>{t("hr.employees.detailNotes")}</strong> {selectedEmployee.notes}
               </div>
             )}
           </div>
@@ -665,8 +665,9 @@ function EmployeesContent() {
 }
 
 export default function EmployeesPage() {
+  const { t } = useI18n();
   return (
-    <Suspense fallback={<PrinterLoader label="جاري تحميل قائمة الموظفين..." />}>
+    <Suspense fallback={<PrinterLoader label={t("hr.employees.loading")} />}>
       <EmployeesContent />
     </Suspense>
   );
