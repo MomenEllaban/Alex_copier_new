@@ -15,7 +15,6 @@ export async function GET(
     const employee = await prisma.employee.findUnique({
       where: { id },
       include: {
-        Department: { select: { id: true, name: true, nameAr: true } },
         JobTitle: { select: { id: true, title: true, titleAr: true } },
         Shift: { select: { id: true, name: true, startTime: true, endTime: true } },
         User: { select: { id: true, email: true, name: true, role: true } },
@@ -52,6 +51,9 @@ export async function PUT(
       return NextResponse.json({ error: "الموظف غير موجود" }, { status: 404 });
     }
 
+    const nullable = (v: unknown, fallback: string | null | undefined) =>
+      v === undefined ? fallback : v === "" || v === null ? null : String(v);
+
     const newBaseSalary = body.baseSalary !== undefined ? parseFloat(body.baseSalary) : existing.baseSalary;
 
     // Track salary history if baseSalary changed
@@ -72,25 +74,24 @@ export async function PUT(
       where: { id },
       data: {
         fullName: body.fullName ?? existing.fullName,
-        fullNameAr: body.fullNameAr ?? existing.fullNameAr,
-        nationalId: body.nationalId ?? existing.nationalId,
-        phone: body.phone ?? existing.phone,
-        email: body.email ?? existing.email,
+        fullNameAr: nullable(body.fullNameAr, existing.fullNameAr),
+        hireDate: body.hireDate ? new Date(body.hireDate) : existing.hireDate,
+        nationalId: nullable(body.nationalId, existing.nationalId),
+        phone: nullable(body.phone, existing.phone),
+        email: nullable(body.email, existing.email),
         employmentType: body.employmentType ?? existing.employmentType,
         status: body.status ?? existing.status,
         baseSalary: newBaseSalary,
-        departmentId: body.departmentId ?? existing.departmentId,
-        jobTitleId: body.jobTitleId ?? existing.jobTitleId,
-        shiftId: body.shiftId ?? existing.shiftId,
-        userId: body.userId ?? existing.userId,
-        engineerId: body.engineerId ?? existing.engineerId,
-        notes: body.notes ?? existing.notes,
+        jobTitleId: nullable(body.jobTitleId, existing.jobTitleId),
+        shiftId: nullable(body.shiftId, existing.shiftId),
+        userId: nullable(body.userId, existing.userId),
+        engineerId: nullable(body.engineerId, existing.engineerId),
+        notes: nullable(body.notes, existing.notes),
         annualLeaveBalance: body.annualLeaveBalance !== undefined ? parseFloat(body.annualLeaveBalance) : existing.annualLeaveBalance,
         sickLeaveBalance: body.sickLeaveBalance !== undefined ? parseFloat(body.sickLeaveBalance) : existing.sickLeaveBalance,
         emergencyLeaveBalance: body.emergencyLeaveBalance !== undefined ? parseFloat(body.emergencyLeaveBalance) : existing.emergencyLeaveBalance,
       },
       include: {
-        Department: { select: { id: true, name: true, nameAr: true } },
         JobTitle: { select: { id: true, title: true, titleAr: true } },
         Shift: { select: { id: true, name: true } },
       },
@@ -110,5 +111,39 @@ export async function PUT(
   } catch (error) {
     console.error("PUT /api/hr/employees/[id] error:", error);
     return NextResponse.json({ error: "Failed to update employee" }, { status: 500 });
+  }
+}
+
+export async function DELETE(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const actor = await requireAuth();
+    if (!actor) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const { id } = await params;
+
+    const existing = await prisma.employee.findUnique({ where: { id } });
+    if (!existing) {
+      return NextResponse.json({ error: "الموظف غير موجود" }, { status: 404 });
+    }
+
+    await prisma.employee.delete({ where: { id } });
+
+    await prisma.approvalLog.create({
+      data: {
+        userId: actor.id,
+        action: "DELETE",
+        entityType: "Employee",
+        entityId: id,
+        notes: `Deleted employee ${existing.fullName} (${existing.code})`,
+      },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("DELETE /api/hr/employees/[id] error:", error);
+    return NextResponse.json({ error: "Failed to delete employee" }, { status: 500 });
   }
 }
