@@ -13,9 +13,8 @@ import ExportButton from "@/components/ExportButton";
 import RefreshButton from "@/components/RefreshButton";
 import StatsCards from "@/components/StatsCards";
 import { useConfirm, useToast } from "@/components/UIProvider";
-import { Plus, Eye, Pencil, Trash2, Users, UserCheck, Wallet, Building2 } from "lucide-react";
+import { Plus, Eye, Pencil, Trash2, Users, UserCheck, Wallet, Briefcase } from "lucide-react";
 
-interface Department { id: string; name: string; nameAr?: string | null; }
 interface JobTitle { id: string; title: string; titleAr?: string | null; }
 interface Shift { id: string; name: string; startTime: string; endTime: string; }
 interface Company { id: string; name: string; }
@@ -33,12 +32,10 @@ interface Employee {
   employmentType: string;
   status: string;
   baseSalary: number;
-  departmentId?: string | null;
   jobTitleId?: string | null;
   shiftId?: string | null;
   companyId: string;
   notes?: string | null;
-  Department?: Department | null;
   JobTitle?: JobTitle | null;
   Shift?: Shift | null;
 }
@@ -51,13 +48,11 @@ function EmployeesContent() {
   const { success: toastSuccess, error: toastError } = useToast();
 
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
   const [jobTitles, setJobTitles] = useState<JobTitle[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [departmentFilter, setDepartmentFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 15;
@@ -80,7 +75,6 @@ function EmployeesContent() {
     employmentType: "FULL_TIME",
     status: "ACTIVE",
     baseSalary: "0",
-    departmentId: "",
     jobTitleId: "",
     shiftId: "",
     companyId: "",
@@ -90,15 +84,13 @@ function EmployeesContent() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [empRes, deptRes, jtRes, compRes] = await Promise.all([
+      const [empRes, jtRes, compRes] = await Promise.all([
         fetch("/api/hr/employees"),
-        fetch("/api/hr/departments"),
         fetch("/api/hr/job-titles"),
         fetch("/api/companies"),
       ]);
 
       if (empRes.ok) setEmployees(await empRes.json());
-      if (deptRes.ok) setDepartments(await deptRes.json());
       if (jtRes.ok) setJobTitles(await jtRes.json());
       if (compRes.ok) setCompanies(await compRes.json());
     } catch (err) {
@@ -136,7 +128,6 @@ function EmployeesContent() {
       employmentType: "FULL_TIME",
       status: "ACTIVE",
       baseSalary: "0",
-      departmentId: departments[0]?.id || "",
       jobTitleId: jobTitles[0]?.id || "",
       shiftId: "",
       companyId: companies[0]?.id || "",
@@ -160,7 +151,6 @@ function EmployeesContent() {
       employmentType: emp.employmentType || "FULL_TIME",
       status: emp.status || "ACTIVE",
       baseSalary: String(emp.baseSalary || 0),
-      departmentId: emp.departmentId || "",
       jobTitleId: emp.jobTitleId || "",
       shiftId: emp.shiftId || "",
       companyId: emp.companyId || "",
@@ -232,9 +222,8 @@ function EmployeesContent() {
       emp.code.toLowerCase().includes(search.toLowerCase()) ||
       (emp.phone && emp.phone.includes(search)) ||
       (emp.fingerprintId && emp.fingerprintId.includes(search));
-    const matchesDept = !departmentFilter || emp.departmentId === departmentFilter;
     const matchesStatus = !statusFilter || emp.status === statusFilter;
-    return matchesSearch && matchesDept && matchesStatus;
+    return matchesSearch && matchesStatus;
   });
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE) || 1;
@@ -242,12 +231,12 @@ function EmployeesContent() {
 
   const stats = useMemo(() => {
     const totalBaseSalary = employees.reduce((sum, e) => sum + (e.baseSalary || 0), 0);
-    const departmentsCount = new Set(employees.filter((e) => e.departmentId).map((e) => e.departmentId)).size;
+    const jobTitlesCount = new Set(employees.filter((e) => e.jobTitleId).map((e) => e.jobTitleId)).size;
     return {
       total: employees.length,
       active: employees.filter((e) => e.status === "ACTIVE").length,
       totalBaseSalary,
-      departmentsCount,
+      jobTitlesCount,
     };
   }, [employees]);
 
@@ -271,12 +260,12 @@ function EmployeesContent() {
           <ExportButton
             filename="employees_export"
             getExport={() => ({
-              headers: ["كود الموظف", "الاسم", "رقم البصمة", "القسم", "الراتب الأساسي", "الحالة"],
+              headers: ["كود الموظف", "الاسم", "رقم البصمة", "المسمى الوظيفي", "الراتب الأساسي", "الحالة"],
               rows: filtered.map((e) => [
                 e.code,
                 e.fullNameAr || e.fullName,
                 e.fingerprintId || "",
-                e.Department?.nameAr || e.Department?.name || "",
+                e.JobTitle?.titleAr || e.JobTitle?.title || "",
                 String(e.baseSalary || 0),
                 e.status,
               ]),
@@ -298,22 +287,16 @@ function EmployeesContent() {
           { label: "إجمالي الموظفين", value: stats.total.toLocaleString("ar-EG"), icon: <Users size={18} />, tone: "sky" },
           { label: "موظفون نشطون", value: stats.active.toLocaleString("ar-EG"), icon: <UserCheck size={18} />, tone: "green" },
           { label: "إجمالي الرواتب الأساسية", value: `${stats.totalBaseSalary.toLocaleString("ar-EG")} ج.م`, icon: <Wallet size={18} />, tone: "emerald" },
-          { label: "الأقسام", value: stats.departmentsCount.toLocaleString("ar-EG"), icon: <Building2 size={18} />, tone: "purple" },
+          { label: "المسميات الوظيفية", value: stats.jobTitlesCount.toLocaleString("ar-EG"), icon: <Briefcase size={18} />, tone: "purple" },
         ]}
       />
 
       {/* Search & Filters */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-4">
         <SearchInput
           value={search}
           onChange={(v) => { setSearch(v); setPage(1); }}
           placeholder="بحث باسم الموظف، الكود، أو رقم البصمة..."
-        />
-        <FilterSelect
-          value={departmentFilter}
-          onChange={(v) => { setDepartmentFilter(v); setPage(1); }}
-          allLabel="جميع الأقسام"
-          options={departments.map((d) => ({ label: d.nameAr || d.name, value: d.id }))}
         />
         <FilterSelect
           value={statusFilter}
@@ -336,7 +319,7 @@ function EmployeesContent() {
               <tr>
                 <th className="p-3 font-semibold text-start">الكود / البصمة</th>
                 <th className="p-3 font-semibold text-start">اسم الموظف</th>
-                <th className="p-3 font-semibold text-start">القسم والوظيفة</th>
+                <th className="p-3 font-semibold text-start">المسمى الوظيفي</th>
                 <th className="p-3 font-semibold text-start">الهاتف / الرقم القومي</th>
                 <th className="p-3 font-semibold text-start">الراتب الأساسي</th>
                 <th className="p-3 font-semibold text-start">الحالة</th>
@@ -346,7 +329,7 @@ function EmployeesContent() {
             <tbody className="divide-y divide-gray-100">
               {paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-gray-500">
+                  <td colSpan={6} className="p-8 text-center text-gray-500">
                     لا يوجد موظفون مطابقون للشروط الحالية.
                   </td>
                 </tr>
@@ -366,8 +349,7 @@ function EmployeesContent() {
                       {emp.fullNameAr && <div className="text-xs text-gray-500">{emp.fullNameAr}</div>}
                     </td>
                     <td className="p-3">
-                      <div className="text-gray-900 font-medium">{emp.Department?.nameAr || emp.Department?.name || "بدون قسم"}</div>
-                      <div className="text-xs text-gray-500">{emp.JobTitle?.titleAr || emp.JobTitle?.title || "-"}</div>
+                      <div className="text-gray-900 font-medium">{emp.JobTitle?.titleAr || emp.JobTitle?.title || "بدون مسمى"}</div>
                     </td>
                     <td className="p-3">
                       <div className="text-gray-900">{emp.phone || "-"}</div>
@@ -550,22 +532,6 @@ function EmployeesContent() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">القسم</label>
-                <select
-                  value={formData.departmentId}
-                  onChange={(e) => setFormData({ ...formData, departmentId: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">بدون قسم</option>
-                  {departments.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.nameAr || d.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">المسمى الوظيفي</label>
                 <select
                   value={formData.jobTitleId}
@@ -664,10 +630,6 @@ function EmployeesContent() {
               <div>
                 <span className="text-xs text-gray-500 block">رقم جهاز البصمة</span>
                 <span className="font-bold text-blue-600">{selectedEmployee.fingerprintId || "غير معرف"}</span>
-              </div>
-              <div>
-                <span className="text-xs text-gray-500 block">القسم</span>
-                <span className="font-bold text-gray-900">{selectedEmployee.Department?.nameAr || selectedEmployee.Department?.name || "-"}</span>
               </div>
               <div>
                 <span className="text-xs text-gray-500 block">المسمى الوظيفي</span>

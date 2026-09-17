@@ -31,7 +31,6 @@ export async function GET(request: Request) {
       where,
       orderBy: { code: "asc" },
       include: {
-        Department: { select: { id: true, name: true, nameAr: true } },
         JobTitle: { select: { id: true, title: true, titleAr: true } },
         Shift: { select: { id: true, name: true, startTime: true, endTime: true } },
         User: { select: { id: true, email: true, name: true, role: true } },
@@ -63,7 +62,6 @@ export async function POST(request: Request) {
       employmentType,
       status,
       baseSalary,
-      departmentId,
       jobTitleId,
       shiftId,
       userId,
@@ -106,7 +104,6 @@ export async function POST(request: Request) {
         employmentType: employmentType || "FULL_TIME",
         status: status || "ACTIVE",
         baseSalary: parseFloat(baseSalary || "0"),
-        departmentId: departmentId || null,
         jobTitleId: jobTitleId || null,
         shiftId: shiftId || null,
         companyId,
@@ -115,7 +112,6 @@ export async function POST(request: Request) {
         notes: notes || null,
       },
       include: {
-        Department: { select: { id: true, name: true, nameAr: true } },
         JobTitle: { select: { id: true, title: true, titleAr: true } },
         Shift: { select: { id: true, name: true } },
       },
