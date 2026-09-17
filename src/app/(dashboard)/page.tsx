@@ -362,22 +362,22 @@ export default function Dashboard() {
               <table className="w-full text-right min-w-[640px]">
                 <thead>
                   <tr className="border-b border-gray-200 text-gray-500 text-sm">
-                    <th className="pb-2 px-2 font-medium">
+                    <th className="pb-2 px-2 font-medium text-start">
                       {t("companies.title")}
                     </th>
-                    <th className="pb-2 px-2 font-medium">
+                    <th className="pb-2 px-2 font-medium text-start">
                       {t("dashboard.salesThisMonth")}
                     </th>
-                    <th className="pb-2 px-2 font-medium">
+                    <th className="pb-2 px-2 font-medium text-start">
                       {t("dashboard.purchasesThisMonth")}
                     </th>
-                    <th className="pb-2 px-2 font-medium">
+                    <th className="pb-2 px-2 font-medium text-start">
                       {t("dashboard.expensesThisMonth")}
                     </th>
-                    <th className="pb-2 px-2 font-medium">
+                    <th className="pb-2 px-2 font-medium text-start">
                       {t("dashboard.collectedThisMonth")}
                     </th>
-                    <th className="pb-2 px-2 font-medium">
+                    <th className="pb-2 px-2 font-medium text-start">
                       {t("dashboard.openRequests")}
                     </th>
                   </tr>
@@ -456,13 +456,13 @@ export default function Dashboard() {
             <table className="w-full text-right">
               <thead>
                 <tr className="border-b border-gray-200 text-gray-500 text-sm">
-                  <th className="pb-2 font-medium">
+                  <th className="pb-2 font-medium text-start">
                     {t("dashboard.engineer")}
                   </th>
-                  <th className="pb-2 font-medium">
+                  <th className="pb-2 font-medium text-start">
                     {t("dashboard.assignedOpen")}
                   </th>
-                  <th className="pb-2 font-medium">
+                  <th className="pb-2 font-medium text-start">
                     {t("dashboard.visitsCol")}
                   </th>
                 </tr>
@@ -523,26 +523,26 @@ export default function Dashboard() {
             <table className="w-full text-right min-w-[720px]">
               <thead>
                 <tr className="border-b border-gray-200 text-gray-500 text-sm">
-                  <th className="pb-2 px-2 font-medium">#</th>
-                  <th className="pb-2 px-2 font-medium">
+                  <th className="pb-2 px-2 font-medium text-start">#</th>
+                  <th className="pb-2 px-2 font-medium text-start">
                     {t("common.description")}
                   </th>
-                  <th className="pb-2 px-2 font-medium">
+                  <th className="pb-2 px-2 font-medium text-start">
                     {t("serviceRequests.customer")}
                   </th>
-                  <th className="pb-2 px-2 font-medium">
+                  <th className="pb-2 px-2 font-medium text-start">
                     {t("machines.serialNumber")}
                   </th>
-                  <th className="pb-2 px-2 font-medium">
+                  <th className="pb-2 px-2 font-medium text-start">
                     {t("serviceRequests.priority")}
                   </th>
-                  <th className="pb-2 px-2 font-medium">
+                  <th className="pb-2 px-2 font-medium text-start">
                     {t("serviceRequests.status")}
                   </th>
-                  <th className="pb-2 px-2 font-medium">
+                  <th className="pb-2 px-2 font-medium text-start">
                     {t("dashboard.engineer")}
                   </th>
-                  <th className="pb-2 px-2 font-medium">{t("common.date")}</th>
+                  <th className="pb-2 px-2 font-medium text-start">{t("common.date")}</th>
                 </tr>
               </thead>
               <tbody>

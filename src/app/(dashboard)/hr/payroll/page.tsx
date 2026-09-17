@@ -221,12 +221,12 @@ export default function PayrollPage() {
           <table className="w-full text-right text-sm">
             <thead className="bg-gray-50 text-gray-700 border-b border-gray-200">
               <tr>
-                <th className="p-3 font-semibold">الشهر / السنة</th>
-                <th className="p-3 font-semibold">عدد الموظفين</th>
-                <th className="p-3 font-semibold">إجمالي الرواتب (Gross)</th>
-                <th className="p-3 font-semibold">إجمالي الخصومات</th>
-                <th className="p-3 font-semibold">صافي الرواتب (Net)</th>
-                <th className="p-3 font-semibold">الحالة</th>
+                <th className="p-3 font-semibold text-start">الشهر / السنة</th>
+                <th className="p-3 font-semibold text-start">عدد الموظفين</th>
+                <th className="p-3 font-semibold text-start">إجمالي الرواتب (Gross)</th>
+                <th className="p-3 font-semibold text-start">إجمالي الخصومات</th>
+                <th className="p-3 font-semibold text-start">صافي الرواتب (Net)</th>
+                <th className="p-3 font-semibold text-start">الحالة</th>
                 <th className="p-3 font-semibold text-center">الإجراءات</th>
               </tr>
             </thead>
@@ -403,14 +403,14 @@ export default function PayrollPage() {
               <table className="w-full text-right text-xs">
                 <thead className="bg-gray-100 text-gray-800 sticky top-0">
                   <tr>
-                    <th className="p-2">الموظف</th>
-                    <th className="p-2">الأساسي</th>
-                    <th className="p-2">أيام العمل</th>
-                    <th className="p-2">أيام الغياب</th>
-                    <th className="p-2">التأخير (أيام)</th>
-                    <th className="p-2">إجمالي الإيراد</th>
-                    <th className="p-2">إجمالي الخصم</th>
-                    <th className="p-2">الصافي</th>
+                    <th className="p-2 text-start">الموظف</th>
+                    <th className="p-2 text-start">الأساسي</th>
+                    <th className="p-2 text-start">أيام العمل</th>
+                    <th className="p-2 text-start">أيام الغياب</th>
+                    <th className="p-2 text-start">التأخير (أيام)</th>
+                    <th className="p-2 text-start">إجمالي الإيراد</th>
+                    <th className="p-2 text-start">إجمالي الخصم</th>
+                    <th className="p-2 text-start">الصافي</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">

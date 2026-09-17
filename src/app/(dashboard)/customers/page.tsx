@@ -757,7 +757,7 @@ export default function CustomersPage() {
                           <td className="px-4 py-2">{loc.address || "—"}</td>
                           <td className="px-4 py-2">{loc.city || "—"}</td>
                           <td className="px-4 py-2">{loc.governorate || "—"}</td>
-                          <td className="px-4 py-2"><span dir="ltr">{loc.phone || "—"}</span></td>
+                          <td className="px-4 py-2 text-end"><span dir="ltr">{loc.phone || "—"}</span></td>
                           <td className="px-4 py-2">
                             <div className="flex gap-2">
                               <button onClick={() => openLocationEdit(loc)} className="text-blue-600 hover:text-blue-800"><Pencil size={14} className="inline-block me-1" />{t("common.edit")}</button>

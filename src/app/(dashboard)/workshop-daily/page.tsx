@@ -413,7 +413,7 @@ export default function WorkshopDailyPage() {
                             <span className="block truncate text-xs text-red-500">{tx.rejectReason}</span>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-sm font-bold whitespace-nowrap text-slate-900" dir="ltr">{fmtMoney(tx.amount)}</td>
+                        <td className="px-4 py-3 text-sm font-bold whitespace-nowrap text-slate-900 text-end" dir="ltr">{fmtMoney(tx.amount)}</td>
                         <td className="px-4 py-3 text-sm">
                           <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-bold whitespace-nowrap ${STATUS_STYLES[tx.status]}`}>
                             {tx.status === "PENDING" ? t("workshopDaily.pending") : tx.status === "CONFIRMED" ? t("workshopDaily.confirmed") : t("workshopDaily.rejected")}
@@ -463,9 +463,9 @@ export default function WorkshopDailyPage() {
                     {data.closedBooks.map((b) => (
                       <tr key={b.id} className="hover:bg-gray-50">
                         <td className="px-4 py-2 text-sm whitespace-nowrap text-slate-700">{fmtDate(b.bookDate)}</td>
-                        <td className="px-4 py-2 text-sm font-semibold text-green-700" dir="ltr">{fmtMoney(b.totals.inTotal)}</td>
-                        <td className="px-4 py-2 text-sm font-semibold text-red-700" dir="ltr">{fmtMoney(b.totals.outTotal)}</td>
-                        <td className="px-4 py-2 text-sm font-bold text-slate-900" dir="ltr">{b.handoverAmount != null ? fmtMoney(b.handoverAmount) : "—"}</td>
+                        <td className="px-4 py-2 text-sm font-semibold text-green-700 text-end" dir="ltr">{fmtMoney(b.totals.inTotal)}</td>
+                        <td className="px-4 py-2 text-sm font-semibold text-red-700 text-end" dir="ltr">{fmtMoney(b.totals.outTotal)}</td>
+                        <td className="px-4 py-2 text-sm font-bold text-slate-900 text-end" dir="ltr">{b.handoverAmount != null ? fmtMoney(b.handoverAmount) : "—"}</td>
                         <td className="px-4 py-2 text-sm text-slate-600">{b.handoverTo || "—"}</td>
                       </tr>
                     ))}

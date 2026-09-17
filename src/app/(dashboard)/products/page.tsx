@@ -452,7 +452,7 @@ export default function ProductsPage() {
                     <td className="px-4 py-3 text-sm font-medium text-slate-800">{product.name}</td>
                     <td className="px-4 py-3"><span className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-xs font-semibold ${TYPE_BADGES[product.productType] || ""}`}>{product.productType === "MACHINE" ? t("products.machine") : t("products.sparePart")}</span></td>
                     <td className="px-4 py-3 text-sm text-slate-600">{product.company?.nameAr || product.company?.name || "—"}</td>
-                    <td className="px-4 py-3 text-sm text-slate-600"><span dir="ltr">{product.sku || "—"}</span></td>
+                    <td className="px-4 py-3 text-sm text-slate-600 text-end"><span dir="ltr">{product.sku || "—"}</span></td>
                     <td className="px-4 py-3 text-sm text-slate-600">{product.purchasePrice != null ? product.purchasePrice.toLocaleString() : "—"}</td>
                     <td className="px-4 py-3 text-sm">
                       {(() => {

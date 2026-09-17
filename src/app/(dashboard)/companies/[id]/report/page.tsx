@@ -596,7 +596,7 @@ export default function CompanyReportPage() {
                       {report.customerDebt.details.map((row) => (
                         <tr key={row.customerId} className="border-t border-gray-100 hover:bg-slate-50/50">
                           <td className="px-4 py-3 text-sm font-medium">{row.customerName}</td>
-                          <td className="px-4 py-3 text-sm" dir="ltr">{row.phone || "—"}</td>
+                          <td className="px-4 py-3 text-sm text-end" dir="ltr">{row.phone || "—"}</td>
                           <td className="px-4 py-3 text-sm font-bold text-amber-600">{moneyFormatter.format(row.balance)}</td>
                         </tr>
                       ))}

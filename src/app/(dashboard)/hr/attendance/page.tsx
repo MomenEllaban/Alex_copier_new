@@ -274,14 +274,14 @@ export default function AttendancePage() {
           <table className="w-full text-right text-sm">
             <thead className="bg-gray-50 text-gray-700 border-b border-gray-200">
               <tr>
-                <th className="p-3 font-semibold">الموظف</th>
-                <th className="p-3 font-semibold">القسم</th>
-                <th className="p-3 font-semibold">وقت الدخول</th>
-                <th className="p-3 font-semibold">وقت الخروج</th>
-                <th className="p-3 font-semibold">ساعات العمل</th>
-                <th className="p-3 font-semibold">التأخير</th>
-                <th className="p-3 font-semibold">الحالة</th>
-                <th className="p-3 font-semibold">إدخال يدوي</th>
+                <th className="p-3 font-semibold text-start">الموظف</th>
+                <th className="p-3 font-semibold text-start">القسم</th>
+                <th className="p-3 font-semibold text-start">وقت الدخول</th>
+                <th className="p-3 font-semibold text-start">وقت الخروج</th>
+                <th className="p-3 font-semibold text-start">ساعات العمل</th>
+                <th className="p-3 font-semibold text-start">التأخير</th>
+                <th className="p-3 font-semibold text-start">الحالة</th>
+                <th className="p-3 font-semibold text-start">إدخال يدوي</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">

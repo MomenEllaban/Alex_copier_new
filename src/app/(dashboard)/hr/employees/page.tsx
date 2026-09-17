@@ -334,12 +334,12 @@ function EmployeesContent() {
           <table className="w-full text-right text-sm">
             <thead className="bg-gray-50 text-gray-700 border-b border-gray-200">
               <tr>
-                <th className="p-3 font-semibold">الكود / البصمة</th>
-                <th className="p-3 font-semibold">اسم الموظف</th>
-                <th className="p-3 font-semibold">القسم والوظيفة</th>
-                <th className="p-3 font-semibold">الهاتف / الرقم القومي</th>
-                <th className="p-3 font-semibold">الراتب الأساسي</th>
-                <th className="p-3 font-semibold">الحالة</th>
+                <th className="p-3 font-semibold text-start">الكود / البصمة</th>
+                <th className="p-3 font-semibold text-start">اسم الموظف</th>
+                <th className="p-3 font-semibold text-start">القسم والوظيفة</th>
+                <th className="p-3 font-semibold text-start">الهاتف / الرقم القومي</th>
+                <th className="p-3 font-semibold text-start">الراتب الأساسي</th>
+                <th className="p-3 font-semibold text-start">الحالة</th>
                 <th className="p-3 font-semibold text-center">الإجراءات</th>
               </tr>
             </thead>
