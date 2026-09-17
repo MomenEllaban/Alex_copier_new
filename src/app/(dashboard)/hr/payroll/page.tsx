@@ -51,7 +51,7 @@ interface PayrollItem {
 }
 
 export default function PayrollPage() {
-  const { t } = useI18n();
+  const { t, dir } = useI18n();
   const confirmAction = useConfirm();
   const { success: toastSuccess, error: toastError } = useToast();
 
@@ -73,7 +73,7 @@ export default function PayrollPage() {
       if (res.ok) setRuns(await res.json());
     } catch (err) {
       console.error("Error fetching payroll runs:", err);
-      toastError("فشل تحميل مسيرات الرواتب");
+      toastError(t("hr.payroll.toastLoadFailed"));
     } finally {
       setLoading(false);
     }
@@ -100,21 +100,21 @@ export default function PayrollPage() {
         });
 
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "فشل احتساب مسير الرواتب");
+        if (!res.ok) throw new Error(data.error || t("hr.payroll.toastCalcFailed"));
 
-        toastSuccess("تم احتساب الرواتب للشهر المحدد بنجاح");
+        toastSuccess(t("hr.payroll.toastCalcSuccess"));
         setShowCalcModal(false);
         fetchRuns();
       } catch (err: any) {
-        setFormError(err.message || "حدث خطأ في الاحتساب");
+        setFormError(err.message || t("hr.payroll.toastCalcError"));
       }
     });
   };
 
   const handleApproveRun = async (runId: string) => {
     const ok = await confirmAction({
-      title: "اعتماد كشف الرواتب",
-      message: "هل أنت متأكد من اعتماد هذا المسير المالي وتثبيته للاعتماد النهائي؟",
+      title: t("hr.payroll.approveConfirmTitle"),
+      message: t("hr.payroll.approveConfirmMsg"),
     });
     if (!ok) return;
 
@@ -127,20 +127,20 @@ export default function PayrollPage() {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "فشل اعتماد المسير");
+        throw new Error(data.error || t("hr.payroll.toastApproveFailed"));
       }
 
-      toastSuccess("تم اعتماد مسير الرواتب بنجاح");
+      toastSuccess(t("hr.payroll.toastApproved"));
       fetchRuns();
     } catch (err: any) {
-      toastError(err.message || "خطأ في الاعتماد");
+      toastError(err.message || t("hr.payroll.toastApproveError"));
     }
   };
 
   const handleLockRun = async (runId: string) => {
     const ok = await confirmAction({
-      title: "قفل وصرف الرواتب",
-      message: "هل تريد قفل الكشف وإغلاقه نهائياً وتأكيد الخصومات والسلف؟",
+      title: t("hr.payroll.lockConfirmTitle"),
+      message: t("hr.payroll.lockConfirmMsg"),
     });
     if (!ok) return;
 
@@ -153,13 +153,13 @@ export default function PayrollPage() {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "فشل قفل الكشف");
+        throw new Error(data.error || t("hr.payroll.toastLockFailed"));
       }
 
-      toastSuccess("تم قفل وصرف مسير الرواتب وإغلاق السلف المقترنة");
+      toastSuccess(t("hr.payroll.toastLocked"));
       fetchRuns();
     } catch (err: any) {
-      toastError(err.message || "خطأ في قفل الكشف");
+      toastError(err.message || t("hr.payroll.toastLockError"));
     }
   };
 
@@ -174,23 +174,23 @@ export default function PayrollPage() {
         setSelectedRunItems([]);
       }
     } catch (err) {
-      toastError("فشل تحميل تفاصيل مفردات الرواتب");
+      toastError(t("hr.payroll.toastDetailsFailed"));
     }
   };
 
-  if (loading) return <PrinterLoader label="جاري تحميل كشوف ومسيرات الرواتب..." />;
+  if (loading) return <PrinterLoader label={t("hr.payroll.loading")} />;
 
   return (
-    <div className="space-y-6">
+    <div dir={dir} className="space-y-6">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Banknote className="text-blue-600" size={28} />
-            مسيرات وكشوف الرواتب
+            <Banknote className="text-blue-600 shrink-0" size={28} />
+            {t("hr.payroll.title")}
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            احتساب الرواتب الشهرية تلقائيًا بناءً على البصمة والإجازات والخصومات والسلف.
+            {t("hr.payroll.subtitle")}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -199,8 +199,8 @@ export default function PayrollPage() {
             onClick={() => setShowCalcModal(true)}
             className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2.5 rounded-lg shadow-sm transition-colors text-sm"
           >
-            <Calculator size={18} />
-            احتساب مسير رواتب جديد
+            <Calculator size={18} className="shrink-0" />
+            {t("hr.payroll.calcBtn")}
           </button>
         </div>
       </div>
@@ -208,10 +208,10 @@ export default function PayrollPage() {
       <StatsCards
         columns={4}
         stats={[
-          { label: "مسيرات الرواتب", value: runs.length.toLocaleString("ar-EG"), icon: <Banknote size={18} />, tone: "sky" },
-          { label: "الموظفون المشمولون", value: runs.reduce((sum, r) => sum + (r.employeeCount || 0), 0).toLocaleString("ar-EG"), icon: <Users size={18} />, tone: "green" },
-          { label: "إجمالي الرواتب (Gross)", value: `${runs.reduce((sum, r) => sum + (r.totalGross || 0), 0).toLocaleString("ar-EG")} ج.م`, icon: <Calculator size={18} />, tone: "amber" },
-          { label: "صافي الرواتب (Net)", value: `${runs.reduce((sum, r) => sum + (r.totalNet || 0), 0).toLocaleString("ar-EG")} ج.م`, icon: <Wallet size={18} />, tone: "emerald" },
+          { label: t("hr.payroll.statRuns"), value: runs.length.toLocaleString("en-US"), icon: <Banknote size={18} />, tone: "sky" },
+          { label: t("hr.payroll.statEmployees"), value: runs.reduce((sum, r) => sum + (r.employeeCount || 0), 0).toLocaleString("en-US"), icon: <Users size={18} />, tone: "green" },
+          { label: t("hr.payroll.statGross"), value: `${runs.reduce((sum, r) => sum + (r.totalGross || 0), 0).toLocaleString("en-US")} ${t("hr.currency")}`, icon: <Calculator size={18} />, tone: "amber" },
+          { label: t("hr.payroll.statNet"), value: `${runs.reduce((sum, r) => sum + (r.totalNet || 0), 0).toLocaleString("en-US")} ${t("hr.currency")}`, icon: <Wallet size={18} />, tone: "emerald" },
         ]}
       />
 
@@ -221,54 +221,54 @@ export default function PayrollPage() {
           <table className="w-full min-w-[720px] text-sm">
             <thead className="bg-gray-50 text-gray-700 border-b border-gray-200">
               <tr>
-                <th className="p-3 font-semibold text-start">الشهر / السنة</th>
-                <th className="p-3 font-semibold text-start">عدد الموظفين</th>
-                <th className="p-3 font-semibold text-start">إجمالي الرواتب (Gross)</th>
-                <th className="p-3 font-semibold text-start">إجمالي الخصومات</th>
-                <th className="p-3 font-semibold text-start">صافي الرواتب (Net)</th>
-                <th className="p-3 font-semibold text-start">الحالة</th>
-                <th className="p-3 font-semibold text-center">الإجراءات</th>
+                <th className="p-3 font-semibold text-start">{t("hr.payroll.thPeriod")}</th>
+                <th className="p-3 font-semibold text-start">{t("hr.payroll.thCount")}</th>
+                <th className="p-3 font-semibold text-start">{t("hr.payroll.thGross")}</th>
+                <th className="p-3 font-semibold text-start">{t("hr.payroll.thDeductions")}</th>
+                <th className="p-3 font-semibold text-start">{t("hr.payroll.thNet")}</th>
+                <th className="p-3 font-semibold text-start">{t("hr.payroll.thStatus")}</th>
+                <th className="p-3 font-semibold text-center">{t("hr.payroll.thActions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {runs.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="p-8 text-center text-gray-500">
-                    لم يتم احتساب أي مسيرات رواتب بعد. اضغط "احتساب مسير رواتب جديد" للبدء.
+                    {t("hr.payroll.noRuns")}
                   </td>
                 </tr>
               ) : (
                 runs.map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="p-3 font-bold text-gray-900">
-                      شهر {r.Period?.month} / {r.Period?.year}
+                    <td className="p-3 font-bold text-gray-900 whitespace-nowrap">
+                      {t("hr.payroll.monthWord")} <span dir="ltr">{r.Period?.month} / {r.Period?.year}</span>
                     </td>
-                    <td className="p-3 font-medium text-gray-700">
-                      {r.employeeCount} موظف
+                    <td className="p-3 font-medium text-gray-700 whitespace-nowrap">
+                      {r.employeeCount} {t("hr.payroll.employeeWord")}
                     </td>
-                    <td className="p-3 text-gray-900 font-semibold">
-                      {r.totalGross.toLocaleString()} ج.م
+                    <td className="p-3 text-gray-900 font-semibold whitespace-nowrap">
+                      {r.totalGross.toLocaleString("en-US")} {t("hr.currency")}
                     </td>
-                    <td className="p-3 text-rose-600 font-semibold">
-                      {r.totalDeductions.toLocaleString()} ج.م
+                    <td className="p-3 text-rose-600 font-semibold whitespace-nowrap">
+                      {r.totalDeductions.toLocaleString("en-US")} {t("hr.currency")}
                     </td>
-                    <td className="p-3 text-emerald-700 font-extrabold text-base">
-                      {r.totalNet.toLocaleString()} ج.م
+                    <td className="p-3 text-emerald-700 font-extrabold text-base whitespace-nowrap">
+                      {r.totalNet.toLocaleString("en-US")} {t("hr.currency")}
                     </td>
                     <td className="p-3">
                       {r.status === "CALCULATED" && (
-                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800">
-                          محسوب (Draft)
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 whitespace-nowrap">
+                          {t("hr.payroll.statusCalculated")}
                         </span>
                       )}
                       {r.status === "APPROVED" && (
-                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800">
-                          معتمد (Approved)
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 whitespace-nowrap">
+                          {t("hr.payroll.statusApproved")}
                         </span>
                       )}
                       {r.status === "LOCKED" && (
-                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">
-                          مغلق ومصروف (Locked)
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 whitespace-nowrap">
+                          {t("hr.payroll.statusLocked")}
                         </span>
                       )}
                     </td>
@@ -277,7 +277,7 @@ export default function PayrollPage() {
                         <button
                           onClick={() => handleViewDetails(r)}
                           className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="عرض تفاصيل المفردات"
+                          title={t("hr.payroll.actionView")}
                         >
                           <Eye size={18} />
                         </button>
@@ -286,7 +286,7 @@ export default function PayrollPage() {
                             onClick={() => handleApproveRun(r.id)}
                             className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2.5 py-1 rounded-md font-bold transition-colors"
                           >
-                            اعتماد
+                            {t("hr.payroll.actionApprove")}
                           </button>
                         )}
                         {r.status === "APPROVED" && (
@@ -294,7 +294,7 @@ export default function PayrollPage() {
                             onClick={() => handleLockRun(r.id)}
                             className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-2.5 py-1 rounded-md font-bold transition-colors flex items-center gap-1"
                           >
-                            <Lock size={12} /> قفل وصرف
+                            <Lock size={12} className="shrink-0" /> {t("hr.payroll.actionLock")}
                           </button>
                         )}
                       </div>
@@ -312,7 +312,7 @@ export default function PayrollPage() {
         <FormModal
           open={showCalcModal}
           onClose={() => setShowCalcModal(false)}
-          title="احتساب مسير رواتب جديد"
+          title={t("hr.payroll.calcModalTitle")}
         >
           <form onSubmit={handleCalculatePayroll} className="space-y-4">
             {formError && (
@@ -323,7 +323,7 @@ export default function PayrollPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">الشهر *</label>
+                <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.payroll.monthLabel")}</label>
                 <select
                   value={calcMonth}
                   onChange={(e) => setCalcMonth(Number(e.target.value))}
@@ -331,14 +331,14 @@ export default function PayrollPage() {
                 >
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => (
                     <option key={m} value={m}>
-                      شهر {m}
+                      {t("hr.payroll.monthOption")} {m}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">السنة *</label>
+                <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.payroll.yearLabel")}</label>
                 <input
                   type="number"
                   min="2020"
@@ -351,7 +351,7 @@ export default function PayrollPage() {
             </div>
 
             <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-900 leading-relaxed">
-              سيقوم المحرك تلقائيًا بحساب أيام الحضور والغياب والتأخيرات والسلف المستحقة وتجميع الإجمالي والصافي لكل الموظفين النشطين بالشركة.
+              {t("hr.payroll.calcInfo")}
             </div>
 
             <div className="flex justify-end gap-2 pt-3 border-t border-gray-200">
@@ -360,9 +360,9 @@ export default function PayrollPage() {
                 onClick={() => setShowCalcModal(false)}
                 className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
               >
-                إلغاء
+                {t("common.cancel")}
               </button>
-              <SubmitButton loading={isPending} label="بدء الاحتساب" />
+              <SubmitButton loading={isPending} label={t("hr.payroll.startCalc")} />
             </div>
           </form>
         </FormModal>
@@ -373,17 +373,17 @@ export default function PayrollPage() {
         <FormModal
           open={!!selectedRunDetails}
           onClose={() => { setSelectedRunDetails(null); setSelectedRunItems(null); }}
-          title={`مفردات رواتب: شهر ${selectedRunDetails.Period?.month} / ${selectedRunDetails.Period?.year}`}
+          title={`${t("hr.payroll.detailTitlePrefix")}${t("hr.payroll.monthWord")} ${selectedRunDetails.Period?.month} / ${selectedRunDetails.Period?.year}`}
           xl
         >
           <div className="space-y-4">
             <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border border-gray-200">
-              <span className="text-xs text-gray-600">إجمالي الموظفين: <strong>{selectedRunItems.length}</strong></span>
-              <span className="text-xs text-emerald-800 font-bold">إجمالي الصافي: {selectedRunDetails.totalNet.toLocaleString()} ج.م</span>
+              <span className="text-xs text-gray-600">{t("hr.payroll.detailTotalEmployees")} <strong>{selectedRunItems.length}</strong></span>
+              <span className="text-xs text-emerald-800 font-bold whitespace-nowrap">{t("hr.payroll.detailTotalNet")} {selectedRunDetails.totalNet.toLocaleString("en-US")} {t("hr.currency")}</span>
               <ExportButton
                 filename={`payroll_slip_${selectedRunDetails.Period?.month}_${selectedRunDetails.Period?.year}`}
                 getExport={() => ({
-                  headers: ["كود الموظف", "الاسم", "الأساسي", "أيام العمل", "الغياب", "التأخير", "الإيراد", "الخصم", "الصافي"],
+                  headers: [t("hr.payroll.detailExportCode"), t("hr.payroll.detailExportName"), t("hr.payroll.detailExportBasic"), t("hr.payroll.detailExportWorked"), t("hr.payroll.detailExportAbsent"), t("hr.payroll.detailExportLate"), t("hr.payroll.detailExportEarnings"), t("hr.payroll.detailExportDeductions"), t("hr.payroll.detailExportNet")],
                   rows: selectedRunItems.map((i) => [
                     i.Employee?.code || "",
                     i.Employee?.fullNameAr || i.Employee?.fullName || "",
@@ -403,29 +403,29 @@ export default function PayrollPage() {
               <table className="w-full min-w-[760px] text-xs">
                 <thead className="bg-gray-100 text-gray-800 sticky top-0">
                   <tr>
-                    <th className="p-2 text-start">الموظف</th>
-                    <th className="p-2 text-start">الأساسي</th>
-                    <th className="p-2 text-start">أيام العمل</th>
-                    <th className="p-2 text-start">أيام الغياب</th>
-                    <th className="p-2 text-start">التأخير (أيام)</th>
-                    <th className="p-2 text-start">إجمالي الإيراد</th>
-                    <th className="p-2 text-start">إجمالي الخصم</th>
-                    <th className="p-2 text-start">الصافي</th>
+                    <th className="p-2 text-start">{t("hr.payroll.roleThEmployee")}</th>
+                    <th className="p-2 text-start">{t("hr.payroll.roleThBasic")}</th>
+                    <th className="p-2 text-start">{t("hr.payroll.roleThWorkedDays")}</th>
+                    <th className="p-2 text-start">{t("hr.payroll.roleThAbsentDays")}</th>
+                    <th className="p-2 text-start">{t("hr.payroll.roleThLateDays")}</th>
+                    <th className="p-2 text-start">{t("hr.payroll.roleThEarnings")}</th>
+                    <th className="p-2 text-start">{t("hr.payroll.roleThDeductions")}</th>
+                    <th className="p-2 text-start">{t("hr.payroll.roleThNet")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {selectedRunItems.map((item) => (
                     <tr key={item.id} className="hover:bg-gray-50">
                       <td className="p-2 font-bold text-gray-900">
-                        {item.Employee?.fullNameAr || item.Employee?.fullName} ({item.Employee?.code})
+                        {item.Employee?.fullNameAr || item.Employee?.fullName} (<span dir="ltr">{item.Employee?.code}</span>)
                       </td>
-                      <td className="p-2">{item.basicSalary.toLocaleString()} ج.م</td>
-                      <td className="p-2 text-emerald-700 font-semibold">{item.workedDays} يوم</td>
-                      <td className="p-2 text-rose-600 font-semibold">{item.absentDays} يوم</td>
-                      <td className="p-2 text-amber-700">{item.lateDays} يوم</td>
-                      <td className="p-2 font-semibold">{item.totalEarnings.toLocaleString()} ج.م</td>
-                      <td className="p-2 text-rose-600 font-semibold">{item.totalDeductions.toLocaleString()} ج.م</td>
-                      <td className="p-2 text-emerald-700 font-extrabold text-sm">{item.netSalary.toLocaleString()} ج.م</td>
+                      <td className="p-2 whitespace-nowrap">{item.basicSalary.toLocaleString("en-US")} {t("hr.currency")}</td>
+                      <td className="p-2 text-emerald-700 font-semibold whitespace-nowrap">{item.workedDays} {t("hr.payroll.dayWord")}</td>
+                      <td className="p-2 text-rose-600 font-semibold whitespace-nowrap">{item.absentDays} {t("hr.payroll.dayWord")}</td>
+                      <td className="p-2 text-amber-700 whitespace-nowrap">{item.lateDays} {t("hr.payroll.dayWord")}</td>
+                      <td className="p-2 font-semibold whitespace-nowrap">{item.totalEarnings.toLocaleString("en-US")} {t("hr.currency")}</td>
+                      <td className="p-2 text-rose-600 font-semibold whitespace-nowrap">{item.totalDeductions.toLocaleString("en-US")} {t("hr.currency")}</td>
+                      <td className="p-2 text-emerald-700 font-extrabold text-sm whitespace-nowrap">{item.netSalary.toLocaleString("en-US")} {t("hr.currency")}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -35,7 +35,7 @@ interface LeaveRequest {
 }
 
 export default function LeavesPage() {
-  const { t } = useI18n();
+  const { t, dir, locale } = useI18n();
   const confirmAction = useConfirm();
   const { success: toastSuccess, error: toastError } = useToast();
 
@@ -71,7 +71,7 @@ export default function LeavesPage() {
       if (eRes.ok) setEmployees(await eRes.json());
     } catch (err) {
       console.error("Error loading leaves:", err);
-      toastError("فشل تحميل طلبات الإجازات");
+      toastError(t("hr.leaves.toastLoadFailed"));
     } finally {
       setLoading(false);
     }
@@ -98,7 +98,7 @@ export default function LeavesPage() {
     setFormError("");
 
     if (!formData.employeeId || !formData.startDate || !formData.endDate) {
-      setFormError("رجاء تعبئة بيانات الإجازة والتواريخ بشكل صحيح");
+      setFormError(t("hr.leaves.validFill"));
       return;
     }
 
@@ -111,21 +111,21 @@ export default function LeavesPage() {
         });
 
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "فشل تقديم طلب الإجازة");
+        if (!res.ok) throw new Error(data.error || t("hr.leaves.toastAddFailed"));
 
-        toastSuccess("تم تقديم طلب الإجازة بنجاح");
+        toastSuccess(t("hr.leaves.toastAdded"));
         setShowAddModal(false);
         fetchData();
       } catch (err: any) {
-        setFormError(err.message || "حدث خطأ أثناء تقديم الطلب");
+        setFormError(err.message || t("hr.leaves.toastAddError"));
       }
     });
   };
 
   const handleApprove = async (id: string) => {
     const ok = await confirmAction({
-      title: "الموافقة على الإجازة",
-      message: "هل أنت متأكد من موافقتك على طلب الإجازة؟",
+      title: t("hr.leaves.approveConfirmTitle"),
+      message: t("hr.leaves.approveConfirmMsg"),
     });
     if (!ok) return;
 
@@ -138,13 +138,13 @@ export default function LeavesPage() {
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "فشل إكمال الموافقة");
+        throw new Error(data.error || t("hr.leaves.toastApproveFailed"));
       }
 
-      toastSuccess("تمت الموافقة على طلب الإجازة وتحديث الرصيد");
+      toastSuccess(t("hr.leaves.toastApproved"));
       fetchData();
     } catch (err: any) {
-      toastError(err.message || "خطأ في عملية الموافقة");
+      toastError(err.message || t("hr.leaves.toastApproveError"));
     }
   };
 
@@ -166,15 +166,15 @@ export default function LeavesPage() {
 
         if (!res.ok) {
           const data = await res.json();
-          throw new Error(data.error || "فشل عملية الرفض");
+          throw new Error(data.error || t("hr.leaves.toastRejectFailed"));
         }
 
-        toastSuccess("تم رفض طلب الإجازة بنجاح");
+        toastSuccess(t("hr.leaves.toastRejected"));
         setShowRejectModal(null);
         setRejectReasonInput("");
         fetchData();
       } catch (err: any) {
-        toastError(err.message || "حدث خطأ في الرفض");
+        toastError(err.message || t("hr.leaves.toastRejectError"));
       }
     });
   };
@@ -198,29 +198,29 @@ export default function LeavesPage() {
 
   const getLeaveTypeLabel = (cat: string) => {
     switch (cat) {
-      case "ANNUAL": return "سنوية (Annual)";
-      case "SICK": return "مرضية (Sick)";
-      case "UNPAID": return "بدون أجر (Unpaid)";
-      case "EMERGENCY": return "عارضة / طارئة (Emergency)";
-      case "MATERNITY": return "وضع / أمومة (Maternity)";
-      case "OTHER": return "أخرى (Other)";
+      case "ANNUAL": return t("hr.leaves.typeAnnual");
+      case "SICK": return t("hr.leaves.typeSick");
+      case "UNPAID": return t("hr.leaves.typeUnpaid");
+      case "EMERGENCY": return t("hr.leaves.typeEmergency");
+      case "MATERNITY": return t("hr.leaves.typeMaternity");
+      case "OTHER": return t("hr.leaves.typeOther");
       default: return cat;
     }
   };
 
-  if (loading) return <PrinterLoader label="جاري تحميل طلبات الإجازات..." />;
+  if (loading) return <PrinterLoader label={t("hr.leaves.loading")} />;
 
   return (
-    <div className="space-y-6">
+    <div dir={dir} className="space-y-6">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Calendar className="text-blue-600" size={28} />
-            طلبات الإجازات والاستئذانات
+            <Calendar className="text-blue-600 shrink-0" size={28} />
+            {t("hr.leaves.title")}
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            تقديم طلبات الإجازة، ومراجعتها، والموافقة أو الرفض مع خصم الأرصدة التلقائي.
+            {t("hr.leaves.subtitle")}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -228,13 +228,13 @@ export default function LeavesPage() {
           <ExportButton
             filename="leaves_export"
             getExport={() => ({
-              headers: ["كود الموظف", "الاسم", "نوع الإجازة", "من", "إلى", "عدد الأيام", "الحالة"],
+              headers: [t("hr.leaves.exportCode"), t("hr.leaves.exportName"), t("hr.leaves.exportType"), t("hr.leaves.exportFrom"), t("hr.leaves.exportTo"), t("hr.leaves.exportDays"), t("hr.leaves.exportStatus")],
               rows: filtered.map((l) => [
                 l.Employee?.code || "",
                 l.Employee?.fullNameAr || l.Employee?.fullName || "",
                 getLeaveTypeLabel(l.category),
-                new Date(l.startDate).toLocaleDateString("ar-EG"),
-                new Date(l.endDate).toLocaleDateString("ar-EG"),
+                new Date(l.startDate).toLocaleDateString(locale === "ar" ? "ar-EG" : "en-GB"),
+                new Date(l.endDate).toLocaleDateString(locale === "ar" ? "ar-EG" : "en-GB"),
                 String(l.daysCount),
                 l.status,
               ]),
@@ -244,8 +244,8 @@ export default function LeavesPage() {
             onClick={handleOpenAddModal}
             className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2.5 rounded-lg shadow-sm transition-colors text-sm"
           >
-            <Plus size={18} />
-            طلب إجازة جديد
+            <Plus size={18} className="shrink-0" />
+            {t("hr.leaves.newRequest")}
           </button>
         </div>
       </div>
@@ -253,10 +253,10 @@ export default function LeavesPage() {
       <StatsCards
         columns={4}
         stats={[
-          { label: "إجمالي الطلبات", value: stats.total.toLocaleString("ar-EG"), icon: <Calendar size={18} />, tone: "sky" },
-          { label: "معلقة", value: stats.pending.toLocaleString("ar-EG"), icon: <Clock size={18} />, tone: "amber" },
-          { label: "مقبولة", value: stats.approved.toLocaleString("ar-EG"), icon: <CheckCircle2 size={18} />, tone: "green" },
-          { label: "مرفوضة", value: stats.rejected.toLocaleString("ar-EG"), icon: <XCircle size={18} />, tone: "rose" },
+          { label: t("hr.leaves.statTotal"), value: stats.total.toLocaleString("en-US"), icon: <Calendar size={18} />, tone: "sky" },
+          { label: t("hr.leaves.statPending"), value: stats.pending.toLocaleString("en-US"), icon: <Clock size={18} />, tone: "amber" },
+          { label: t("hr.leaves.statApproved"), value: stats.approved.toLocaleString("en-US"), icon: <CheckCircle2 size={18} />, tone: "green" },
+          { label: t("hr.leaves.statRejected"), value: stats.rejected.toLocaleString("en-US"), icon: <XCircle size={18} />, tone: "rose" },
         ]}
       />
 
@@ -265,17 +265,17 @@ export default function LeavesPage() {
         <SearchInput
           value={search}
           onChange={setSearch}
-          placeholder="بحث باسم الموظف أو الكود..."
+          placeholder={t("hr.leaves.searchPlaceholder")}
         />
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
           className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500"
         >
-          <option value="">جميع الحالات (معلقة، مأذونة، مرفوضة)</option>
-          <option value="PENDING">معلقة (Pending)</option>
-          <option value="APPROVED">مقبولة (Approved)</option>
-          <option value="REJECTED">مرفوضة (Rejected)</option>
+          <option value="">{t("hr.leaves.allStatuses")}</option>
+          <option value="PENDING">{t("hr.leaves.filterPending")}</option>
+          <option value="APPROVED">{t("hr.leaves.filterApproved")}</option>
+          <option value="REJECTED">{t("hr.leaves.filterRejected")}</option>
         </select>
       </div>
 
@@ -285,20 +285,20 @@ export default function LeavesPage() {
           <table className="w-full min-w-[720px] text-sm">
             <thead className="bg-gray-50 text-gray-700 border-b border-gray-200">
               <tr>
-                <th className="p-3 font-semibold text-start">الموظف</th>
-                <th className="p-3 font-semibold text-start">نوع الإجازة</th>
-                <th className="p-3 font-semibold text-start">فترة الإجازة</th>
-                <th className="p-3 font-semibold text-start">عدد الأيام</th>
-                <th className="p-3 font-semibold text-start">السبب / الملاحظات</th>
-                <th className="p-3 font-semibold text-start">الحالة</th>
-                <th className="p-3 font-semibold text-center">الإجراءات</th>
+                <th className="p-3 font-semibold text-start">{t("hr.leaves.thEmployee")}</th>
+                <th className="p-3 font-semibold text-start">{t("hr.leaves.thType")}</th>
+                <th className="p-3 font-semibold text-start">{t("hr.leaves.thPeriod")}</th>
+                <th className="p-3 font-semibold text-start">{t("hr.leaves.thDays")}</th>
+                <th className="p-3 font-semibold text-start">{t("hr.leaves.thReason")}</th>
+                <th className="p-3 font-semibold text-start">{t("hr.leaves.thStatus")}</th>
+                <th className="p-3 font-semibold text-center">{t("hr.leaves.thActions")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="p-8 text-center text-gray-500">
-                    لا توجد طلبات إجازة متطابقة.
+                    {t("hr.leaves.noMatch")}
                   </td>
                 </tr>
               ) : (
@@ -306,40 +306,40 @@ export default function LeavesPage() {
                   <tr key={l.id} className="hover:bg-gray-50 transition-colors">
                     <td className="p-3">
                       <div className="font-bold text-gray-900">{l.Employee?.fullNameAr || l.Employee?.fullName}</div>
-                      <div className="text-xs text-gray-500">{l.Employee?.code}</div>
+                      <div className="text-xs text-gray-500"><span dir="ltr">{l.Employee?.code}</span></div>
                     </td>
                     <td className="p-3 font-medium text-gray-800">
                       {getLeaveTypeLabel(l.category)}
                     </td>
                     <td className="p-3 text-gray-700">
-                      <div>من: {new Date(l.startDate).toLocaleDateString("ar-EG")}</div>
-                      <div>إلى: {new Date(l.endDate).toLocaleDateString("ar-EG")}</div>
+                      <div>{t("hr.leaves.from")} <span dir="ltr">{new Date(l.startDate).toLocaleDateString(locale === "ar" ? "ar-EG" : "en-GB")}</span></div>
+                      <div>{t("hr.leaves.to")} <span dir="ltr">{new Date(l.endDate).toLocaleDateString(locale === "ar" ? "ar-EG" : "en-GB")}</span></div>
                     </td>
                     <td className="p-3">
-                      <span className="font-extrabold text-blue-700 bg-blue-50 px-2.5 py-1 rounded">
-                        {l.daysCount} يوم
+                      <span className="font-extrabold text-blue-700 bg-blue-50 px-2.5 py-1 rounded whitespace-nowrap">
+                        {l.daysCount} {t("hr.leaves.day")}
                       </span>
                     </td>
                     <td className="p-3 text-gray-600 max-w-xs truncate">
                       {l.reason || "-"}
                       {l.rejectReason && (
-                        <div className="text-xs text-rose-600 mt-0.5">سبب الرفض: {l.rejectReason}</div>
+                        <div className="text-xs text-rose-600 mt-0.5">{t("hr.leaves.rejectReasonPrefix")}{l.rejectReason}</div>
                       )}
                     </td>
                     <td className="p-3">
                       {l.status === "PENDING" && (
-                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 flex items-center gap-1 w-fit">
-                          <Clock size={14} /> معلقة
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 flex items-center gap-1 w-fit whitespace-nowrap">
+                          <Clock size={14} className="shrink-0" /> {t("hr.leaves.badgePending")}
                         </span>
                       )}
                       {l.status === "APPROVED" && (
-                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1 w-fit">
-                          <CheckCircle2 size={14} /> مقبول
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 flex items-center gap-1 w-fit whitespace-nowrap">
+                          <CheckCircle2 size={14} className="shrink-0" /> {t("hr.leaves.badgeApproved")}
                         </span>
                       )}
                       {l.status === "REJECTED" && (
-                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 flex items-center gap-1 w-fit">
-                          <XCircle size={14} /> مرفوض
+                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 flex items-center gap-1 w-fit whitespace-nowrap">
+                          <XCircle size={14} className="shrink-0" /> {t("hr.leaves.badgeRejected")}
                         </span>
                       )}
                     </td>
@@ -350,17 +350,17 @@ export default function LeavesPage() {
                             onClick={() => handleApprove(l.id)}
                             className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition-colors"
                           >
-                            موافقة
+                            {t("hr.leaves.actionApprove")}
                           </button>
                           <button
                             onClick={() => { setShowRejectModal(l); setRejectReasonInput(""); }}
                             className="bg-rose-600 hover:bg-rose-700 text-white text-xs px-3 py-1.5 rounded-lg font-bold transition-colors"
                           >
-                            رفض
+                            {t("hr.leaves.actionReject")}
                           </button>
                         </div>
                       ) : (
-                        <span className="text-xs text-gray-400">تمت المراجعة</span>
+                        <span className="text-xs text-gray-400">{t("hr.leaves.reviewed")}</span>
                       )}
                     </td>
                   </tr>
@@ -376,7 +376,7 @@ export default function LeavesPage() {
         <FormModal
           open={showAddModal}
           onClose={() => setShowAddModal(false)}
-          title="تقديم طلب إجازة جديد"
+          title={t("hr.leaves.addModalTitle")}
         >
           <form onSubmit={handleAddSubmit} className="space-y-4">
             {formError && (
@@ -386,14 +386,14 @@ export default function LeavesPage() {
             )}
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">الموظف *</label>
+              <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.leaves.labelEmployee")}</label>
               <select
                 required
                 value={formData.employeeId}
                 onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">اختر الموظف...</option>
+                <option value="">{t("hr.leaves.selectEmployee")}</option>
                 {employees.map((e) => (
                   <option key={e.id} value={e.id}>
                     {e.code} - {e.fullNameAr || e.fullName}
@@ -403,24 +403,24 @@ export default function LeavesPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">نوع الإجازة *</label>
+              <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.leaves.labelType")}</label>
               <select
                 value={formData.category}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
               >
-                <option value="ANNUAL">سنوية (Annual)</option>
-                <option value="SICK">مرضية (Sick)</option>
-                <option value="EMERGENCY">عارضة / طارئة (Emergency)</option>
-                <option value="UNPAID">بدون أجر (Unpaid)</option>
-                <option value="MATERNITY">أمومة / وضع (Maternity)</option>
-                <option value="OTHER">أخرى (Other)</option>
+                <option value="ANNUAL">{t("hr.leaves.typeAnnual")}</option>
+                <option value="SICK">{t("hr.leaves.typeSick")}</option>
+                <option value="EMERGENCY">{t("hr.leaves.typeEmergency")}</option>
+                <option value="UNPAID">{t("hr.leaves.typeUnpaid")}</option>
+                <option value="MATERNITY">{t("hr.leaves.typeMaternity")}</option>
+                <option value="OTHER">{t("hr.leaves.typeOther")}</option>
               </select>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">تاريخ البداية *</label>
+                <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.leaves.labelStartDate")}</label>
                 <input
                   type="date"
                   required
@@ -431,7 +431,7 @@ export default function LeavesPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">تاريخ النهاية *</label>
+                <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.leaves.labelEndDate")}</label>
                 <input
                   type="date"
                   required
@@ -443,13 +443,13 @@ export default function LeavesPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">سبب الإجازة / ملاحظات</label>
+              <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.leaves.labelReason")}</label>
               <textarea
                 rows={3}
                 value={formData.reason}
                 onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
-                placeholder="اكتب سبب طلب الإجازة هنا..."
+                placeholder={t("hr.leaves.reasonPlaceholder")}
               />
             </div>
 
@@ -459,9 +459,9 @@ export default function LeavesPage() {
                 onClick={() => setShowAddModal(false)}
                 className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
               >
-                إلغاء
+                {t("common.cancel")}
               </button>
-              <SubmitButton loading={isPending} label="تقديم الطلب" />
+              <SubmitButton loading={isPending} label={t("hr.leaves.submitRequest")} />
             </div>
           </form>
         </FormModal>
@@ -472,22 +472,22 @@ export default function LeavesPage() {
         <FormModal
           open={!!showRejectModal}
           onClose={() => setShowRejectModal(null)}
-          title="رفض طلب الإجازة"
+          title={t("hr.leaves.rejectModalTitle")}
         >
           <form onSubmit={handleRejectSubmit} className="space-y-4">
             <p className="text-sm text-gray-700">
-              أنت على وشك رفض إجازة الموظف: <strong>{showRejectModal.Employee?.fullNameAr || showRejectModal.Employee?.fullName}</strong>
+              {t("hr.leaves.rejectIntro")} <strong>{showRejectModal.Employee?.fullNameAr || showRejectModal.Employee?.fullName}</strong>
             </p>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">سبب الرفض</label>
+              <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.leaves.rejectReasonLabel")}</label>
               <textarea
                 rows={3}
                 required
                 value={rejectReasonInput}
                 onChange={(e) => setRejectReasonInput(e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-500"
-                placeholder="وضح للموظف سبب عدم موافقة الإدارة..."
+                placeholder={t("hr.leaves.rejectReasonPlaceholder")}
               />
             </div>
 
@@ -497,9 +497,9 @@ export default function LeavesPage() {
                 onClick={() => setShowRejectModal(null)}
                 className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
               >
-                إلغاء
+                {t("common.cancel")}
               </button>
-              <SubmitButton loading={isPending} label="تأكيد الرفض" className="bg-rose-600 hover:bg-rose-700 text-white" />
+              <SubmitButton loading={isPending} label={t("hr.leaves.confirmReject")} className="bg-rose-600 hover:bg-rose-700 text-white" />
             </div>
           </form>
         </FormModal>

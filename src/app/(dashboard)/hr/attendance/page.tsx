@@ -37,7 +37,7 @@ interface AttendanceRecord {
 }
 
 export default function AttendancePage() {
-  const { t } = useI18n();
+  const { t, dir, locale } = useI18n();
   const { success: toastSuccess, error: toastError } = useToast();
 
   const [date, setDate] = useState<string>(new Date().toISOString().split("T")[0]);
@@ -72,7 +72,7 @@ export default function AttendancePage() {
       if (empRes.ok) setEmployees(await empRes.json());
     } catch (err) {
       console.error("Error loading attendance:", err);
-      toastError("فشل تحميل سجلات البصمة والحضور");
+      toastError(t("hr.attendance.toastLoadFailed"));
     } finally {
       setLoading(false);
     }
@@ -100,7 +100,7 @@ export default function AttendancePage() {
     setFormError("");
 
     if (!formData.employeeId || !formData.date) {
-      setFormError("اختر الموظف والتاريخ بشكل صحيح");
+      setFormError(t("hr.attendance.validSelect"));
       return;
     }
 
@@ -130,13 +130,13 @@ export default function AttendancePage() {
         });
 
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "فشل تسجيل الحضور");
+        if (!res.ok) throw new Error(data.error || t("hr.attendance.toastSubmitFailed"));
 
-        toastSuccess("تم تسجيل / تحديث بصمة الموظف بنجاح");
+        toastSuccess(t("hr.attendance.toastSaved"));
         setShowModal(false);
         fetchData();
       } catch (err: any) {
-        setFormError(err.message || "حدث خطأ أثناء الحفظ");
+        setFormError(err.message || t("hr.attendance.toastSaveError"));
       }
     });
   };
@@ -162,15 +162,15 @@ export default function AttendancePage() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "PRESENT":
-        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800">حاضر</span>;
+        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 whitespace-nowrap">{t("hr.attendance.badgePresent")}</span>;
       case "LATE":
-        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800">متأخر</span>;
+        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 whitespace-nowrap">{t("hr.attendance.badgeLate")}</span>;
       case "ABSENT":
-        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800">غائب</span>;
+        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-100 text-rose-800 whitespace-nowrap">{t("hr.attendance.badgeAbsent")}</span>;
       case "ON_LEAVE":
-        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800">إجازة</span>;
+        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 whitespace-nowrap">{t("hr.attendance.badgeOnLeave")}</span>;
       case "HOLIDAY":
-        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-800">عطلة رسمية</span>;
+        return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-purple-100 text-purple-800 whitespace-nowrap">{t("hr.attendance.badgeHoliday")}</span>;
       default:
         return <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-800">{status}</span>;
     }
@@ -179,22 +179,22 @@ export default function AttendancePage() {
   const formatTime = (isoStr?: string | null) => {
     if (!isoStr) return "--:--";
     const d = new Date(isoStr);
-    return d.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleTimeString(locale === "ar" ? "ar-EG" : "en-GB", { hour: "2-digit", minute: "2-digit" });
   };
 
-  if (loading) return <PrinterLoader label="جاري تحميل سجل البصمات والحضور..." />;
+  if (loading) return <PrinterLoader label={t("hr.attendance.loading")} />;
 
   return (
-    <div className="space-y-6">
+    <div dir={dir} className="space-y-6">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <UserCheck className="text-blue-600" size={28} />
-            سجل التحضير والبصمة اليومية
+            <UserCheck className="text-blue-600 shrink-0" size={28} />
+            {t("hr.attendance.title")}
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            متابعة الحضور، الغياب، التأخير، والخروج المبكر للموظفين.
+            {t("hr.attendance.subtitle")}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -202,7 +202,7 @@ export default function AttendancePage() {
           <ExportButton
             filename={`attendance_${date}`}
             getExport={() => ({
-              headers: ["كود الموظف", "الاسم", "الدخول", "الخروج", "التأخير بالدقائق", "الحالة"],
+              headers: [t("hr.attendance.exportCode"), t("hr.attendance.exportName"), t("hr.attendance.exportIn"), t("hr.attendance.exportOut"), t("hr.attendance.exportLateMinutes"), t("hr.attendance.exportStatus")],
               rows: filtered.map((r) => [
                 r.Employee?.code || "",
                 r.Employee?.fullNameAr || r.Employee?.fullName || "",
@@ -217,8 +217,8 @@ export default function AttendancePage() {
             onClick={handleOpenAddModal}
             className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2.5 rounded-lg shadow-sm transition-colors text-sm"
           >
-            <Plus size={18} />
-            تسجيل حضور يدوي
+            <Plus size={18} className="shrink-0" />
+            {t("hr.attendance.manualAdd")}
           </button>
         </div>
       </div>
@@ -226,10 +226,10 @@ export default function AttendancePage() {
       <StatsCards
         columns={4}
         stats={[
-          { label: "سجلات اليوم", value: stats.total.toLocaleString("ar-EG"), icon: <Users size={18} />, tone: "sky" },
-          { label: "حاضرون", value: stats.present.toLocaleString("ar-EG"), icon: <UserCheck size={18} />, tone: "green" },
-          { label: "متأخرون", value: stats.late.toLocaleString("ar-EG"), icon: <Clock3 size={18} />, tone: "amber" },
-          { label: "غائبون", value: stats.absent.toLocaleString("ar-EG"), icon: <XCircle size={18} />, tone: "rose" },
+          { label: t("hr.attendance.statToday"), value: stats.total.toLocaleString("en-US"), icon: <Users size={18} />, tone: "sky" },
+          { label: t("hr.attendance.statPresent"), value: stats.present.toLocaleString("en-US"), icon: <UserCheck size={18} />, tone: "green" },
+          { label: t("hr.attendance.statLate"), value: stats.late.toLocaleString("en-US"), icon: <Clock3 size={18} />, tone: "amber" },
+          { label: t("hr.attendance.statAbsent"), value: stats.absent.toLocaleString("en-US"), icon: <XCircle size={18} />, tone: "rose" },
         ]}
       />
 
@@ -237,8 +237,8 @@ export default function AttendancePage() {
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row items-center gap-4 justify-between">
         <div className="flex items-center gap-3 w-full md:w-auto">
           <label className="text-xs font-bold text-gray-700 whitespace-nowrap flex items-center gap-1">
-            <Calendar size={16} className="text-blue-600" />
-            تاريخ اليوم:
+            <Calendar size={16} className="text-blue-600 shrink-0" />
+            {t("hr.attendance.todayLabel")}
           </label>
           <input
             type="date"
@@ -252,18 +252,18 @@ export default function AttendancePage() {
           <SearchInput
             value={search}
             onChange={setSearch}
-            placeholder="بحث باسم الموظف أو الكود..."
+            placeholder={t("hr.attendance.searchPlaceholder")}
           />
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
             className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500"
           >
-            <option value="">جميع الحالات</option>
-            <option value="PRESENT">حاضر (Present)</option>
-            <option value="LATE">متأخر (Late)</option>
-            <option value="ABSENT">غائب (Absent)</option>
-            <option value="ON_LEAVE">في إجازة (On Leave)</option>
+            <option value="">{t("hr.attendance.allStatuses")}</option>
+            <option value="PRESENT">{t("hr.attendance.statusPresent")}</option>
+            <option value="LATE">{t("hr.attendance.statusLate")}</option>
+            <option value="ABSENT">{t("hr.attendance.statusAbsent")}</option>
+            <option value="ON_LEAVE">{t("hr.attendance.statusOnLeave")}</option>
           </select>
         </div>
       </div>
@@ -274,21 +274,21 @@ export default function AttendancePage() {
           <table className="w-full min-w-[820px] text-sm">
             <thead className="bg-gray-50 text-gray-700 border-b border-gray-200">
               <tr>
-                <th className="p-3 font-semibold text-start">الموظف</th>
-                <th className="p-3 font-semibold text-start">القسم</th>
-                <th className="p-3 font-semibold text-start">وقت الدخول</th>
-                <th className="p-3 font-semibold text-start">وقت الخروج</th>
-                <th className="p-3 font-semibold text-start">ساعات العمل</th>
-                <th className="p-3 font-semibold text-start">التأخير</th>
-                <th className="p-3 font-semibold text-start">الحالة</th>
-                <th className="p-3 font-semibold text-start">إدخال يدوي</th>
+                <th className="p-3 font-semibold text-start">{t("hr.attendance.thEmployee")}</th>
+                <th className="p-3 font-semibold text-start">{t("hr.attendance.thDepartment")}</th>
+                <th className="p-3 font-semibold text-start">{t("hr.attendance.thInTime")}</th>
+                <th className="p-3 font-semibold text-start">{t("hr.attendance.thOutTime")}</th>
+                <th className="p-3 font-semibold text-start">{t("hr.attendance.thWorkHours")}</th>
+                <th className="p-3 font-semibold text-start">{t("hr.attendance.thLate")}</th>
+                <th className="p-3 font-semibold text-start">{t("hr.attendance.thStatus")}</th>
+                <th className="p-3 font-semibold text-start">{t("hr.attendance.thManual")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="p-8 text-center text-gray-500">
-                    لا توجد سجلات حضور مسجلة لهذا اليوم.
+                    {t("hr.attendance.noRecords")}
                   </td>
                 </tr>
               ) : (
@@ -298,35 +298,35 @@ export default function AttendancePage() {
                       <div className="font-bold text-gray-900">
                         {rec.Employee?.fullNameAr || rec.Employee?.fullName}
                       </div>
-                      <div className="text-xs text-gray-500">{rec.Employee?.code}</div>
+                      <div className="text-xs text-gray-500"><span dir="ltr">{rec.Employee?.code}</span></div>
                     </td>
                     <td className="p-3 text-gray-600">
                       {rec.Employee?.Department?.nameAr || rec.Employee?.Department?.name || "-"}
                     </td>
                     <td className="p-3 font-medium text-emerald-700">
-                      {formatTime(rec.firstIn)}
+                      <span dir="ltr">{formatTime(rec.firstIn)}</span>
                     </td>
                     <td className="p-3 font-medium text-rose-700">
-                      {formatTime(rec.lastOut)}
+                      <span dir="ltr">{formatTime(rec.lastOut)}</span>
                     </td>
                     <td className="p-3 text-gray-900 font-semibold">
-                      {(rec.workMinutes / 60).toFixed(1)} ساعة
+                      {(rec.workMinutes / 60).toFixed(1)} {t("hr.attendance.hours")}
                     </td>
                     <td className="p-3">
                       {rec.lateMinutes > 0 ? (
-                        <span className="text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded text-xs">
-                          {rec.lateMinutes} دقيقة
+                        <span className="text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded text-xs whitespace-nowrap">
+                          {rec.lateMinutes} {t("hr.attendance.minutes")}
                         </span>
                       ) : (
-                        <span className="text-emerald-600 text-xs font-medium">في الموعد</span>
+                        <span className="text-emerald-600 text-xs font-medium whitespace-nowrap">{t("hr.attendance.onTime")}</span>
                       )}
                     </td>
                     <td className="p-3">{getStatusBadge(rec.status)}</td>
                     <td className="p-3 text-xs text-gray-500">
                       {rec.isManual ? (
-                        <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded">يدوي</span>
+                        <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded whitespace-nowrap">{t("hr.attendance.manualSource")}</span>
                       ) : (
-                        <span className="text-gray-400">بصمة جهاز</span>
+                        <span className="text-gray-400 whitespace-nowrap">{t("hr.attendance.deviceSource")}</span>
                       )}
                     </td>
                   </tr>
@@ -342,7 +342,7 @@ export default function AttendancePage() {
         <FormModal
           open={showModal}
           onClose={() => setShowModal(false)}
-          title="تسجيل حضور / تعديل بصمة يدويًا"
+          title={t("hr.attendance.modalTitle")}
         >
           <form onSubmit={handleSubmit} className="space-y-4">
             {formError && (
@@ -352,14 +352,14 @@ export default function AttendancePage() {
             )}
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">الموظف *</label>
+              <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.attendance.labelEmployee")}</label>
               <select
                 required
                 value={formData.employeeId}
                 onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">اختر الموظف...</option>
+                <option value="">{t("hr.attendance.selectEmployee")}</option>
                 {employees.map((e) => (
                   <option key={e.id} value={e.id}>
                     {e.code} - {e.fullNameAr || e.fullName}
@@ -369,7 +369,7 @@ export default function AttendancePage() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">التاريخ *</label>
+              <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.attendance.labelDate")}</label>
               <input
                 type="date"
                 required
@@ -381,7 +381,7 @@ export default function AttendancePage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">وقت الدخول (In)</label>
+                <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.attendance.labelInTime")}</label>
                 <input
                   type="time"
                   value={formData.inTime}
@@ -391,7 +391,7 @@ export default function AttendancePage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">وقت الخروج (Out)</label>
+                <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.attendance.labelOutTime")}</label>
                 <input
                   type="time"
                   value={formData.outTime}
@@ -402,27 +402,27 @@ export default function AttendancePage() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">الحالة *</label>
+              <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.attendance.labelStatus")}</label>
               <select
                 value={formData.status}
                 onChange={(e) => setFormData({ ...formData, status: e.target.value })}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
               >
-                <option value="PRESENT">حاضر (Present)</option>
-                <option value="LATE">متأخر (Late)</option>
-                <option value="ABSENT">غائب (Absent)</option>
-                <option value="ON_LEAVE">في إجازة (On Leave)</option>
+                <option value="PRESENT">{t("hr.attendance.statusPresent")}</option>
+                <option value="LATE">{t("hr.attendance.statusLate")}</option>
+                <option value="ABSENT">{t("hr.attendance.statusAbsent")}</option>
+                <option value="ON_LEAVE">{t("hr.attendance.statusOnLeave")}</option>
               </select>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">سبب التعديل اليدوي / ملاحظات</label>
+              <label className="block text-xs font-bold text-gray-700 mb-1">{t("hr.attendance.labelNotes")}</label>
               <textarea
                 rows={2}
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
-                placeholder="مثال: عطل في جهاز البصمة، أو تصريح رسمي..."
+                placeholder={t("hr.attendance.notesPlaceholder")}
               />
             </div>
 
@@ -432,9 +432,9 @@ export default function AttendancePage() {
                 onClick={() => setShowModal(false)}
                 className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50"
               >
-                إلغاء
+                {t("common.cancel")}
               </button>
-              <SubmitButton loading={isPending} label="حفظ السجل" />
+              <SubmitButton loading={isPending} label={t("hr.attendance.saveRecord")} />
             </div>
           </form>
         </FormModal>

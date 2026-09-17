@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Users, UserCheck, Calendar, DollarSign, Building2, UserPlus, Clock, FileBadge, Briefcase } from "lucide-react";
 import PrinterLoader from "@/components/PrinterLoader";
+import { useI18n } from "@/i18n/context";
 
 interface SummaryData {
   totalEmployees: number;
@@ -17,6 +18,7 @@ interface SummaryData {
 }
 
 export default function HRDashboardPage() {
+  const { t, dir } = useI18n();
   const [stats, setStats] = useState<SummaryData>({
     totalEmployees: 0,
     activeEmployees: 0,
@@ -80,42 +82,42 @@ export default function HRDashboardPage() {
     fetchStats();
   }, []);
 
-  if (loading) return <PrinterLoader label="جاري تحميل لوحة الموارد البشرية..." />;
+  if (loading) return <PrinterLoader label={t("hr.dashboard.loading")} />;
 
   const statCards = [
-    { label: "إجمالي الموظفين", value: stats.totalEmployees, sub: `${stats.activeEmployees} نشط`, icon: Users, color: "bg-blue-500", href: "/hr/employees" },
-    { label: "الحاضرون اليوم", value: stats.presentToday, sub: `${stats.lateToday} متأخر`, icon: UserCheck, color: "bg-emerald-500", href: "/hr/attendance" },
-    { label: "طلبات الإجازة المعلقة", value: stats.pendingLeaves, sub: `${stats.onLeaveToday} في إجازة اليوم`, icon: Calendar, color: "bg-amber-500", href: "/hr/leaves" },
-    { label: "الغائبون اليوم", value: stats.absentToday, sub: "بدون إذن مُسبق", icon: Clock, color: "bg-rose-500", href: "/hr/attendance" },
+    { label: t("hr.dashboard.statTotalEmployees"), value: stats.totalEmployees, sub: `${stats.activeEmployees} ${t("hr.dashboard.activeSuffix")}`, icon: Users, color: "bg-blue-500", href: "/hr/employees" },
+    { label: t("hr.dashboard.statPresentToday"), value: stats.presentToday, sub: `${stats.lateToday} ${t("hr.dashboard.lateSuffix")}`, icon: UserCheck, color: "bg-emerald-500", href: "/hr/attendance" },
+    { label: t("hr.dashboard.statPendingLeaves"), value: stats.pendingLeaves, sub: `${stats.onLeaveToday} ${t("hr.dashboard.onLeaveSuffix")}`, icon: Calendar, color: "bg-amber-500", href: "/hr/leaves" },
+    { label: t("hr.dashboard.statAbsentToday"), value: stats.absentToday, sub: t("hr.dashboard.absentSub"), icon: Clock, color: "bg-rose-500", href: "/hr/attendance" },
   ];
 
   const quickLinks = [
-    { title: "إدارة الموظفين", desc: "إضافة وتعديل وحفظ بيانات الموظفين", href: "/hr/employees", icon: Users, btnText: "فتح الموظفين" },
-    { title: "سجل التحضير والبصمة", desc: "متابعة الحضور والغياب اليومي وسحب البصمات", href: "/hr/attendance", icon: UserCheck, btnText: "عرض البصمات" },
-    { title: "الإجازات والاستئذانات", desc: "مراجعة طلبات الإجازات والموافقة عليها", href: "/hr/leaves", icon: Calendar, btnText: "إدارة الإجازات" },
-    { title: "مسيرات الرواتب والسُلف", desc: "احتساب الرواتب والخصومات والسلف والتأمينات", href: "/hr/payroll", icon: DollarSign, btnText: "عرض الرواتب" },
-    { title: "الأقسام والمسميات", desc: "هيكلة الأقسام والمسميات الوظيفية بالشركة", href: "/hr/departments", icon: Building2, btnText: "الهيكل الوظيفي" },
+    { title: t("hr.dashboard.empTitle"), desc: t("hr.dashboard.empDesc"), href: "/hr/employees", icon: Users, btnText: t("hr.dashboard.empBtn") },
+    { title: t("hr.dashboard.attTitle"), desc: t("hr.dashboard.attDesc"), href: "/hr/attendance", icon: UserCheck, btnText: t("hr.dashboard.attBtn") },
+    { title: t("hr.dashboard.leaveTitle"), desc: t("hr.dashboard.leaveDesc"), href: "/hr/leaves", icon: Calendar, btnText: t("hr.dashboard.leaveBtn") },
+    { title: t("hr.dashboard.payrollTitle"), desc: t("hr.dashboard.payrollDesc"), href: "/hr/payroll", icon: DollarSign, btnText: t("hr.dashboard.payrollBtn") },
+    { title: t("hr.dashboard.deptTitle"), desc: t("hr.dashboard.deptDesc"), href: "/hr/departments", icon: Building2, btnText: t("hr.dashboard.deptBtn") },
   ];
 
   return (
-    <div className="space-y-6">
+    <div dir={dir} className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Briefcase className="text-blue-600" size={28} />
-            لوحة الموارد البشرية (HR & Payroll)
+            <Briefcase className="text-blue-600 shrink-0" size={28} />
+            {t("hr.dashboard.title")}
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            إدارة الموظفين، البصمات، الإجازات، مسيرات الرواتب، والسُلف بكل سهولة ودقة.
+            {t("hr.dashboard.subtitle")}
           </p>
         </div>
         <Link
           href="/hr/employees?add=1"
           className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2.5 rounded-lg shadow-sm transition-colors text-sm"
         >
-          <UserPlus size={18} />
-          إضافة موظف جديد
+          <UserPlus size={18} className="shrink-0" />
+          {t("hr.dashboard.addEmployee")}
         </Link>
       </div>
 
@@ -147,8 +149,8 @@ export default function HRDashboardPage() {
       {/* Quick Navigation Cards */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
         <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-          <FileBadge className="text-blue-600" size={20} />
-          اقسام موديول الموارد البشرية
+          <FileBadge className="text-blue-600 shrink-0" size={20} />
+          {t("hr.dashboard.sectionsTitle")}
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {quickLinks.map((item, idx) => {
