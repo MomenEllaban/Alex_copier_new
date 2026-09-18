@@ -129,7 +129,7 @@ export default function CustomersPage() {
   const [paymentCompanyId, setPaymentCompanyId] = useState("");
   const [savingPayment, setSavingPayment] = useState(false);
   const [savingLocation, setSavingLocation] = useState(false);
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = 10;
 
   const fetchCustomers = async () => {
     try {

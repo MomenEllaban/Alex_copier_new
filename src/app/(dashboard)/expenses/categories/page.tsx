@@ -6,6 +6,7 @@ import { useI18n } from "@/i18n/context";
 import { useRouter } from "next/navigation";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
+import Pagination from "@/components/Pagination";
 import { ArrowRight, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import PrinterLoader from "@/components/PrinterLoader";
 import { AddFormBoundary } from "@/hooks/useAutoAddForm";
@@ -37,7 +38,10 @@ export default function ExpenseCategoriesPage() {
   const [formError, setFormError] = useState("");
   const [search, setSearch] = useState("");
   const [companyFilter, setCompanyFilter] = useState("");
+  const [page, setPage] = useState(1);
   const [form, setForm] = useState({ name: "", companyId: "" });
+
+  const PAGE_SIZE = 10;
 
   const fetchData = async () => {
     try {
@@ -68,6 +72,10 @@ export default function ExpenseCategoriesPage() {
     (!companyFilter || cat.companyId === companyFilter) &&
     (matchesQuery(cat.name, search) || matchesQuery(cat.company?.name, search))
   );
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const openCreate = () => {
     setForm({ name: "", companyId: "" });
@@ -167,7 +175,7 @@ export default function ExpenseCategoriesPage() {
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-200 p-4 md:flex-row md:items-center md:flex-wrap">
           <div className="w-full md:w-80 md:flex-none"><SearchInput value={search} onChange={setSearch} placeholder={t("finance.searchCategoryPlaceholder")} /></div>
-          <FilterSelect value={companyFilter} onChange={(v) => { setCompanyFilter(v); }} options={companies.map((c) => ({ value: c.id, label: c.name }))} allLabel={`${t("common.company")} — ${t("common.all")}`} className="md:w-40" />
+          <FilterSelect value={companyFilter} onChange={(v) => { setCompanyFilter(v); setPage(1); }} options={companies.map((c) => ({ value: c.id, label: c.name }))} allLabel={`${t("common.company")} — ${t("common.all")}`} className="md:w-40" />
           <div className="md:ms-auto">
             <RefreshButton onRefresh={refresh} refreshing={refreshing} />
           </div>
@@ -195,7 +203,7 @@ export default function ExpenseCategoriesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {filtered.map((cat) => (
+                {paged.map((cat) => (
                   <tr key={cat.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-sm font-medium">{cat.name}</td>
                     <td className="px-4 py-3 text-sm">{cat.company?.name || "—"}</td>
@@ -215,6 +223,13 @@ export default function ExpenseCategoriesPage() {
             </table>
           </div>
         )}
+        <Pagination
+          currentPage={safePage}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          totalItems={filtered.length}
+          pageSize={PAGE_SIZE}
+        />
       </div>
     </div>
   );

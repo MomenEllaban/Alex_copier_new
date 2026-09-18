@@ -68,7 +68,7 @@ export default function SuppliersPage() {
   const [orders, setOrders] = useState<PurchaseOrderLite[]>([]);
   const [returns, setReturns] = useState<PurchaseReturnLite[]>([]);
   const [statementId, setStatementId] = useState<string | null>(null);
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = 10;
 
   const fetchSuppliers = async () => {
     try {

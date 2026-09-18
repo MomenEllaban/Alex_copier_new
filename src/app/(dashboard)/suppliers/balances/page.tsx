@@ -44,7 +44,7 @@ export default function SupplierBalancesPage() {
   const [companyFilter, setCompanyFilter] = useState("");
   const [page, setPage] = useState(1);
   const [statementId, setStatementId] = useState<string | null>(null);
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = 10;
 
   const fetchAll = async () => {
     try {

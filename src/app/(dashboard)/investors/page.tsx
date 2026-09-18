@@ -44,7 +44,7 @@ export default function InvestorsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = 10;
 
   const fetchInvestors = async () => {
     try {

@@ -37,7 +37,7 @@ interface NotificationItem {
   sender?: { id?: string; name?: string } | null;
 }
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 10;
 
 const CATEGORY_ICON: Record<string, { icon: typeof Bell; classes: string }> = {
   SERVICE_REQUEST: { icon: Wrench, classes: "bg-amber-100 text-amber-700" },

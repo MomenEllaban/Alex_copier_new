@@ -852,6 +852,7 @@
     "statusChanged": "Account status changed successfully",
     "actionFailed": "Something went wrong, please try again",
     "you": "You",
+    "cannotDeleteSelf": "You cannot delete your own account",
     "passwordMin": "At least 6 characters",
     "resetData": {
       "title": "Reset test data",

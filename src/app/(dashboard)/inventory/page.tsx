@@ -73,7 +73,7 @@ export default function InventoryPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = 10;
 
   const companyMap = companies.reduce<Record<string, string>>((acc, company) => {
     const normalized = (company.nameAr || company.name || "").toLowerCase();

@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition, useMemo } from "react";
 import { useI18n } from "@/i18n/context";
 import PrinterLoader from "@/components/PrinterLoader";
 import SearchInput from "@/components/SearchInput";
+import Pagination from "@/components/Pagination";
 import FormModal from "@/components/FormModal";
 import SubmitButton from "@/components/SubmitButton";
 import ExportButton from "@/components/ExportButton";
@@ -44,6 +45,9 @@ export default function LeavesPage() {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+
+  const PAGE_SIZE = 10;
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState<LeaveRequest | null>(null);
@@ -187,6 +191,10 @@ export default function LeavesPage() {
     return matchesSearch && matchesStatus;
   });
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
   const stats = useMemo(() => {
     return {
       total: leaves.length,
@@ -264,12 +272,12 @@ export default function LeavesPage() {
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-4">
         <SearchInput
           value={search}
-          onChange={setSearch}
+          onChange={(v) => { setSearch(v); setPage(1); }}
           placeholder={t("hr.leaves.searchPlaceholder")}
         />
         <select
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
+          onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
           className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500"
         >
           <option value="">{t("hr.leaves.allStatuses")}</option>
@@ -302,7 +310,7 @@ export default function LeavesPage() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((l) => (
+                paged.map((l) => (
                   <tr key={l.id} className="hover:bg-gray-50 transition-colors">
                     <td className="p-3">
                       <div className="font-bold text-gray-900">{l.Employee?.fullNameAr || l.Employee?.fullName}</div>
@@ -369,6 +377,13 @@ export default function LeavesPage() {
             </tbody>
           </table>
         </div>
+        <Pagination
+          currentPage={safePage}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          totalItems={filtered.length}
+          pageSize={PAGE_SIZE}
+        />
       </div>
 
       {/* Add Leave Modal */}

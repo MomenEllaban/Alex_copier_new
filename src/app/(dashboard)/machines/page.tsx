@@ -102,7 +102,7 @@ const { success: toastSuccess } = useToast();
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("");
   const [showImport, setShowImport] = useState(false);
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = 10;
 
   const fetchMachines = async () => {
     try {

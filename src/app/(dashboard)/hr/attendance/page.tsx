@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition, useMemo } from "react";
 import { useI18n } from "@/i18n/context";
 import PrinterLoader from "@/components/PrinterLoader";
 import SearchInput from "@/components/SearchInput";
+import Pagination from "@/components/Pagination";
 import FormModal from "@/components/FormModal";
 import SubmitButton from "@/components/SubmitButton";
 import ExportButton from "@/components/ExportButton";
@@ -46,6 +47,9 @@ export default function AttendancePage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [page, setPage] = useState(1);
+
+  const PAGE_SIZE = 10;
 
   const [showModal, setShowModal] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -150,7 +154,11 @@ export default function AttendancePage() {
     return matchesSearch && matchesStatus;
   });
 
-  const stats = useMemo(() => {
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const filteredTodayEmployees = useMemo(() => {
     return {
       total: records.length,
       present: records.filter((r) => r.status === "PRESENT").length,
@@ -226,10 +234,10 @@ export default function AttendancePage() {
       <StatsCards
         columns={4}
         stats={[
-          { label: t("hr.attendance.statToday"), value: stats.total.toLocaleString("en-US"), icon: <Users size={18} />, tone: "sky" },
-          { label: t("hr.attendance.statPresent"), value: stats.present.toLocaleString("en-US"), icon: <UserCheck size={18} />, tone: "green" },
-          { label: t("hr.attendance.statLate"), value: stats.late.toLocaleString("en-US"), icon: <Clock3 size={18} />, tone: "amber" },
-          { label: t("hr.attendance.statAbsent"), value: stats.absent.toLocaleString("en-US"), icon: <XCircle size={18} />, tone: "rose" },
+          { label: t("hr.attendance.statToday"), value: filteredTodayEmployees.total.toLocaleString("en-US"), icon: <Users size={18} />, tone: "sky" },
+          { label: t("hr.attendance.statPresent"), value: filteredTodayEmployees.present.toLocaleString("en-US"), icon: <UserCheck size={18} />, tone: "green" },
+          { label: t("hr.attendance.statLate"), value: filteredTodayEmployees.late.toLocaleString("en-US"), icon: <Clock3 size={18} />, tone: "amber" },
+          { label: t("hr.attendance.statAbsent"), value: filteredTodayEmployees.absent.toLocaleString("en-US"), icon: <XCircle size={18} />, tone: "rose" },
         ]}
       />
 
@@ -243,7 +251,7 @@ export default function AttendancePage() {
           <input
             type="date"
             value={date}
-            onChange={(e) => setDate(e.target.value)}
+            onChange={(e) => { setDate(e.target.value); setPage(1); }}
             className="border border-gray-300 rounded-lg px-3 py-2 text-sm font-semibold text-gray-900 focus:ring-2 focus:ring-blue-500"
           />
         </div>
@@ -251,12 +259,12 @@ export default function AttendancePage() {
         <div className="flex items-center gap-3 w-full md:w-auto">
           <SearchInput
             value={search}
-            onChange={setSearch}
+            onChange={(v) => { setSearch(v); setPage(1); }}
             placeholder={t("hr.attendance.searchPlaceholder")}
           />
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
             className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500"
           >
             <option value="">{t("hr.attendance.allStatuses")}</option>
@@ -292,7 +300,7 @@ export default function AttendancePage() {
                   </td>
                 </tr>
               ) : (
-                filtered.map((rec) => (
+                paged.map((rec) => (
                   <tr key={rec.id} className="hover:bg-gray-50 transition-colors">
                     <td className="p-3">
                       <div className="font-bold text-gray-900">
@@ -335,6 +343,13 @@ export default function AttendancePage() {
             </tbody>
           </table>
         </div>
+        <Pagination
+          currentPage={safePage}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          totalItems={filtered.length}
+          pageSize={PAGE_SIZE}
+        />
       </div>
 
       {/* Manual Attendance Modal */}

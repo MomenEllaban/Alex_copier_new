@@ -37,7 +37,7 @@ export default function CustomerBalancesPage() {
   const [typeFilter, setTypeFilter] = useState("");
   const [balanceFilter, setBalanceFilter] = useState("");
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = 10;
 
   const fetchCustomers = async () => {
     try {

@@ -92,7 +92,7 @@ export default function ProductsPage() {
   const [error, setError] = useState("");
   const [viewProduct, setViewProduct] = useState<Product | null>(null);
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = 10;
 
   const fetchData = async () => {
     try {

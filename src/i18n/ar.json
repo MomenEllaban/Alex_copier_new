@@ -846,6 +846,7 @@
     "statusChanged": "تم تغيير حالة الحساب بنجاح",
     "actionFailed": "حدث خطأ، حاول مرة أخرى",
     "you": "أنت",
+    "cannotDeleteSelf": "لا يمكنك حذف حسابك الشخصي",
     "passwordMin": "6 أحرف على الأقل",
     "resetData": {
       "title": "إعادة تعيين بيانات الاختبار",

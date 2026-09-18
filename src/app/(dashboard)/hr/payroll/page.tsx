@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useI18n } from "@/i18n/context";
 import PrinterLoader from "@/components/PrinterLoader";
+import Pagination from "@/components/Pagination";
 import FormModal from "@/components/FormModal";
 import SubmitButton from "@/components/SubmitButton";
 import ExportButton from "@/components/ExportButton";
@@ -57,6 +58,9 @@ export default function PayrollPage() {
 
   const [runs, setRuns] = useState<PayrollRun[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+
+  const PAGE_SIZE = 10;
   const [selectedRunItems, setSelectedRunItems] = useState<PayrollItem[] | null>(null);
   const [selectedRunDetails, setSelectedRunDetails] = useState<PayrollRun | null>(null);
 
@@ -178,6 +182,10 @@ export default function PayrollPage() {
     }
   };
 
+  const totalPages = Math.max(1, Math.ceil(runs.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pagedRuns = runs.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
   if (loading) return <PrinterLoader label={t("hr.payroll.loading")} />;
 
   return (
@@ -238,7 +246,7 @@ export default function PayrollPage() {
                   </td>
                 </tr>
               ) : (
-                runs.map((r) => (
+                pagedRuns.map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50 transition-colors">
                     <td className="p-3 font-bold text-gray-900 whitespace-nowrap">
                       {t("hr.payroll.monthWord")} <span dir="ltr">{r.Period?.month} / {r.Period?.year}</span>
@@ -305,6 +313,13 @@ export default function PayrollPage() {
             </tbody>
           </table>
         </div>
+        <Pagination
+          currentPage={safePage}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          totalItems={runs.length}
+          pageSize={PAGE_SIZE}
+        />
       </div>
 
       {/* Calculate Modal */}

@@ -93,7 +93,7 @@ export default function WarehousesPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = 10;
 
   const [detailWarehouse, setDetailWarehouse] = useState<Warehouse | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);

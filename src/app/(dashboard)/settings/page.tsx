@@ -5,6 +5,7 @@ import { useI18n } from "@/i18n/context";
 import { useSession } from "next-auth/react";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
+import Pagination from "@/components/Pagination";
 import PrinterLoader from "@/components/PrinterLoader";
 import StatsCards from "@/components/StatsCards";
 import { useConfirm } from "@/components/UIProvider";
@@ -59,7 +60,10 @@ export default function SettingsPage() {
   const loading = !usersLoaded;
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("");
+  const [page, setPage] = useState(1);
   const [banner, setBanner] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const PAGE_SIZE = 10;
 
 const [modalOpen, setModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -109,6 +113,10 @@ setUsersLoaded(true);
         matchesQuery(user.email, search) ||
         matchesQuery(t(`roles.${user.role}`), search))
   );
+
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const pagedUsers = filteredUsers.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const openCreate = () => {
     setEditingUser(null);
@@ -198,7 +206,7 @@ setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, isActive: !user.i
 
   const handleDelete = async (user: User) => {
     if (user.id === meId) {
-      setBanner({ type: "error", text: "لا يمكنك حذف حسابك الشخصي" });
+      setBanner({ type: "error", text: t("settings.cannotDeleteSelf") });
       return;
     }
 
@@ -287,13 +295,13 @@ setUsers((prev) => prev.filter((u) => u.id !== user.id));
               <SearchInput value={search} onChange={setSearch} placeholder={t("settings.usersSearchPlaceholder")} className="md:max-w-md" />
               <FilterSelect
                 value={roleFilter}
-                onChange={(v) => setRoleFilter(v)}
+                onChange={(v) => { setRoleFilter(v); setPage(1); }}
                 options={ALL_ROLES.map((role) => ({ value: role, label: t(`roles.${role}`) }))}
                 allLabel={`${t("settings.roleFilter")} — ${t("common.all")}`}
                 className="md:w-48"
               />
               {(search !== "" || roleFilter !== "") && (
-                <button onClick={() => { setSearch(""); setRoleFilter(""); }} className="text-sm text-gray-500 hover:text-gray-700 underline">
+                <button onClick={() => { setSearch(""); setRoleFilter(""); setPage(1); }} className="text-sm text-gray-500 hover:text-gray-700 underline">
                   {t("common.resetFilters")}
                 </button>
               )}
@@ -324,7 +332,7 @@ setUsers((prev) => prev.filter((u) => u.id !== user.id));
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {filteredUsers.map((user) => {
+                    {pagedUsers.map((user) => {
                       const isSelf = user.id === meId;
                       const initials = user.name.trim().slice(0, 2);
                       return (
@@ -411,6 +419,13 @@ setUsers((prev) => prev.filter((u) => u.id !== user.id));
                 </table>
               </div>
 )}
+            <Pagination
+              currentPage={safePage}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              totalItems={filteredUsers.length}
+              pageSize={PAGE_SIZE}
+            />
           </div>
 
         <div className="bg-white rounded-xl shadow-md overflow-hidden">

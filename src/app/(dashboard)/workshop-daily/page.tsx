@@ -89,7 +89,7 @@ export default function WorkshopDailyPage() {
   const [directionFilter, setDirectionFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = 10;
 
   const [showForm, setShowForm] = useState(false);
   const [editingTx, setEditingTx] = useState<Tx | null>(null);

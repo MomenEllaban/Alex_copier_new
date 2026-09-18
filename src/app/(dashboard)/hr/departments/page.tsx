@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useI18n } from "@/i18n/context";
 import PrinterLoader from "@/components/PrinterLoader";
+import Pagination from "@/components/Pagination";
 import FormModal from "@/components/FormModal";
 import SubmitButton from "@/components/SubmitButton";
 import RefreshButton from "@/components/RefreshButton";
@@ -33,6 +34,10 @@ export default function DepartmentsPage() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [jobTitles, setJobTitles] = useState<JobTitle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deptPage, setDeptPage] = useState(1);
+  const [jobPage, setJobPage] = useState(1);
+
+  const PAGE_SIZE = 10;
 
   const [showDeptModal, setShowDeptModal] = useState(false);
   const [showJobModal, setShowJobModal] = useState(false);
@@ -124,6 +129,14 @@ export default function DepartmentsPage() {
     });
   };
 
+  const deptTotalPages = Math.max(1, Math.ceil(departments.length / PAGE_SIZE));
+  const deptSafePage = Math.min(deptPage, deptTotalPages);
+  const pagedDepts = departments.slice((deptSafePage - 1) * PAGE_SIZE, deptSafePage * PAGE_SIZE);
+
+  const jobTotalPages = Math.max(1, Math.ceil(jobTitles.length / PAGE_SIZE));
+  const jobSafePage = Math.min(jobPage, jobTotalPages);
+  const pagedJobs = jobTitles.slice((jobSafePage - 1) * PAGE_SIZE, jobSafePage * PAGE_SIZE);
+
   if (loading) return <PrinterLoader label={t("hr.departments.loading")} />;
 
   return (
@@ -191,7 +204,7 @@ export default function DepartmentsPage() {
                     </td>
                   </tr>
                 ) : (
-                  departments.map((d) => (
+                  pagedDepts.map((d) => (
                     <tr key={d.id} className="hover:bg-gray-50">
                       <td className="p-2.5 font-bold text-gray-900"><span dir="ltr">{d.code}</span></td>
                       <td className="p-2.5">
@@ -209,6 +222,13 @@ export default function DepartmentsPage() {
               </tbody>
             </table>
           </div>
+          <Pagination
+            currentPage={deptSafePage}
+            totalPages={deptTotalPages}
+            onPageChange={setDeptPage}
+            totalItems={departments.length}
+            pageSize={PAGE_SIZE}
+          />
         </div>
 
         {/* Job Titles List */}
@@ -234,7 +254,7 @@ export default function DepartmentsPage() {
                     </td>
                   </tr>
                 ) : (
-                  jobTitles.map((j) => (
+                  pagedJobs.map((j) => (
                     <tr key={j.id} className="hover:bg-gray-50">
                       <td className="p-2.5 font-bold text-gray-900"><span dir="ltr">{j.code}</span></td>
                       <td className="p-2.5">
@@ -250,6 +270,13 @@ export default function DepartmentsPage() {
               </tbody>
             </table>
           </div>
+          <Pagination
+            currentPage={jobSafePage}
+            totalPages={jobTotalPages}
+            onPageChange={setJobPage}
+            totalItems={jobTitles.length}
+            pageSize={PAGE_SIZE}
+          />
         </div>
       </div>
 

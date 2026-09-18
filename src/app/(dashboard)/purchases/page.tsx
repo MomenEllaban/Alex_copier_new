@@ -111,7 +111,7 @@ export default function PurchasesPage() {
   const [priceHistory, setPriceHistory] = useState<Record<string, PriceHistory>>({});
   const [priceHistoryLoading, setPriceHistoryLoading] = useState<Record<string, boolean>>({});
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = 10;
   const [icPage, setIcPage] = useState(1);
   const IC_PAGE_SIZE = 10;
   const [tab, setTab] = useState<"external" | "inter">("external");

@@ -119,7 +119,7 @@ export default function ServiceRequestsPage() {
     priority: "NORMAL",
   });
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = 10;
 
   const fetchData = async () => {
     try {

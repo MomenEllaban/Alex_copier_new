@@ -127,7 +127,7 @@ export default function ContractsPage() {
     value: "", amountPaid: "", paymentMethod: "CASH", billingCycle: "MONTHLY", notes: "", machineIds: [] as string[],
   });
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = 10;
 
   const remainingAmount = Number(form.value || 0) - Number(form.amountPaid || 0);
   const billingCycleMonths: Record<string, number> = {

@@ -191,7 +191,7 @@ export default function SalesPage() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = 10;
 
   const filtered = orders.filter(order =>
     (!paymentFilter || order.paymentStatus === paymentFilter) &&

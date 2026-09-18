@@ -54,7 +54,7 @@ export default function FinancePage() {
   const [dateTo, setDateTo] = useState("");
   const [page, setPage] = useState(1);
   const [form, setForm] = useState({ companyId: "", categoryId: "", category: "", description: "", amount: "" });
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = 10;
 
   const fetchData = async () => {
     try {

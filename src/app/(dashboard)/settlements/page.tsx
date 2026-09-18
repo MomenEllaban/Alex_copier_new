@@ -64,7 +64,7 @@ export default function SettlementsPage() {
   const [dateTo, setDateTo] = useState("");
   const [form, setForm] = useState({ companyId: "", customerId: "", engineerId: "", amount: "", paymentMethod: "CASH", reason: "", direction: "ADDITION" });
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = 10;
 
   const fetchData = async () => {
     try {

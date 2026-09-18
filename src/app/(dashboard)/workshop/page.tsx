@@ -60,7 +60,7 @@ export default function WorkshopPage() {
     scrapValue: 0,
   });
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = 10;
 
   const filtered = machines.filter(
     (machine) =>

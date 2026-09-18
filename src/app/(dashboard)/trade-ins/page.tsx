@@ -56,7 +56,7 @@ export default function TradeInsPage() {
   const [conditionFilter, setConditionFilter] = useState("");
   const [page, setPage] = useState(1);
   const [showView, setShowView] = useState<TradeInProduct | null>(null);
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = 10;
 
   const filtered = products.filter(
     (p) =>

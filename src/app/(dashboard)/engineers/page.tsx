@@ -98,7 +98,7 @@ export default function EngineersPage() {
   const [engineerSales, setEngineerSales] = useState<SalesOrder[]>([]);
   const [salesLoading, setSalesLoading] = useState(false);
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 15;
+  const PAGE_SIZE = 10;
 
   const fetchEngineers = async () => {
     try {
