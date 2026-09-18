@@ -43,20 +43,52 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "جهة التسليم مطلوبة", code: "HANDOVER_TO_REQUIRED" }, { status: 400 });
     }
 
+    // ═══════════════════════════════════════════════════════════════
+    // PHASE 11c - تقفيل الخزنة اليومي مع الجرد الفعلي والمسوِّغ الإجباري
+    //  • bookBalance  = رصيد الدفاتر (مجموع وارد - صادر بعد التأكيدات)
+    //  • actualBalance= الرصيد الفعلي (جرد أمين الخزنة)
+    //  • variance     = actualBalance - bookBalance (عجز سالب / زيادة موجب)
+    //  • عند وجود عجز أو زيادة يجب إرفاق مسوِّغ إجباري (varianceNote)
+    //                              (عجز مطابق العدد 0 = لا مسوِّغ مطلوب)
+    // ═══════════════════════════════════════════════════════════════
     const totals = calcTotals(book.transactions);
+    const bookBalance = totals.remaining;
+    const rawActual = Number(body.actualBalance);
+    const actualBalance = Number.isFinite(rawActual) ? rawActual : bookBalance; // افتراض التطابق إن لم يُرسل جرد
+    const variance = Math.round((actualBalance - bookBalance) * 100) / 100;
+    const varianceType =
+      Math.abs(variance) < 0.005 ? "MATCH" : variance > 0 ? "SURPLUS" : "DEFICIT";
+    const varianceNoteRaw = typeof body.varianceNote === "string" ? body.varianceNote.trim() : "";
+    if (varianceType !== "MATCH" && !varianceNoteRaw) {
+      return NextResponse.json(
+        { error: "عند وجود عجز أو زيادة يجب توضيح المسوِّغ/سبب الفرق", code: "VARIANCE_NOTE_REQUIRED" },
+        { status: 400 },
+      );
+    }
+
+    // الرصيد الافتتاحي ليوم الغد = رصيد هذا اليوم؛ يُقرأ لأجل التقارير المتراكمة بالفعل هنا
     const closed = await prisma.workshopDailyBook.update({
       where: { id: book.id },
       data: {
         status: "CLOSED",
         closedBy: actorId,
         closedAt: new Date(),
-        handoverAmount: totals.remaining,
+        bookBalance,
+        actualBalance,
+        variance,
+        varianceType,
+        varianceNote: varianceType === "MATCH" ? null : varianceNoteRaw,
+        handoverAmount: bookBalance,
         handoverTo,
         handoverNote: handoverNote || null,
       },
     });
 
-    return NextResponse.json({ ...closed, totals });
+    return NextResponse.json({
+      ...closed,
+      totals: { ...totals, bookBalance, actualBalance, variance, varianceType },
+      openingBalanceForNextDay: bookBalance,
+    });
   } catch {
     return NextResponse.json({ error: "Failed to close day" }, { status: 500 });
   }

@@ -112,6 +112,41 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "البيان مطلوب", code: "REASON_REQUIRED" }, { status: 400 });
     }
 
+    // ═══════════════════════════════════════════════════════════
+    // PHASE 11b - إلزامية تصنيف الوارد (لا يمكن حفظ وارد بدون تصنيف)
+    // الحركة الواردة (IN) يجب أن تُصنَّف: خدمة ورشة / تحصيل نقدية / إيرادات اخرى
+    // — وذلك ليُرحَّل بشكل تلقائي للحساب المحاسبي الصحيح حسب النوع
+    // ═══════════════════════════════════════════════════════════
+    const revenueType =
+      direction === "OUT"
+        ? null
+        : body.revenueType === "SERVICE_REVENUE"
+          ? "SERVICE_REVENUE"
+          : body.revenueType === "CASH_COLLECTION"
+            ? "CASH_COLLECTION"
+            : body.revenueType === "OTHER_INCOME"
+              ? "OTHER_INCOME"
+              : null     ;
+    if (direction === "IN" && !revenueType) {
+      return NextResponse.json(
+        { error: "تصنيف الوارد مطلوب (خدمة ورشة / تحصيل نقدية / إيرادات أخرى)", code: "REVENUE_TYPE_REQUIRED" },
+        { status: 400 },
+      );
+    }
+    if (direction === "OUT" && revenueType) {
+      return NextResponse.json(
+        { error: "تصنيف الوارد يُحدد فقط لحركات الوارد", code: "REVENUE_TYPE_NOT_ALLOWED_ON_OUT" },
+        { status: 400 },
+      );
+    }
+    const customerId = typeof body.customerId === "string" && body.customerId.trim() !== "" ? body.customerId.trim() : null;
+    if (revenueType === "CASH_COLLECTION" && !customerId) {
+      return NextResponse.json(
+        { error: "حركة تحصيل نقدية تتطلب اختيار العميل المرتبط بالمديونية", code: "CASH_COLLECTION_CUSTOMER_REQUIRED" },
+        { status: 400 },
+      );
+    }
+
     // The workshop daily form no longer asks for an expense category.
     // OUT entries are auto-assigned to the workshop's own category so the
     // accountant can confirm without extra input.
@@ -145,6 +180,8 @@ export async function POST(request: Request) {
         companyId: company.id,
         direction,
         amount,
+        revenueType,
+        customerId,
         categoryId: category?.id ?? null,
         reason,
         createdBy: actorId,

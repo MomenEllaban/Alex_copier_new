@@ -7,9 +7,9 @@ datasource db {
   provider = "postgresql"
 }
 
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // PHASE 0 - AUTH
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 enum UserRole {
   GENERAL_MANAGER
@@ -124,9 +124,9 @@ model Notification {
   @@index([userId, createdAt])
 }
 
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // PHASE 1 - CORE
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 enum CustomerType {
   INDIVIDUAL
@@ -203,31 +203,32 @@ model Customer {
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
-  engineer          Engineer?      @relation(fields: [engineerId], references: [id])
-  locations         CustomerLocation[]
-  ledgers           CustomerLedger[]
-  orders            SalesOrder[]
-  serviceRequests   ServiceRequest[]
-  contracts         Contract[]
-  machineOwnerships MachineOwnerHistory[]
-  machines          Machine[]
-  settlements       Settlement[]
-  returns           ReturnTransaction[]
-  payments          CustomerPayment[]
-  copierTests       CopierTest[]
+  engineer             Engineer?             @relation(fields: [engineerId], references: [id])
+  locations            CustomerLocation[]
+  ledgers              CustomerLedger[]
+  orders               SalesOrder[]
+  serviceRequests      ServiceRequest[]
+  contracts            Contract[]
+  machineOwnerships    MachineOwnerHistory[]
+  machines             Machine[]
+  settlements          Settlement[]
+  returns              ReturnTransaction[]
+  payments             CustomerPayment[]
+  copierTests          CopierTest[]
+  workshopTransactions WorkshopTransaction[]
 }
 
 model CustomerPayment {
-  id          String    @id @default(cuid())
+  id          String   @id @default(cuid())
   customerId  String
   companyId   String?
   amount      Float
-  paymentDate DateTime  @default(now())
+  paymentDate DateTime @default(now())
   notes       String?
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime @default(now())
 
-  customer Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  company  Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  company  Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
 }
 
 model CustomerLocation {
@@ -369,9 +370,9 @@ model InvestorDistribution {
   investor Investor                  @relation(fields: [investorId], references: [id], onDelete: Cascade)
 }
 
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // PHASE 2 - MACHINES & INVENTORY
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 enum ProductType {
   MACHINE
@@ -591,41 +592,41 @@ model StockMovement {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
-  warehouse     Warehouse     @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
-  product       Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  warehouse     Warehouse      @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  product       Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
   purchaseOrder PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
 }
 
 model ReturnTransaction {
-  id               String       @id @default(cuid())
-  companyId        String
-  type             ReturnType
-  salesOrderId     String?
-  salesOrderItemId String?
-  purchaseOrderId  String?
+  id                  String       @id @default(cuid())
+  companyId           String
+  type                ReturnType
+  salesOrderId        String?
+  salesOrderItemId    String?
+  purchaseOrderId     String?
   purchaseOrderItemId String?
-  priceTier        String?
-  warehouseId      String?
-  customerId       String?
-  supplierId       String?
-  productId        String
-  quantity         Int
-  unitPrice        Float
-  total            Float
-  reason           String?
-  status           ReturnStatus @default(PENDING)
-  createdAt        DateTime     @default(now())
-  updatedAt        DateTime     @updatedAt
+  priceTier           String?
+  warehouseId         String?
+  customerId          String?
+  supplierId          String?
+  productId           String
+  quantity            Int
+  unitPrice           Float
+  total               Float
+  reason              String?
+  status              ReturnStatus @default(PENDING)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
 
-  company            Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  salesOrder         SalesOrder?        @relation(fields: [salesOrderId], references: [id])
-  salesOrderItem     SalesOrderItem?    @relation(fields: [salesOrderItemId], references: [id])
-  purchaseOrder      PurchaseOrder?     @relation(fields: [purchaseOrderId], references: [id])
-  purchaseOrderItem  PurchaseOrderItem? @relation(fields: [purchaseOrderItemId], references: [id])
-  warehouse          Warehouse?         @relation(fields: [warehouseId], references: [id])
-  customer           Customer?          @relation(fields: [customerId], references: [id])
-  supplier           Supplier?          @relation(fields: [supplierId], references: [id])
-  product            Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  company           Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  salesOrder        SalesOrder?        @relation(fields: [salesOrderId], references: [id])
+  salesOrderItem    SalesOrderItem?    @relation(fields: [salesOrderItemId], references: [id])
+  purchaseOrder     PurchaseOrder?     @relation(fields: [purchaseOrderId], references: [id])
+  purchaseOrderItem PurchaseOrderItem? @relation(fields: [purchaseOrderItemId], references: [id])
+  warehouse         Warehouse?         @relation(fields: [warehouseId], references: [id])
+  customer          Customer?          @relation(fields: [customerId], references: [id])
+  supplier          Supplier?          @relation(fields: [supplierId], references: [id])
+  product           Product            @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
 
 model SparePartCustody {
@@ -645,9 +646,9 @@ model SparePartCustody {
   product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 }
 
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // PHASE 3 - PURCHASING
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 enum PurchaseOrderStatus {
   DRAFT
@@ -667,11 +668,11 @@ model PurchaseOrder {
   createdAt  DateTime            @default(now())
   updatedAt  DateTime            @updatedAt
 
-  company  Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  supplier Supplier            @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  items    PurchaseOrderItem[]
-  invoices PurchaseInvoice[]
-  returns  ReturnTransaction[]
+  company   Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  supplier  Supplier            @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  items     PurchaseOrderItem[]
+  invoices  PurchaseInvoice[]
+  returns   ReturnTransaction[]
   movements StockMovement[]
 }
 
@@ -684,8 +685,8 @@ model PurchaseOrderItem {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
-  product       Product       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  purchaseOrder PurchaseOrder       @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  product       Product             @relation(fields: [productId], references: [id], onDelete: Cascade)
   returns       ReturnTransaction[]
 }
 
@@ -706,27 +707,27 @@ model PurchaseInvoice {
 }
 
 model InterCompanyInvoice {
-  id                   String   @id @default(cuid())
-  fromCompanyId        String
-  toCompanyId          String
-  invoiceNumber        String
-  total                Float
-  invoiceDate          DateTime
-  purchaseOrderId      String?
-  salesOrderId         String?
-  notes                String?
-  internalPaymentMethod String  @default("CREDIT")
-  internalPaidAmount   Float    @default(0)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  id                    String   @id @default(cuid())
+  fromCompanyId         String
+  toCompanyId           String
+  invoiceNumber         String
+  total                 Float
+  invoiceDate           DateTime
+  purchaseOrderId       String?
+  salesOrderId          String?
+  notes                 String?
+  internalPaymentMethod String   @default("CREDIT")
+  internalPaidAmount    Float    @default(0)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   fromCompany Company @relation("InterCompanySales", fields: [fromCompanyId], references: [id], onDelete: Cascade)
   toCompany   Company @relation("InterCompanyPurchases", fields: [toCompanyId], references: [id], onDelete: Cascade)
 }
 
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // PHASE 4 - SALES & CONTRACTS
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 enum OrderType {
   MACHINE_SALE
@@ -828,13 +829,13 @@ model SalesOrder {
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
 
-  company      Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  customer     Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  engineer     Engineer?           @relation(fields: [engineerId], references: [id])
-  salesCategory SalesCategory?     @relation(fields: [categoryId], references: [id])
-  items        SalesOrderItem[]
-  installments Installment[]
-  returns      ReturnTransaction[]
+  company       Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer      Customer            @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  engineer      Engineer?           @relation(fields: [engineerId], references: [id])
+  salesCategory SalesCategory?      @relation(fields: [categoryId], references: [id])
+  items         SalesOrderItem[]
+  installments  Installment[]
+  returns       ReturnTransaction[]
 }
 
 model SalesOrderItem {
@@ -904,9 +905,9 @@ model ContractMachine {
   @@unique([contractId, machineId])
 }
 
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // PHASE 5 - SERVICE
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 enum Priority {
   NORMAL
@@ -977,9 +978,9 @@ model Visit {
   contract       Contract?      @relation(fields: [contractId], references: [id])
 }
 
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // PHASE 6 - WORKSHOP
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 enum ScrapStatus {
   PENDING
@@ -1001,9 +1002,9 @@ model ScrapOrder {
   machine Machine @relation(fields: [machineId], references: [id], onDelete: Cascade)
 }
 
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // PHASE 7 - FINANCE
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 enum AccountType {
   ASSET
@@ -1066,8 +1067,8 @@ model JournalEntryItem {
 }
 
 model Settlement {
-  id               String             @id @default(cuid())
-  settlementNumber String             @unique
+  id               String              @id @default(cuid())
+  settlementNumber String              @unique
   companyId        String
   customerId       String?
   engineerId       String?
@@ -1075,11 +1076,11 @@ model Settlement {
   paymentMethod    PaymentMethod
   reason           String
   direction        SettlementDirection @default(ADDITION)
-  status           SettlementStatus   @default(INITIAL)
+  status           SettlementStatus    @default(INITIAL)
   collectedBy      String
   verifiedBy       String?
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
 
   company   Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
   customer  Customer? @relation(fields: [customerId], references: [id])
@@ -1108,8 +1109,8 @@ model ExpenseCategory {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  expenses Expense[]
+  company              Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  expenses             Expense[]
   workshopTransactions WorkshopTransaction[]
 
   @@unique([companyId, name])
@@ -1129,14 +1130,14 @@ model Expense {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  company  Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  payer    User             @relation(fields: [paidBy], references: [id])
+  company         Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  payer           User             @relation(fields: [paidBy], references: [id])
   expenseCategory ExpenseCategory? @relation(fields: [categoryId], references: [id])
 }
 
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // PHASE 8 - WARRANTY & ENGINEER SALARY
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 model Warranty {
   id              String   @id @default(cuid())
@@ -1154,9 +1155,9 @@ model Warranty {
   engineerId String?
 }
 
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // PHASE 9 - BANK RECONCILIATION
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 model BankReconciliation {
   id               String   @id @default(cuid())
@@ -1172,9 +1173,9 @@ model BankReconciliation {
   updatedAt        DateTime @updatedAt
 }
 
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // PHASE 8 - WARRANTY & ENGINEER SALARY
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 model EngineerSalary {
   id                 String    @id @default(cuid())
@@ -1196,9 +1197,9 @@ model EngineerSalary {
   engineer Engineer @relation(fields: [engineerId], references: [id], onDelete: Cascade)
 }
 
-// ═══════════════════════════════════════════════════════════
-// PHASE 11 - WORKSHOP DAILY CASHBOX (يومية الورشة)
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// PHASE 11 - WORKSHOP DAILY CASHBOX (ÙŠÙˆÙ…ÙŠØ© Ø§Ù„ÙˆØ±Ø´Ø©)
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 enum WorkshopBookStatus {
   OPEN
@@ -1216,84 +1217,115 @@ enum WorkshopTxStatus {
   REJECTED
 }
 
+enum WorkshopRevenueType {
+  SERVICE_REVENUE
+  CASH_COLLECTION
+  OTHER_INCOME
+}
+
+enum WorkshopVarianceType {
+  MATCH
+  DEFICIT
+  SURPLUS
+}
+
 model WorkshopDailyBook {
-  id              String             @id @default(cuid())
-  companyId       String
-  bookDate        DateTime
-  status          WorkshopBookStatus @default(OPEN)
-  notes           String?
-  openedBy        String
-  closedBy        String?
-  closedAt        DateTime?
-  handoverAmount  Float?
-  handoverTo      String?
-  handoverNote    String?
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
+  id             String             @id @default(cuid())
+  companyId      String
+  bookDate       DateTime
+  status         WorkshopBookStatus @default(OPEN)
+  notes          String?
+  openedBy       String
+  closedBy       String?
+  closedAt       DateTime?
+  handoverAmount Float?
+  handoverTo     String?
+  handoverNote   String?
 
-  company      Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // PHASE 11b - DAILY CASH CLOSING (ØªÙ‚ÙÙŠÙ„ Ø§Ù„Ø®Ø²Ù†Ø© Ø§Ù„ÙŠÙˆÙ…ÙŠ)
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  openingBalance Float                 @default(0) // ÙŠÙØ¬Ù„Ø¨ ØªÙ„Ù‚Ø§Ø¦ÙŠÙ‹Ø§ Ù…Ù† Ø±ØµÙŠØ¯ Ø¥Ù‚ÙØ§Ù„ Ø§Ù„ÙŠÙˆÙ… Ø§Ù„Ø³Ø§Ø¨Ù‚
+  bookBalance    Float                 @default(0) // Ø±ØµÙŠØ¯ Ø§Ù„Ø¯ÙØªØ± Ø§Ù„Ù…Ø­Ø³ÙˆØ¨ = ÙØ§ØªØ­ + ÙˆØ§Ø±Ø¯ Ù…Ø¤ÙƒØ¯ - ØµØ§Ø¯Ø± Ù…Ø¤ÙƒØ¯
+  actualBalance  Float? // Ø§Ù„Ø±ØµÙŠØ¯ Ø§Ù„ÙØ¹Ù„ÙŠ Ù…Ù† Ø§Ù„ÙŠØ¯ (Ø¥Ø¯Ø®Ø§Ù„ ÙŠØ¯ÙˆÙŠ)
+  variance       Float                 @default(0) // Ø§Ù„ÙØ±Ù‚ = Ø§Ù„ÙØ¹Ù„ÙŠ - Ø§Ù„Ø¯ÙØªØ±ÙŠ
+  varianceType   WorkshopVarianceType? // Ø¹Ø¬Ø² / Ø²ÙŠØ§Ø¯Ø© / Ù…Ø·Ø§Ø¨Ù‚
+  varianceNote   String? // Ø³Ø¨Ø¨ Ø§Ù„Ø¹Ø¬Ø²/Ø§Ù„Ø²ÙŠØ§Ø¯Ø© (Ø¥Ø¬Ø¨Ø§Ø±ÙŠ Ø¹Ù†Ø¯ Ø§Ù„Ø¹Ø¬Ø² Ø£Ùˆ Ø§Ù„Ø²ÙŠØ§Ø¯Ø©)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company      Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
   transactions WorkshopTransaction[]
-
-  @@index([companyId, status])
 }
 
 model WorkshopTransaction {
-  id           String              @id @default(cuid())
-  bookId       String
-  companyId    String
-  direction    WorkshopTxDirection
-  amount       Float
-  categoryId   String?
-  reason       String
-  status       WorkshopTxStatus    @default(PENDING)
+  id         String              @id @default(cuid())
+  bookId     String
+  companyId  String
+  direction  WorkshopTxDirection
+  amount     Float
+  categoryId String?
+  reason     String
+
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // PHASE 11b - INCOME CLASSIFICATION (ØªØµÙ†ÙŠÙ Ø§Ù„ÙˆØ§Ø±Ø¯)
+  // Ø¥Ù„Ø²Ø§Ù…ÙŠ Ù„ÙƒÙ„ Ø­Ø±ÙƒØ© ÙˆØ§Ø±Ø¯ (IN): Ø®Ø¯Ù…Ø© ÙˆØ±Ø´Ø© / ØªØ­ØµÙŠÙ„ Ù†Ù‚Ø¯ÙŠØ© / Ø¥ÙŠØ±Ø§Ø¯Ø§Øª Ø£Ø®Ø±Ù‰
+  // Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø­ÙØ¸ ÙˆØ§Ø±Ø¯ Ø¨Ø¯ÙˆÙ† ØªØµÙ†ÙŠÙ â€” ÙŠÙØ·Ø¨Ù‚ ÙÙŠ Ø§Ù„Ù€ API validation
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  revenueType WorkshopRevenueType? // Ù…Ø·Ù„ÙˆØ¨ Ø¹Ù†Ø¯Ù…Ø§ direction = IN
+  customerId  String? // Ø±Ø¨Ø· Ø­Ø±ÙƒØ© Ø§Ù„ØªØ­ØµÙŠÙ„ (CASH_COLLECTION) Ø¨Ø­Ø³Ø§Ø¨ Ø§Ù„Ø¹Ù…ÙŠÙ„/Ø§Ù„Ù…Ø¯ÙŠÙˆÙ†ÙŠØ©
+
+  status       WorkshopTxStatus @default(PENDING)
   createdBy    String
   confirmedBy  String?
   confirmedAt  DateTime?
   rejectReason String?
   expenseId    String?
-  createdAt    DateTime            @default(now())
-  updatedAt    DateTime            @updatedAt
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
 
   book     WorkshopDailyBook @relation(fields: [bookId], references: [id], onDelete: Cascade)
   company  Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
   category ExpenseCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  customer Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
-  @@index([bookId, status])
+  @@index([bookId, direction])
 }
 
-// ═══════════════════════════════════════════════════════════
-// PHASE 10 - COPIER TESTS (اختبارات آلات التصوير)
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// PHASE 10 - COPIER TESTS (Ø§Ø®ØªØ¨Ø§Ø±Ø§Øª Ø¢Ù„Ø§Øª Ø§Ù„ØªØµÙˆÙŠØ±)
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 model CopierTest {
-  id               String   @id @default(cuid())
-  customerId       String
-  engineerId       String?
-  machineId        String?
-  pageCount        Int
-  blackCounter     Int?
-  colorCounter     Int?
-  repairStatement  String?
-  spareParts       String?
-  collectedAmount  Float?
-  collectionNote   String?
-  imageUrl         String?
-  imagePublicId    String?
-  notes            String?
-  testDate         DateTime?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id              String    @id @default(cuid())
+  customerId      String
+  engineerId      String?
+  machineId       String?
+  pageCount       Int
+  blackCounter    Int?
+  colorCounter    Int?
+  repairStatement String?
+  spareParts      String?
+  collectedAmount Float?
+  collectionNote  String?
+  imageUrl        String?
+  imagePublicId   String?
+  notes           String?
+  testDate        DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
   engineer Engineer? @relation(fields: [engineerId], references: [id], onDelete: Restrict)
-  machine  Machine? @relation(fields: [machineId], references: [id], onDelete: SetNull)
+  machine  Machine?  @relation(fields: [machineId], references: [id], onDelete: SetNull)
 
   @@index([customerId, testDate])
 }
 
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // PHASE 12 - HR, PAYROLL & ATTENDANCE MODULE
-// ═══════════════════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
 enum EmploymentType {
   FULL_TIME
@@ -1395,45 +1427,45 @@ enum PayrollItemFlag {
 }
 
 model Department {
-  id          String     @id @default(cuid())
-  code        String
-  name        String
-  nameAr      String?
-  managerId   String?
-  companyId   String
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  Company     Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  Employees   Employee[]
+  id        String     @id @default(cuid())
+  code      String
+  name      String
+  nameAr    String?
+  managerId String?
+  companyId String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  Company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  Employees Employee[]
 
   @@unique([companyId, code])
 }
 
 model JobTitle {
-  id          String     @id @default(cuid())
-  title       String
-  titleAr     String?
-  companyId   String
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  Company     Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  Employees   Employee[]
+  id        String     @id @default(cuid())
+  title     String
+  titleAr   String?
+  companyId String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  Company   Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  Employees Employee[]
 }
 
 model Shift {
-  id            String     @id @default(cuid())
-  name          String
-  shiftType     ShiftType  @default(FIXED)
-  startTime     String
-  endTime       String
-  gracePeriod   Int        @default(15)
-  halfDayMinutes Int       @default(240)
-  overtimeStart String?
-  companyId     String
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-  Company       Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  Employees     Employee[]
+  id             String     @id @default(cuid())
+  name           String
+  shiftType      ShiftType  @default(FIXED)
+  startTime      String
+  endTime        String
+  gracePeriod    Int        @default(15)
+  halfDayMinutes Int        @default(240)
+  overtimeStart  String?
+  companyId      String
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  Company        Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  Employees      Employee[]
 }
 
 model Holiday {
@@ -1449,60 +1481,60 @@ model Holiday {
 }
 
 model Employee {
-  id                     String           @id @default(cuid())
-  code                   String           @unique
-  fingerprintId          String?          @unique
-  fullName               String
-  fullNameAr             String?
-  nationalId             String?          @unique
-  phone                  String?
-  email                  String?
-  hireDate               DateTime
-  employmentType         EmploymentType   @default(FULL_TIME)
-  status                 EmploymentStatus @default(ACTIVE)
-  baseSalary             Float            @default(0)
-  currency               String           @default("EGP")
-  departmentId           String?
-  jobTitleId             String?
-  shiftId                String?
-  companyId              String
-  userId                 String?          @unique
-  engineerId             String?          @unique
-  notes                  String?
-  annualLeaveBalance     Float            @default(21)
-  sickLeaveBalance       Float            @default(7)
-  emergencyLeaveBalance  Float            @default(5)
-  createdAt              DateTime         @default(now())
-  updatedAt              DateTime         @updatedAt
+  id                    String           @id @default(cuid())
+  code                  String           @unique
+  fingerprintId         String?          @unique
+  fullName              String
+  fullNameAr            String?
+  nationalId            String?          @unique
+  phone                 String?
+  email                 String?
+  hireDate              DateTime
+  employmentType        EmploymentType   @default(FULL_TIME)
+  status                EmploymentStatus @default(ACTIVE)
+  baseSalary            Float            @default(0)
+  currency              String           @default("EGP")
+  departmentId          String?
+  jobTitleId            String?
+  shiftId               String?
+  companyId             String
+  userId                String?          @unique
+  engineerId            String?          @unique
+  notes                 String?
+  annualLeaveBalance    Float            @default(21)
+  sickLeaveBalance      Float            @default(7)
+  emergencyLeaveBalance Float            @default(5)
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
 
-  Company                Company                 @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  Department             Department?             @relation(fields: [departmentId], references: [id])
-  JobTitle               JobTitle?               @relation(fields: [jobTitleId], references: [id])
-  Shift                  Shift?                  @relation(fields: [shiftId], references: [id])
-  User                   User?                   @relation(fields: [userId], references: [id])
-  Engineer               Engineer?               @relation(fields: [engineerId], references: [id])
-  RawPunches             RawAttendancePunch[]
-  DailyAttendance        DailyAttendanceRecord[]
-  LeaveRequests          LeaveRequest[]
-  SalaryHistory          EmployeeSalaryHistory[]
-  SalaryComponents       EmployeeSalaryComponent[]
-  Advances               EmployeeAdvance[]
-  Loans                  EmployeeLoan[]
-  PayrollItems           PayrollItem[]
-  TraineeInfo            TraineeInfo?
+  Company          Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  Department       Department?               @relation(fields: [departmentId], references: [id])
+  JobTitle         JobTitle?                 @relation(fields: [jobTitleId], references: [id])
+  Shift            Shift?                    @relation(fields: [shiftId], references: [id])
+  User             User?                     @relation(fields: [userId], references: [id])
+  Engineer         Engineer?                 @relation(fields: [engineerId], references: [id])
+  RawPunches       RawAttendancePunch[]
+  DailyAttendance  DailyAttendanceRecord[]
+  LeaveRequests    LeaveRequest[]
+  SalaryHistory    EmployeeSalaryHistory[]
+  SalaryComponents EmployeeSalaryComponent[]
+  Advances         EmployeeAdvance[]
+  Loans            EmployeeLoan[]
+  PayrollItems     PayrollItem[]
+  TraineeInfo      TraineeInfo?
 
   @@index([companyId, status])
 }
 
 model RawAttendancePunch {
-  id            String      @id @default(cuid())
-  employeeId    String
-  punchTime     DateTime
-  source        PunchSource @default(FINGERPRINT_DEVICE)
-  deviceId      String?
-  rawPayload    String?
-  createdAt     DateTime    @default(now())
-  Employee      Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  id         String      @id @default(cuid())
+  employeeId String
+  punchTime  DateTime
+  source     PunchSource @default(FINGERPRINT_DEVICE)
+  deviceId   String?
+  rawPayload String?
+  createdAt  DateTime    @default(now())
+  Employee   Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
   @@index([employeeId, punchTime])
 }
@@ -1547,30 +1579,30 @@ model LeaveRequest {
 }
 
 model EmployeeSalaryHistory {
-  id             String    @id @default(cuid())
-  employeeId     String
-  oldBaseSalary  Float
-  newBaseSalary  Float
-  effectiveDate  DateTime
-  reason         String?
-  changedBy      String
-  createdAt      DateTime  @default(now())
-  Employee       Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  id            String   @id @default(cuid())
+  employeeId    String
+  oldBaseSalary Float
+  newBaseSalary Float
+  effectiveDate DateTime
+  reason        String?
+  changedBy     String
+  createdAt     DateTime @default(now())
+  Employee      Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 }
 
 model SalaryComponent {
-  id              String                 @id @default(cuid())
-  name            String
-  type            SalaryComponentType
-  calcType        CalculationType        @default(FIXED_AMOUNT)
-  defaultValue    Float                  @default(0)
-  isTaxable       Boolean                @default(false)
-  isInsurance     Boolean                @default(false)
-  companyId       String
-  createdAt       DateTime               @default(now())
-  updatedAt       DateTime               @updatedAt
-  Company         Company                @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  EmployeeLinks   EmployeeSalaryComponent[]
+  id                    String                    @id @default(cuid())
+  name                  String
+  type                  SalaryComponentType
+  calcType              CalculationType           @default(FIXED_AMOUNT)
+  defaultValue          Float                     @default(0)
+  isTaxable             Boolean                   @default(false)
+  isInsurance           Boolean                   @default(false)
+  companyId             String
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+  Company               Company                   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  EmployeeLinks         EmployeeSalaryComponent[]
   PayrollItemBreakdowns PayrollItemComponent[]
 }
 
@@ -1608,20 +1640,20 @@ model EmployeeAdvance {
 }
 
 model EmployeeLoan {
-  id            String             @id @default(cuid())
-  employeeId    String
-  totalAmount   Float
+  id               String            @id @default(cuid())
+  employeeId       String
+  totalAmount      Float
   installmentCount Int
-  monthlyAmount Float
-  startDate     DateTime
-  reason        String
-  status        AdvanceStatus      @default(PENDING)
-  approvedBy    String?
-  approvedAt    DateTime?
-  createdAt     DateTime           @default(now())
-  updatedAt     DateTime           @updatedAt
-  Employee      Employee           @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  Installments  LoanInstallment[]
+  monthlyAmount    Float
+  startDate        DateTime
+  reason           String
+  status           AdvanceStatus     @default(PENDING)
+  approvedBy       String?
+  approvedAt       DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  Employee         Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  Installments     LoanInstallment[]
 }
 
 model LoanInstallment {
@@ -1706,15 +1738,15 @@ model PayrollItem {
 }
 
 model PayrollItemComponent {
-  id                String           @id @default(cuid())
+  id                String              @id @default(cuid())
   payrollItemId     String
   salaryComponentId String?
   label             String
   type              SalaryComponentType
-  amount            Float            @default(0)
-  createdAt         DateTime         @default(now())
-  PayrollItem       PayrollItem      @relation(fields: [payrollItemId], references: [id], onDelete: Cascade)
-  SalaryComponent   SalaryComponent? @relation(fields: [salaryComponentId], references: [id])
+  amount            Float               @default(0)
+  createdAt         DateTime            @default(now())
+  PayrollItem       PayrollItem         @relation(fields: [payrollItemId], references: [id], onDelete: Cascade)
+  SalaryComponent   SalaryComponent?    @relation(fields: [salaryComponentId], references: [id])
 
   @@index([payrollItemId])
 }
