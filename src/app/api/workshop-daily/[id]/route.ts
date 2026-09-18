@@ -95,6 +95,35 @@ export async function PUT(
     const direction = body.direction === "IN" ? "IN" : body.direction === "OUT" ? "OUT" : null;
     const amount = Number(body.amount);
     const reason = typeof body.reason === "string" ? body.reason.trim() : "";
+    const revenueType =
+      direction === "OUT"
+        ? null
+        : body.revenueType === "SERVICE_REVENUE"
+          ? "SERVICE_REVENUE"
+          : body.revenueType === "CASH_COLLECTION"
+            ? "CASH_COLLECTION"
+            : body.revenueType === "OTHER_INCOME"
+              ? "OTHER_INCOME"
+              : null    ;
+    if (direction === "IN" && !revenueType) {
+      return NextResponse.json(
+        { error: "تصنيف الوارد مطلوب (خدمة ورشة / تحصيل نقدية / إيرادات أخرى)", code: "REVENUE_TYPE_REQUIRED" },
+        { status: 400 },
+      );
+    }
+    if (direction === "OUT" && revenueType) {
+      return NextResponse.json(
+        { error: "تصنيف الوارد يُحدد فقط لحركات الوارد", code: "REVENUE_TYPE_NOT_ALLOWED_ON_OUT" },
+        { status: 400 },
+      );
+    }
+    const customerId = typeof body.customerId === "string" && body.customerId.trim() !== "" ? body.customerId.trim() : null;
+    if (revenueType === "CASH_COLLECTION" && !customerId) {
+      return NextResponse.json(
+        { error: "حركة تحصيل نقدية تتطلب اختيار العميل المرتبط بالمديونية", code: "CASH_COLLECTION_CUSTOMER_REQUIRED" },
+        { status: 400 },
+      );
+    }
 
     if (!direction) {
       return NextResponse.json({ error: "نوع الحركة مطلوب (وارد أو صادر)", code: "DIRECTION_REQUIRED" }, { status: 400 });
@@ -115,7 +144,7 @@ export async function PUT(
     // confirm/reject cannot be overwritten between the read and the update.
     const changed = await prisma.workshopTransaction.updateMany({
       where: { id, status: "PENDING", book: { status: "OPEN" } },
-      data: { direction, amount, reason, categoryId },
+      data: { direction, amount, revenueType, customerId, categoryId, reason },
     });
     if (changed.count !== 1) {
       return NextResponse.json(
