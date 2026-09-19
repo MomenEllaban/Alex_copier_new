@@ -680,7 +680,16 @@
     "exportFilename": "workshop-daily",
     "editTransaction": "تعديل الحركة",
     "deletePrompt": "حذف هذه الحركة نهائيًا؟ لا يمكن التراجع عن هذا الإجراء.",
-    "editedNext": "تم تعديل الحركة — لا تزال معلقة بانتظار التأكيد"
+    "editedNext": "تم تعديل الحركة — لا تزال معلقة بانتظار التأكيد",
+    "revenueType": "تصنيف الوارد",
+    "revenueTypeRequired": "اختر تصنيف الوارد",
+    "selectRevenueType": "اختر التصنيف",
+    "serviceRevenue": "خدمة ورشة",
+    "cashCollection": "تحصيل نقدية",
+    "otherIncome": "إيرادات أخرى",
+    "customer": "العميل",
+    "selectCustomer": "اختر العميل",
+    "customerRequired": "اختر العميل المرتبط بالتحصيل النقدي"
   },
   "workshop": {
     "title": "الورشة",

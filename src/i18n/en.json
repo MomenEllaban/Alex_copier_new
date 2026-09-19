@@ -686,7 +686,16 @@
     "exportFilename": "workshop-daily",
     "editTransaction": "Edit entry",
     "deletePrompt": "Delete this entry permanently? This cannot be undone.",
-    "editedNext": "Entry updated — still pending confirmation"
+    "editedNext": "Entry updated — still pending confirmation",
+    "revenueType": "Revenue classification",
+    "revenueTypeRequired": "Select revenue classification",
+    "selectRevenueType": "Select classification",
+    "serviceRevenue": "Workshop service",
+    "cashCollection": "Cash collection",
+    "otherIncome": "Other income",
+    "customer": "Customer",
+    "selectCustomer": "Select customer",
+    "customerRequired": "Select the customer for this cash collection"
   },
   "workshop": {
     "title": "Workshop",

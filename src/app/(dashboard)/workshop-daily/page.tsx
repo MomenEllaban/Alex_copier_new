@@ -24,6 +24,8 @@ interface Tx {
   status: "PENDING" | "CONFIRMED" | "REJECTED";
   createdBy: string;
   category?: { id: string; name: string } | null;
+  revenueType?: string | null;
+  customerId?: string | null;
   createdByName?: string | null;
   confirmedByName?: string | null;
   rejectReason?: string | null;
@@ -96,6 +98,9 @@ export default function WorkshopDailyPage() {
   const [direction, setDirection] = useState<"IN" | "OUT">("OUT");
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
+  const [revenueType, setRevenueType] = useState("");
+  const [customerId, setCustomerId] = useState("");
+  const [customers, setCustomers] = useState<{ id: string; name: string }[]>([]);
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -126,6 +131,20 @@ export default function WorkshopDailyPage() {
     fetchDaily();
   }, []);
 
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/customers")
+      .then((r) => r.json())
+      .then((customersData) => {
+        if (!alive) return;
+        setCustomers(Array.isArray(customersData) ? customersData.map((c: { id: string; name?: string }) => ({ id: c.id, name: c.name ?? "" })) : []);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const transactions = data?.book?.transactions ?? [];
   const filtered = transactions.filter(
     (tx) =>
@@ -152,6 +171,8 @@ export default function WorkshopDailyPage() {
     setDirection("OUT");
     setAmount("");
     setReason("");
+    setRevenueType("");
+    setCustomerId("");
     setFormError("");
     setShowForm(true);
   };
@@ -161,6 +182,8 @@ export default function WorkshopDailyPage() {
     setDirection(tx.direction);
     setAmount(String(tx.amount));
     setReason(tx.reason);
+    setRevenueType(tx.revenueType ?? "");
+    setCustomerId(tx.customerId ?? "");
     setFormError("");
     setShowForm(true);
   };
@@ -179,7 +202,15 @@ export default function WorkshopDailyPage() {
       return;
     }
     if (!reason.trim()) {
-      setFormError(t("workshopDaily.reason") + "؟");
+      setFormError(t("workshopDaily.reasonRequired"));
+      return;
+    }
+    if (direction === "IN" && !revenueType) {
+      setFormError(t("workshopDaily.revenueTypeRequired"));
+      return;
+    }
+    if (direction === "IN" && revenueType === "CASH_COLLECTION" && !customerId) {
+      setFormError(t("workshopDaily.customerRequired"));
       return;
     }
     const editing = editingTx;
@@ -188,7 +219,13 @@ export default function WorkshopDailyPage() {
       const res = await fetch(editing ? `/api/workshop-daily/${editing.id}` : "/api/workshop-daily", {
         method: editing ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ direction, amount: value, reason: reason.trim() }),
+        body: JSON.stringify({
+          direction,
+          amount: value,
+          reason: reason.trim(),
+          ...(direction === "IN" ? { revenueType } : {}),
+          ...(revenueType === "CASH_COLLECTION" ? { customerId } : {}),
+        }),
       });
       const json = await res.json().catch(() => null);
       if (!res.ok) {
@@ -556,6 +593,28 @@ export default function WorkshopDailyPage() {
               </button>
             ))}
           </div>
+          {direction === "IN" && (
+            <div className="space-y-1.5">
+              <label className="mb-1 block text-sm font-medium">{t("workshopDaily.revenueType")} <span className="text-red-500">*</span></label>
+              <select value={revenueType} onChange={(e) => { setRevenueType(e.target.value); if (e.target.value !== "CASH_COLLECTION") setCustomerId(""); }} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <option value="">{t("workshopDaily.selectRevenueType")}</option>
+                <option value="SERVICE_REVENUE">{t("workshopDaily.serviceRevenue")}</option>
+                <option value="CASH_COLLECTION">{t("workshopDaily.cashCollection")}</option>
+                <option value="OTHER_INCOME">{t("workshopDaily.otherIncome")}</option>
+              </select>
+            </div>
+          )}
+          {direction === "IN" && revenueType === "CASH_COLLECTION" && (
+            <div className="space-y-1.5">
+              <label className="mb-1 block text-sm font-medium">{t("workshopDaily.customer")} <span className="text-red-500">*</span></label>
+              <select value={customerId} onChange={(e) => setCustomerId(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <option value="">{t("workshopDaily.selectCustomer")}</option>
+                {customers.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="space-y-1.5">
             <label className="mb-1 block text-sm font-medium">{t("workshopDaily.amount")} (ج.م)</label>
             <input type="number" min="0" step="any" value={amount} onChange={(e) => setAmount(e.target.value)} dir="ltr" placeholder="200" className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
