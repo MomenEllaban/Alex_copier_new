@@ -47,3 +47,23 @@ next-env.d.ts
 /src/generated/prisma
 
 .vercel
+
+# بيانات - لا تُرفع للـ repo
+*.accdb
+*.md
+*.xls
+*.xlsx
+dev.log
+eslint-report*.json
+test-api.ts
+scripts/fix-waleed.js
+scripts/test-expense.ts
+scripts/fix-waleed.js
+scripts/test-expense.ts
+test-api.ts
+dev.log
+eslint-report.json
+eslint-report2.json
+Client List - 882.md
+customers-payment.xls
+قاعدة بيانات أليكس كوبير.accdb
