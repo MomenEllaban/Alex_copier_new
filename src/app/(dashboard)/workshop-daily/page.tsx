@@ -26,6 +26,7 @@ interface Tx {
   category?: { id: string; name: string } | null;
   revenueType?: string | null;
   customerId?: string | null;
+  customerName?: string | null;
   createdByName?: string | null;
   confirmedByName?: string | null;
   rejectReason?: string | null;
@@ -485,7 +486,21 @@ export default function WorkshopDailyPage() {
                               {tx.direction === "IN" ? t("workshopDaily.in") : t("workshopDaily.out")}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-sm text-slate-700">{tx.category?.name || "—"}</td>
+                          <td className="px-4 py-3 text-sm">
+                            <span className="font-medium text-slate-700">{tx.category?.name || "—"}</span>
+                            {tx.direction === "IN" && tx.revenueType && (
+                              <span className={`ms-1.5 inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold whitespace-nowrap ${
+                                tx.revenueType === "SERVICE_REVENUE" ? "bg-blue-50 text-blue-700" :
+                                tx.revenueType === "CASH_COLLECTION" ? "bg-amber-50 text-amber-700" : "bg-teal-50 text-teal-700"
+                              }`}>
+                                {tx.revenueType === "SERVICE_REVENUE" ? t("workshopDaily.serviceRevenue") :
+                                 tx.revenueType === "CASH_COLLECTION" ? t("workshopDaily.cashCollection") : t("workshopDaily.otherIncome")}
+                              </span>
+                            )}
+                            {tx.direction === "IN" && tx.customerName && (
+                              <span className="mt-0.5 block text-xs text-slate-500">👤 {tx.customerName}</span>
+                            )}
+                          </td>
                           <td className="max-w-[260px] truncate px-4 py-3 text-sm text-slate-800" title={tx.rejectReason || tx.reason}>
                             {tx.reason}
                             {tx.status === "REJECTED" && tx.rejectReason && (

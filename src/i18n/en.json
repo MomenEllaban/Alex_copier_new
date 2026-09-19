@@ -1021,6 +1021,8 @@
     "MODIFY_FORBIDDEN": "You can only edit or delete your own pending entries",
     "DIRECTION_REQUIRED": "Entry type is required (incoming or outgoing)",
     "REASON_REQUIRED": "Description is required",
+    "REVENUE_TYPE_REQUIRED": "Revenue classification is required (workshop service / cash collection / other income)",
+    "CASH_COLLECTION_CUSTOMER_REQUIRED": "Cash collection requires selecting the customer linked to the receivable",
     "WORKSHOP_TX_NOT_FOUND": "Entry not found"
   },
   "statement": {

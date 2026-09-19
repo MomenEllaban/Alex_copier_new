@@ -7,6 +7,8 @@ const WORKSHOP_CATEGORY_NAME = "يومية الورشة";
 
 const TX_INCLUDE = {
   category: { select: { id: true, name: true } },
+  customer: { select: { id: true, name: true } },
+  createdBy: { select: { name: true } },
 } as const;
 
 async function guard() {
@@ -69,6 +71,7 @@ export async function GET() {
               ...t,
               createdByName: userName.get(t.createdBy) ?? null,
               confirmedByName: t.confirmedBy ? (userName.get(t.confirmedBy) ?? null) : null,
+              customerName: t.customer?.name ?? null,
             })),
           }
         : null,

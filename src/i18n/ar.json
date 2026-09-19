@@ -1022,6 +1022,8 @@
     "MODIFY_FORBIDDEN": "يمكنك تعديل أو حذف الحركات المعلقة التي أضفتها فقط",
     "DIRECTION_REQUIRED": "نوع الحركة مطلوب (وارد أو صادر)",
     "REASON_REQUIRED": "البيان مطلوب",
+    "REVENUE_TYPE_REQUIRED": "تصنيف الوارد مطلوب (خدمة ورشة / تحصيل نقدية / إيرادات أخرى)",
+    "CASH_COLLECTION_CUSTOMER_REQUIRED": "حركة التحصيل النقدي تتطلب اختيار العميل المرتبط بالمديونية",
     "WORKSHOP_TX_NOT_FOUND": "الحركة غير موجودة"
   },
   "statement": {
