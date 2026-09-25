@@ -2,6 +2,11 @@ import 'dotenv/config';
 import { PrismaClient } from '../src/generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import bcrypt from 'bcryptjs';
+import { assertDestructiveSeedAllowed } from './destructive-guard';
+
+// Refuses to run against production before a single connection is opened.
+const guardWarning = assertDestructiveSeedAllowed();
+if (guardWarning) console.warn(guardWarning);
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });

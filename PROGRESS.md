@@ -24,7 +24,7 @@ Legend: ⬜ لسه · 🟡 شغال · ✅ خلص · ⏭️ متخطّى (لاز
 | 1.1 | `GET /api/returns/[id]` مفتوح بدون تسجيل دخول | ✅ | `?` | `requireAuth` (401) + `requirePageAccess("returns")` (403) + 5 اختبارات جديدة |
 | 1.2 | موديول HR كله بدون صلاحيات | ✅ | `?` | 16 handler في 7 ملفات: `requirePageAccess` بدل `requireAuth` وحده. **اتوسّعنا للقراءات كمان** مش الكتابة بس — نفس الثغرة بالظبط. 35 اختبار جديد |
 | 1.3 | XSS مخزّن في فواتير/سندات الطباعة | ✅ | `?` | `src/lib/html-escape.ts` (دالة `esc` واحدة) + تهريب **كل** قيمة مستخدم في `invoice-template.ts` (فاتورة + ريسيت 58/80) و `supplier-statement.ts` + `X-Content-Type-Options: nosniff`. 18 اختبار جديد |
-| 1.4 | `seed.ts` بيمسح قاعدة الإنتاج | ⬜ | — | |
+| 1.4 | `seed.ts` بيمسح قاعدة الإنتاج | ✅ | `?` | `prisma/destructive-guard.ts` — يرفض التشغيل قبل أي اتصال، إلا لو localhost أو `ALLOW_DESTRUCTIVE_SEED=1`. الـ host بيتفكّع بـ `URL` مش substring (عشان `localhost.evil.com` ما يعدّيش). 19 اختبار. **اتأكدت يدويًا:** رابط neon بيدي رفض، و localhost بيمر |
 | 1.5 | مسح الدفاتر متاح في الإنتاج | ⬜ | — | |
 | 1.6 | رابط كشف الحساب ما بينتهيش أبدًا | ⬜ | — | |
 | 1.7 | كل قراءات الـ GET مفتوحة لأي مستخدم | ⬜ | — | |
