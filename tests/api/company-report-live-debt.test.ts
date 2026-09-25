@@ -12,7 +12,13 @@ const mocks = vi.hoisted(() => {
   return { requireAuth: vi.fn(), db };
 });
 
-vi.mock("@/lib/auth-helpers", () => ({ requireAuth: mocks.requireAuth }));
+vi.mock("@/lib/auth-helpers", () => ({
+  requireAuth: mocks.requireAuth,
+  // 1.7: this report is reachable by "reports" or "companies"; these tests
+  // cover the arithmetic, not the permission table.
+  requirePageAccess: vi.fn(async () => mocks.requireAuth()),
+  requireAnyPage: vi.fn(async () => mocks.requireAuth()),
+}));
 vi.mock("@/lib/prisma", () => ({ prisma: mocks.db }));
 
 import { GET } from "@/app/api/companies/[id]/report/route";

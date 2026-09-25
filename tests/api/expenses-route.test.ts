@@ -82,9 +82,12 @@ const createdExpense = {
 describe("GET /api/expenses", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // 1.7: the list is now gated on the "finance" page, not just a session.
+    mocks.requirePageAccess.mockResolvedValue(gm);
   });
 
   it("returns 401 when unauthenticated", async () => {
+    mocks.requirePageAccess.mockResolvedValue(null);
     mocks.requireAuth.mockResolvedValue(null);
     expect((await GET()).status).toBe(401);
   });
@@ -96,6 +99,16 @@ describe("GET /api/expenses", () => {
     expect(res.status).toBe(200);
     expect((await res.json())[0].payer.name).toBe("مدير");
     expect(mocks.prisma.expense.findMany.mock.calls[0][0].orderBy).toBeDefined();
+  });
+
+  it("returns 403 for a signed-in user without the finance page", async () => {
+    mocks.requirePageAccess.mockResolvedValue(null);
+    mocks.requireAuth.mockResolvedValue(salesUser);
+    const res = await GET();
+
+    expect(res.status).toBe(403);
+    expect((await res.json()).code).toBe("FORBIDDEN");
+    expect(mocks.prisma.expense.findMany).not.toHaveBeenCalled();
   });
 });
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireAuth } from "@/lib/auth-helpers";
+import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
 import {
   createNotification,
   getNotificationsForUser,
@@ -44,9 +44,13 @@ const notificationSchema = z.object({
 
 export async function GET(request: Request) {
   try {
-    const user = await requireAuth();
+    const user = await requirePageAccess("dashboard");
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      const authed = await requireAuth();
+      return NextResponse.json(
+        { error: authed ? "Forbidden" : "Unauthorized", code: authed ? "FORBIDDEN" : "UNAUTHORIZED" },
+        { status: authed ? 403 : 401 }
+      );
     }
 
     // Opportunistic business sweep (contract expiry / low stock), throttled internally.

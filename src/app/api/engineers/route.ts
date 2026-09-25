@@ -8,8 +8,14 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function GET() {
   try {
-    const actor = await requireAuth();
-    if (!actor) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const actor = await requirePageAccess("engineers");
+    if (!actor) {
+      const authed = await requireAuth();
+      return NextResponse.json(
+        { error: authed ? "Forbidden" : "Unauthorized", code: authed ? "FORBIDDEN" : "UNAUTHORIZED" },
+        { status: authed ? 403 : 401 }
+      );
+    }
     const engineers = await prisma.engineer.findMany({
       include: {
         areas: true,

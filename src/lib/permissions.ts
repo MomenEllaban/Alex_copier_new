@@ -62,6 +62,10 @@ export const ROLE_PERMISSIONS: Record<Role, Page[]> = {
     "inventory", "warehouses", "products", "workshop", "finance", "settlements",
     "reports", "suppliers", "returns", "tradeIns", "workshopDaily",
     "copierTests",
+    // 1.7: These two were unreachable for a company manager even though the
+    // API let every signed-in user read them. Granted so the sidebar and the
+    // API now agree.
+    "companies", "investors",
     "hrDashboard", "hrEmployees", "hrAttendance", "hrLeaves", "hrPayroll", "hrSettings", "hrReports", "hrSelfService",
   ],
 
@@ -90,6 +94,9 @@ export const ROLE_PERMISSIONS: Record<Role, Page[]> = {
   // المهندس — طلبات الصيانة المعينة عليه + عملاؤه المسندون إليه فقط
   ENGINEER: [
     "dashboard", "serviceRequests", "customers",
+    // 1.7: needed for their own statement/sales. Those two routes are also
+    // self-scoped, so this does not expose another engineer's earnings.
+    "engineers",
     "copierTests",
     "hrSelfService",
   ],

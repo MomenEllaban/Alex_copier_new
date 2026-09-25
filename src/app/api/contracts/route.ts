@@ -5,8 +5,14 @@ import { traceError } from "@/lib/prisma-errors";
 
 export async function GET() {
   try {
-    const user = await requireAuth();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const user = await requirePageAccess("contracts");
+    if (!user) {
+      const authed = await requireAuth();
+      return NextResponse.json(
+        { error: authed ? "Forbidden" : "Unauthorized", code: authed ? "FORBIDDEN" : "UNAUTHORIZED" },
+        { status: authed ? 403 : 401 }
+      );
+    }
     const contracts = await prisma.contract.findMany({
       include: {
         customer: true,

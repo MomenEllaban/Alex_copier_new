@@ -29,6 +29,19 @@ export async function requirePageAccess(page: Page) {
   return user;
 }
 
+/**
+ * Guard for endpoints that are legitimately backed by more than one page — a
+ * company's financial report, for example, is reachable by "companies" and by
+ * "reports". Passing a single page here would lock out roles that the sidebar
+ * already lets through.
+ */
+export async function requireAnyPage(...pages: Page[]) {
+  const user = await requireAuth();
+  if (!user) return null;
+  const role = (user as { role?: string }).role;
+  return pages.some((page) => hasPageAccess(role, page)) ? user : null;
+}
+
 export async function requireRole(...roles: string[]) {
   const user = await requireAuth();
   if (!user) return null;

@@ -9,7 +9,12 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/prisma", () => ({ prisma: mocks.prisma }));
-vi.mock("@/lib/auth-helpers", () => ({ requireAuth: mocks.requireAuth }));
+vi.mock("@/lib/auth-helpers", () => ({
+  requireAuth: mocks.requireAuth,
+  // 1.7: the customer list is now page-checked; these tests are about scoping.
+  requirePageAccess: vi.fn(async () => mocks.requireAuth()),
+  requireAnyPage: vi.fn(async () => mocks.requireAuth()),
+}));
 
 import { GET as listCustomers } from "@/app/api/customers/route";
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth-helpers";
+import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
 import { LOW_STOCK_THRESHOLD } from "@/lib/notifications";
 import {
   OPEN_REQUEST_STATUSES,
@@ -16,8 +16,14 @@ import {
 
 export async function GET() {
   try {
-    const user = await requireAuth();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const user = await requirePageAccess("dashboard");
+    if (!user) {
+      const authed = await requireAuth();
+      return NextResponse.json(
+        { error: authed ? "Forbidden" : "Unauthorized", code: authed ? "FORBIDDEN" : "UNAUTHORIZED" },
+        { status: authed ? 403 : 401 }
+      );
+    }
 
     const userRole = (user as { role?: string }).role ?? "";
     const now = new Date();

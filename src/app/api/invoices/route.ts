@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth-helpers";
+import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
 import {
   generateInvoiceHtml,
   generateReceiptHtml,
@@ -11,9 +11,13 @@ import {
 
 export async function GET(request: Request) {
   try {
-    const user = await requireAuth();
+    const user = await requirePageAccess("finance");
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      const authed = await requireAuth();
+      return NextResponse.json(
+        { error: authed ? "Forbidden" : "Unauthorized", code: authed ? "FORBIDDEN" : "UNAUTHORIZED" },
+        { status: authed ? 403 : 401 }
+      );
     }
 
     const { searchParams } = new URL(request.url);

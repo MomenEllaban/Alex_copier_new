@@ -62,8 +62,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const user = await requireAuth();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const user = await requirePageAccess("copierTests");
+    if (!user) {
+      const authed = await requireAuth();
+      return NextResponse.json(
+        { error: authed ? "Forbidden" : "Unauthorized", code: authed ? "FORBIDDEN" : "UNAUTHORIZED" },
+        { status: authed ? 403 : 401 }
+      );
+    }
     const { id } = await params;
     const test = await prisma.copierTest.findUnique({
       where: { id },

@@ -5,8 +5,14 @@ import { generateStatementToken } from "@/lib/statement-token";
 
 export async function GET() {
   try {
-    const user = await requireAuth();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const user = await requirePageAccess("customers");
+    if (!user) {
+      const authed = await requireAuth();
+      return NextResponse.json(
+        { error: authed ? "Forbidden" : "Unauthorized", code: authed ? "FORBIDDEN" : "UNAUTHORIZED" },
+        { status: authed ? 403 : 401 }
+      );
+    }
     // Engineers only see their assigned customers (Customer.engineerId).
     let engineerFilter: { engineerId: string } | undefined;
     const role = (user as { role?: string }).role;

@@ -20,6 +20,10 @@ const { requireAuth, db } = vi.hoisted(() => ({
 
 vi.mock("@/lib/auth-helpers", () => ({
   requireAuth,
+  // 1.7: the dashboard now checks the "dashboard" page. These tests are about
+  // the payload, not the permission table, so mirror requireAuth.
+  requirePageAccess: vi.fn(async () => requireAuth()),
+  requireAnyPage: vi.fn(async () => requireAuth()),
 }));
 
 vi.mock("@/lib/prisma", () => ({

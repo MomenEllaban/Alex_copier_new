@@ -4,8 +4,14 @@ import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
 
 export async function GET() {
   try {
-    const user = await requireAuth();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const user = await requirePageAccess("suppliers");
+    if (!user) {
+      const authed = await requireAuth();
+      return NextResponse.json(
+        { error: authed ? "Forbidden" : "Unauthorized", code: authed ? "FORBIDDEN" : "UNAUTHORIZED" },
+        { status: authed ? 403 : 401 }
+      );
+    }
     const suppliers = await prisma.supplier.findMany({
       include: {
         company: true,

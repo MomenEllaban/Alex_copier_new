@@ -205,6 +205,7 @@ describe("copier tests API", () => {
 
   it("GET list returns 401 when unauthenticated", async () => {
     mocks.requireAuth.mockResolvedValue(null);
+    mocks.requirePageAccess.mockResolvedValue(null);
     const res = await listTests(new Request("http://localhost/x"), params("c1"));
     expect(res.status).toBe(401);
   });

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth-helpers";
+import { requireAuth, requireAnyPage } from "@/lib/auth-helpers";
 
 interface MonthlyData {
   month: string;
@@ -28,9 +28,13 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await requireAuth();
+    const user = await requireAnyPage("reports", "companies");
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      const authed = await requireAuth();
+      return NextResponse.json(
+        { error: authed ? "Forbidden" : "Unauthorized", code: authed ? "FORBIDDEN" : "UNAUTHORIZED" },
+        { status: authed ? 403 : 401 }
+      );
     }
 
     const { id } = await params;
