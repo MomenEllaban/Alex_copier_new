@@ -279,6 +279,7 @@ export async function GET(request: Request) {
     return new NextResponse(html, {
       headers: {
         "Content-Type": "text/html; charset=utf-8",
+        "X-Content-Type-Options": "nosniff",
       },
     });
   } catch (error) {

@@ -22,6 +22,8 @@
  * not financial facts yet).
  */
 
+import { esc } from "@/lib/html-escape";
+
 export interface PurchaseOrderLite {
   id: string;
   supplierId: string;
@@ -176,28 +178,28 @@ export function buildSupplierStatementPrintHtml(
   const rows = statement.entries
     .map(
       (e) => `<tr>
-        <td>${new Date(e.date).toLocaleDateString("en-GB")}</td>
+        <td>${esc(new Date(e.date).toLocaleDateString("en-GB"))}</td>
         <td>${e.kind === "PURCHASE" ? "فاتورة شراء" : "مرتجع مشتريات"}</td>
-        <td>${e.label}</td>
-        <td style="color:${e.amount < 0 ? "#b91c1c" : "#166534"};font-weight:bold">${e.amount.toLocaleString("ar-EG")} ج.م</td>
+        <td>${esc(e.label)}</td>
+        <td style="color:${e.amount < 0 ? "#b91c1c" : "#166534"};font-weight:bold">${esc(e.amount.toLocaleString("ar-EG"))} ج.م</td>
       </tr>`,
     )
     .join("");
   return `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8">
-    <title>كشف حساب المورد — ${supplierName}</title>
+    <title>كشف حساب المورد — ${esc(supplierName)}</title>
     <style>@page{size:A4;margin:15mm}body{font-family:Arial,sans-serif;font-size:12pt;color:#111}
     h1{font-size:18pt;margin:0}table{width:100%;border-collapse:collapse;margin-top:12px}
     th,td{border:1px solid #999;padding:6px 8px;text-align:right;font-size:10.5pt}
     th{background:#f1f5f9}.summary{display:flex;gap:12px;margin-top:12px}
     .card{border:1px solid #999;padding:8px 12px;flex:1}.muted{color:#555;font-size:10pt}</style>
     </head><body>
-    <h1>كشف حساب المورد — ${supplierName}</h1>
-    <p class="muted">${companyName} — بتاريخ ${generatedAt}</p>
+    <h1>كشف حساب المورد — ${esc(supplierName)}</h1>
+    <p class="muted">${esc(companyName)} — بتاريخ ${esc(generatedAt)}</p>
     <div class="summary">
-      <div class="card">إجمالي المشتريات (صافي بعد المرتجعات)<br><b>${statement.totalPurchases.toLocaleString("ar-EG")} ج.م</b></div>
-      <div class="card">عدد الفواتير<br><b>${statement.ordersCount}</b></div>
-      <div class="card">إجمالي المرتجعات (معلوماتي)<br><b>${statement.returnsTotal.toLocaleString("ar-EG")} ج.م</b></div>
-      <div class="card">الرصيد المستحق للمورد<br><b>${statement.balance.toLocaleString("ar-EG")} ج.م</b></div>
+      <div class="card">إجمالي المشتريات (صافي بعد المرتجعات)<br><b>${esc(statement.totalPurchases.toLocaleString("ar-EG"))} ج.م</b></div>
+      <div class="card">عدد الفواتير<br><b>${esc(statement.ordersCount)}</b></div>
+      <div class="card">إجمالي المرتجعات (معلوماتي)<br><b>${esc(statement.returnsTotal.toLocaleString("ar-EG"))} ج.م</b></div>
+      <div class="card">الرصيد المستحق للمورد<br><b>${esc(statement.balance.toLocaleString("ar-EG"))} ج.م</b></div>
     </div>
     <table><thead><tr><th>التاريخ</th><th>النوع</th><th>البيان</th><th>المبلغ</th></tr></thead>
     <tbody>${rows || '<tr><td colspan="4">لا توجد حركات</td></tr>'}</tbody></table>

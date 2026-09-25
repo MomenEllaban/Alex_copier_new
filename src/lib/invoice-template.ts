@@ -1,3 +1,5 @@
+import { esc } from "@/lib/html-escape";
+
 export interface InvoiceItem {
   name: string;
   quantity: number;
@@ -156,7 +158,7 @@ function money(n: number, c: ReturnType<typeof ctx>): string {
 
 function fdate(iso: string, c: ReturnType<typeof ctx>): string {
   const d = new Date(iso);
-  if (isNaN(d.getTime())) return iso;
+  if (isNaN(d.getTime())) return esc(iso);
   return c.lang === "en"
     ? d.toLocaleDateString("en-GB", { year: "numeric", month: "short", day: "numeric" })
     : d.toLocaleDateString("ar-EG", { year: "numeric", month: "long", day: "numeric" });
@@ -168,7 +170,7 @@ function discountDisplay(data: InvoiceData): { label: string; amount: number } |
   if (data.discountType === "PERCENTAGE") {
     const pct = Math.min(data.discount, 100);
     return {
-      label: c.lang === "en" ? `Discount (${data.discount}%)` : `الخصم (${data.discount}%)`,
+      label: c.lang === "en" ? `Discount (${esc(data.discount)}%)` : `الخصم (${esc(data.discount)}%)`,
       amount: (data.subtotal * pct) / 100,
     };
   }
@@ -236,7 +238,7 @@ export function generateInvoiceHtml(data: InvoiceData): string {
       <div class="kv"><span>${L.paidCash}</span><b>${money(paid, c)}</b></div>
       <div class="kv"><span>${L.dueCredit}</span><b class="${due > 0 ? "due" : "ok"}">${due > 0 ? money(due, c) : L.settledState}</b></div></div>`
     : pm || ps
-      ? `<div><h3>${L.paySummary}</h3><p>${[pm, ps].filter(Boolean).join(" · ")}</p></div>`
+      ? `<div><h3>${L.paySummary}</h3><p>${esc([pm, ps].filter(Boolean).join(" · "))}</p></div>`
       : "";
 
   const itemRows = data.items
@@ -244,7 +246,7 @@ export function generateInvoiceHtml(data: InvoiceData): string {
       (it, i) => `
       <tr>
         <td class="c">${i + 1}</td>
-        <td class="item">${it.name}</td>
+        <td class="item">${esc(it.name)}</td>
         <td class="c">${num(it.quantity, locale)}</td>
         <td class="c">${num(it.unitPrice, locale)}</td>
         <td class="c">${it.discount > 0 ? num(it.discount, locale) : "–"}</td>
@@ -254,7 +256,7 @@ export function generateInvoiceHtml(data: InvoiceData): string {
     .join("");
 
   const extra = (data.extraFields || [])
-    .map((f) => `<div class="kv"><span>${f.label}</span><b>${f.value}</b></div>`)
+    .map((f) => `<div class="kv"><span>${esc(f.label)}</span><b>${esc(f.value)}</b></div>`)
     .join("");
 
   return `<!DOCTYPE html>
@@ -262,7 +264,7 @@ export function generateInvoiceHtml(data: InvoiceData): string {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${title} — ${data.id.slice(0, 8)}</title>
+<title>${title} — ${esc(data.id.slice(0, 8))}</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap');
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -325,17 +327,17 @@ export function generateInvoiceHtml(data: InvoiceData): string {
 <body>
 <div class="screen-pad"><div class="inv">
   <div class="head">
-    <div class="co"><h1>${data.companyName}</h1>${companyLine ? `<p>${companyLine}</p>` : ""}</div>
-    <div class="doc"><div class="t">${title}</div><div class="n">#${data.id.slice(0, 8)}</div><div class="d">${fdate(data.date, c)}</div></div>
+    <div class="co"><h1>${esc(data.companyName)}</h1>${companyLine ? `<p>${esc(companyLine)}</p>` : ""}</div>
+    <div class="doc"><div class="t">${title}</div><div class="n">#${esc(data.id.slice(0, 8))}</div><div class="d">${fdate(data.date, c)}</div></div>
   </div>
 
   <div class="info${payCol ? "" : " cols2"}">
-    <div><h3>${partyTitle}</h3><p class="name">${data.counterpartyName}</p>${partyLine ? `<p>${partyLine}</p>` : ""}</div>
+    <div><h3>${partyTitle}</h3><p class="name">${esc(data.counterpartyName)}</p>${partyLine ? `<p>${esc(partyLine)}</p>` : ""}</div>
     <div><h3>${L.details}</h3>
-      ${pm ? `<div class="kv"><span>${L.payMethod}</span><b>${pm}</b></div>` : ""}
-      ${ps ? `<div class="kv"><span>${L.payStatus}</span><b>${ps}</b></div>` : ""}
-      ${data.engineerName ? `<div class="kv"><span>${L.engineer}</span><b>${data.engineerName}</b></div>` : ""}
-      ${data.warehouseName ? `<div class="kv"><span>${L.warehouse}</span><b>${data.warehouseName}</b></div>` : ""}
+      ${pm ? `<div class="kv"><span>${L.payMethod}</span><b>${esc(pm)}</b></div>` : ""}
+      ${ps ? `<div class="kv"><span>${L.payStatus}</span><b>${esc(ps)}</b></div>` : ""}
+      ${data.engineerName ? `<div class="kv"><span>${L.engineer}</span><b>${esc(data.engineerName)}</b></div>` : ""}
+      ${data.warehouseName ? `<div class="kv"><span>${L.warehouse}</span><b>${esc(data.warehouseName)}</b></div>` : ""}
       ${extra}
     </div>
     ${payCol}
@@ -357,12 +359,12 @@ export function generateInvoiceHtml(data: InvoiceData): string {
         <div class="r"><span>${L.paidCash}</span><b>${money(paid, c)}</b></div>
         <div class="r"><span>${L.dueCredit}</span><b class="due">${money(due, c)}</b></div>
       </div>` : ""}
-      ${data.notes ? `<div class="notes"><b>${L.notes}:</b> ${data.notes}</div>` : ""}
+      ${data.notes ? `<div class="notes"><b>${L.notes}:</b> ${esc(data.notes)}</div>` : ""}
     </div>
     <div class="totals">
       <div class="trow"><span>${L.subtotal}</span><span>${money(data.subtotal, c)}</span></div>
       ${disc ? `<div class="trow disc"><span>${disc.label}</span><span>−${money(disc.amount, c)}</span></div>` : ""}
-      ${data.taxRate > 0 ? `<div class="trow"><span>${L.tax} (${data.taxRate}%)</span><span>${money(data.taxAmount, c)}</span></div>` : ""}
+      ${data.taxRate > 0 ? `<div class="trow"><span>${L.tax} (${esc(data.taxRate)}%)</span><span>${money(data.taxAmount, c)}</span></div>` : ""}
       <div class="trow grand"><span>${L.total}</span><span>${money(data.total, c)}</span></div>
     </div>
   </div>
@@ -400,14 +402,14 @@ export function generateReceiptHtml(data: InvoiceData, width: ReceiptWidth = 80)
     .map((it, i) => {
       const lineTotal = it.quantity * it.unitPrice - it.discount;
       return `<div class="it">
-        <div class="nm">${i + 1}. ${it.name}</div>
+        <div class="nm">${i + 1}. ${esc(it.name)}</div>
         <div class="ln"><span>${num(it.quantity, locale)} × ${num(it.unitPrice, locale)}${it.discount > 0 ? ` (−${num(it.discount, locale)})` : ""}</span><b>${num(lineTotal, locale)}</b></div>
       </div>`;
     })
     .join("");
 
   const extra = (data.extraFields || [])
-    .map((f) => `<div class="m"><span>${f.label}</span><b>${f.value}</b></div>`)
+    .map((f) => `<div class="m"><span>${esc(f.label)}</span><b>${esc(f.value)}</b></div>`)
     .join("");
 
   return `<!DOCTYPE html>
@@ -415,7 +417,7 @@ export function generateReceiptHtml(data: InvoiceData, width: ReceiptWidth = 80)
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>${title} — ${data.id.slice(0, 8)}</title>
+<title>${title} — ${esc(data.id.slice(0, 8))}</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700&display=swap');
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -454,19 +456,19 @@ export function generateReceiptHtml(data: InvoiceData, width: ReceiptWidth = 80)
 <body>
 <div class="rc">
   <div class="ch">
-    <h1>${data.companyName}</h1>
-    ${data.companyPhone ? `<p>${data.companyPhone}</p>` : ""}
-    ${data.companyAddress ? `<p>${data.companyAddress}</p>` : ""}
-    <div class="t">${title} #${data.id.slice(0, 8)}</div>
+    <h1>${esc(data.companyName)}</h1>
+    ${data.companyPhone ? `<p>${esc(data.companyPhone)}</p>` : ""}
+    ${data.companyAddress ? `<p>${esc(data.companyAddress)}</p>` : ""}
+    <div class="t">${title} #${esc(data.id.slice(0, 8))}</div>
   </div>
   <hr class="d">
-  <div class="m"><span>${data.type === "purchase" ? L.supplier : L.customer}</span><b>${data.counterpartyName}</b></div>
-  ${data.counterpartyPhone ? `<div class="m"><span>☎</span><b>${data.counterpartyPhone}</b></div>` : ""}
+  <div class="m"><span>${data.type === "purchase" ? L.supplier : L.customer}</span><b>${esc(data.counterpartyName)}</b></div>
+  ${data.counterpartyPhone ? `<div class="m"><span>☎</span><b>${esc(data.counterpartyPhone)}</b></div>` : ""}
   <div class="m"><span>${L.date}</span><b>${fdate(data.date, c)}</b></div>
-  ${pm ? `<div class="m"><span>${L.payMethod}</span><b>${pm}</b></div>` : ""}
-  ${ps ? `<div class="m"><span>${L.payStatus}</span><b>${ps}</b></div>` : ""}
-  ${data.engineerName ? `<div class="m"><span>${L.engineer}</span><b>${data.engineerName}</b></div>` : ""}
-  ${data.warehouseName ? `<div class="m"><span>${L.warehouse}</span><b>${data.warehouseName}</b></div>` : ""}
+  ${pm ? `<div class="m"><span>${L.payMethod}</span><b>${esc(pm)}</b></div>` : ""}
+  ${ps ? `<div class="m"><span>${L.payStatus}</span><b>${esc(ps)}</b></div>` : ""}
+  ${data.engineerName ? `<div class="m"><span>${L.engineer}</span><b>${esc(data.engineerName)}</b></div>` : ""}
+  ${data.warehouseName ? `<div class="m"><span>${L.warehouse}</span><b>${esc(data.warehouseName)}</b></div>` : ""}
   ${extra}
   <hr class="d">
   <div class="sec">${L.items} (${data.items.length})</div>
@@ -475,7 +477,7 @@ export function generateReceiptHtml(data: InvoiceData, width: ReceiptWidth = 80)
   <div class="tot">
     <div class="r"><span>${L.subtotal}</span><span>${money(data.subtotal, c)}</span></div>
     ${disc ? `<div class="r"><span>${disc.label}</span><span>−${money(disc.amount, c)}</span></div>` : ""}
-    ${data.taxRate > 0 ? `<div class="r"><span>${L.tax} (${data.taxRate}%)</span><span>${money(data.taxAmount, c)}</span></div>` : ""}
+    ${data.taxRate > 0 ? `<div class="r"><span>${L.tax} (${esc(data.taxRate)}%)</span><span>${money(data.taxAmount, c)}</span></div>` : ""}
     <div class="r grand"><span>${L.total}</span><span>${money(data.total, c)}</span></div>
   </div>
   ${showPay ? `<div class="pay">
@@ -487,7 +489,7 @@ export function generateReceiptHtml(data: InvoiceData, width: ReceiptWidth = 80)
     <div class="r"><span>${L.lastPayment}</span><b>${lastPay}</b></div>
     ${added > 0 ? `<div class="r"><span>${L.addedDebt}</span><b>+${money(added, c)}</b></div>` : ""}
   </div>` : ""}
-  ${data.notes ? `<div class="nts">${L.notes}: ${data.notes}</div>` : ""}
+  ${data.notes ? `<div class="nts">${L.notes}: ${esc(data.notes)}</div>` : ""}
   <div class="ft">${L.thanks}<br>${L.printDate}: ${fdate(new Date().toISOString(), c)}</div>
 </div>
 <button class="print-btn" onclick="window.print()">${L.printReceipt}</button>
