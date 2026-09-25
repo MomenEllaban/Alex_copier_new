@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requirePageAccess } from "@/lib/auth-helpers";
+import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
 import { recalculatePaymentStatus } from "@/lib/payment-status";
 
 export async function GET(
@@ -8,6 +8,16 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await requireAuth();
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const actor = await requirePageAccess("returns");
+    if (!actor) {
+      return NextResponse.json({ error: "Forbidden", code: "FORBIDDEN" }, { status: 403 });
+    }
+
     const { id } = await params;
     const ret = await prisma.returnTransaction.findUnique({
       where: { id },
