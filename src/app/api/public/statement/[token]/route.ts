@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { buildCustomerStatement } from "@/lib/customer-statement";
+import { isStatementTokenExpired } from "@/lib/statement-token";
 
 // Public, unauthenticated endpoint: resolves a customer by its secret
 // statement token and returns their full account statement. The token is
-// unguessable, so the data is only reachable by whoever was given the link.
+// unguessable, expires, and dies the moment a new one is issued — so the data
+// is only reachable by whoever was given the link, and only for 30 days.
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ token: string }> }
@@ -17,10 +19,16 @@ export async function GET(
 
     const customer = await prisma.customer.findUnique({
       where: { statementToken: token },
-      select: { id: true },
+      select: { id: true, statementTokenExpiresAt: true },
     });
     if (!customer) {
       return NextResponse.json({ error: "Link not found" }, { status: 404 });
+    }
+    if (isStatementTokenExpired(customer.statementTokenExpiresAt)) {
+      return NextResponse.json(
+        { error: "انتهت صلاحية الرابط", code: "TOKEN_EXPIRED" },
+        { status: 410 },
+      );
     }
 
     const statement = await buildCustomerStatement(customer.id);

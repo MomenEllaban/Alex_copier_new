@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePageAccess, requireAuth } from "@/lib/auth-helpers";
-import { generateStatementToken } from "@/lib/statement-token";
+import { issueStatementToken } from "@/lib/statement-token";
 
 export async function POST(
   _request: Request,
@@ -22,17 +22,19 @@ export async function POST(
     const { id } = await params;
     const engineer = await prisma.engineer.findUnique({
       where: { id },
-      select: { id: true, statementToken: true },
+      select: { id: true },
     });
     if (!engineer) {
       return NextResponse.json({ error: "المهندس غير موجود", code: "NOT_FOUND" }, { status: 404 });
     }
-    let token = engineer.statementToken;
-    if (!token) {
-      token = generateStatementToken();
-      await prisma.engineer.update({ where: { id }, data: { statementToken: token } });
-    }
-    return NextResponse.json({ token });
+    // Always re-issue: this endpoint doubles as the "cancel the link" button,
+    // because issuing a new token kills the previous one.
+    const issued = issueStatementToken();
+    await prisma.engineer.update({ where: { id }, data: issued });
+    return NextResponse.json({
+      token: issued.statementToken,
+      expiresAt: issued.statementTokenExpiresAt.toISOString(),
+    });
   } catch {
     return NextResponse.json(
       { error: "Failed to generate statement link", code: "FAILED" },

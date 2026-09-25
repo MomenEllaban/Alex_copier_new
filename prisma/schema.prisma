@@ -197,9 +197,11 @@ model Customer {
   isActive        Boolean      @default(true)
   totalDebt       Float        @default(0)
   remainingDebt   Float        @default(0)
-  lastPaymentDate DateTime?
-  statementToken  String?      @unique
-  engineerId      String?
+  lastPaymentDate      DateTime?
+  statementToken       String?      @unique
+  statementTokenCreatedAt DateTime?
+  statementTokenExpiresAt DateTime?
+  engineerId           String?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
 
@@ -293,6 +295,8 @@ model Engineer {
   commissionRate     Float    @default(25)
   isActive           Boolean  @default(true)
   statementToken     String?  @unique
+  statementTokenCreatedAt DateTime?
+  statementTokenExpiresAt DateTime?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
