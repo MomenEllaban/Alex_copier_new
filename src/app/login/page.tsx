@@ -7,13 +7,14 @@ import { Printer, Mail, Lock, LogIn, User, Shield } from "lucide-react";
 import PrinterLoader from "@/components/PrinterLoader";
 
 const testAccounts = [
-  { name: "رضا", email: "reza@alex-copier.com", password: "password123", role: "المدير العام", color: "bg-purple-100 text-purple-700" },
-  { name: "سارة محمد", email: "sarah@jmal-ahlat.com", password: "password123", role: "مدير الشركة", color: "bg-blue-100 text-blue-700" },
-  { name: "عمرو", email: "amr.accountant@alex-copier.com", password: "password123", role: "المحاسب", color: "bg-green-100 text-green-700" },
-  { name: "عمرو", email: "amr.maintenance@alex-copier.com", password: "password123", role: "مدير الصيانة", color: "bg-orange-100 text-orange-700" },
-  { name: "علي خالد", email: "ali@alex-copier.com", password: "password123", role: "مدير الورشة", color: "bg-yellow-100 text-yellow-700" },
-  { name: "أحمد علي", email: "ahmed.ali@alex-copier.com", password: "password123", role: "مهندس", color: "bg-cyan-100 text-cyan-700" },
-  { name: "فاطمة عبدالله", email: "fatma@alex-copier.com", password: "password123", role: "موظف مبيعات", color: "bg-pink-100 text-pink-700" },
+  { name: "رضا", email: "reza@alex-copier.com", password: "password123", role: "المدير العام — كل حاجة في السيستم", color: "bg-purple-100 text-purple-700" },
+  { name: "عمرو", email: "amr.manager@alex-copier.com", password: "password123", role: "مدير إداري — شركة القطاعي + الورشة", color: "bg-blue-100 text-blue-700" },
+  { name: "حاتم", email: "hatem.accountant@alex-copier.com", password: "password123", role: "محاسب — كل حاجة في السيستم", color: "bg-green-100 text-green-700" },
+  { name: "عمرو", email: "amr.accountant@alex-copier.com", password: "password123", role: "محاسب — كل حاجة في السيستم", color: "bg-emerald-100 text-emerald-700" },
+  { name: "أحمد خالد", email: "ahmed.khaled@alex-copier.com", password: "password123", role: "الورشة — تسجيل الاختبارات + يومية الورشة", color: "bg-yellow-100 text-yellow-700" },
+  { name: "مؤمن", email: "moemen.sales.parts@alex-copier.com", password: "password123", role: "موظف مبيعات — شركة جملة قطع غيار", color: "bg-pink-100 text-pink-700" },
+  { name: "مؤمن", email: "moemen.sales.machines@alex-copier.com", password: "password123", role: "موظف مبيعات — شركة جملة آلات", color: "bg-orange-100 text-orange-700" },
+  { name: "مؤمن", email: "moemen.engineer@alex-copier.com", password: "password123", role: "مهندس صيانة", color: "bg-cyan-100 text-cyan-700" },
 ];
 
 export default function LoginPage() {
@@ -161,9 +162,9 @@ export default function LoginPage() {
                   <User size={20} className="text-white" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
+                  <div className="mb-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
                     <p className="text-white font-medium text-sm">{account.name}</p>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${account.color}`}>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${account.color}`}>
                       {account.role}
                     </span>
                   </div>
