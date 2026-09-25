@@ -162,14 +162,14 @@ export default function TradeInsPage() {
         <div className="flex-1">
           <SearchInput value={search} onChange={setSearch} placeholder="بحث..." />
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <FilterSelect value={companyFilter} onChange={setCompanyFilter} options={companies.map((c) => ({ value: c.id, label: c.name }))} allLabel="الكل" />
+        <div className="flex flex-1 flex-wrap items-center gap-2">
+          <FilterSelect value={companyFilter} onChange={setCompanyFilter} options={companies.map((c) => ({ value: c.id, label: c.name }))} allLabel="الكل" className="w-full sm:w-48" />
           <FilterSelect value={conditionFilter} onChange={setConditionFilter} options={[
             { value: "excellent", label: "ممتاز" },
             { value: "good", label: "جيد" },
             { value: "fair", label: "مقبول" },
             { value: "poor", label: "ضعيف" },
-          ]} allLabel="الكل" />
+          ]} allLabel="الكل" className="w-full sm:w-40" />
           <RefreshButton onRefresh={refresh} refreshing={refreshing} />
           <ExportButton filename="products-trade-in" getExport={exportData} />
         </div>

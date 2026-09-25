@@ -32,6 +32,8 @@ export type Page =
   | "returns"
   | "tradeIns"
   | "workshopDaily"
+  /** Copier tests (اختبارات العملاء) — recorded by the engineer on site. */
+  | "copierTests"
   // HR pages
   | "hrDashboard"
   | "hrEmployees"
@@ -49,6 +51,7 @@ export const ROLE_PERMISSIONS: Record<Role, Page[]> = {
     "serviceRequests", "contracts", "purchases", "sales",
     "inventory", "warehouses", "products", "workshop", "finance", "companies",
     "settlements", "reports", "settings", "suppliers", "investors", "returns", "tradeIns", "workshopDaily",
+    "copierTests",
     "hrDashboard", "hrEmployees", "hrAttendance", "hrLeaves", "hrPayroll", "hrSettings", "hrReports", "hrSelfService",
   ],
 
@@ -58,6 +61,7 @@ export const ROLE_PERMISSIONS: Record<Role, Page[]> = {
     "serviceRequests", "contracts", "purchases", "sales",
     "inventory", "warehouses", "products", "workshop", "finance", "settlements",
     "reports", "suppliers", "returns", "tradeIns", "workshopDaily",
+    "copierTests",
     "hrDashboard", "hrEmployees", "hrAttendance", "hrLeaves", "hrPayroll", "hrSettings", "hrReports", "hrSelfService",
   ],
 
@@ -72,24 +76,28 @@ export const ROLE_PERMISSIONS: Record<Role, Page[]> = {
   MAINTENANCE_MANAGER: [
     "dashboard", "serviceRequests", "engineers",
     "contracts", "workshop", "inventory", "warehouses", "products", "machines",
+    "copierTests",
     "hrSelfService",
   ],
 
   // مدير الورشة — الورشة والمخزون وengineers
   WORKSHOP_MANAGER: [
     "dashboard", "workshop", "inventory", "warehouses", "products", "engineers", "machines", "workshopDaily",
+    "copierTests",
     "hrSelfService",
   ],
 
   // المهندس — طلبات الصيانة المعينة عليه + عملاؤه المسندون إليه فقط
   ENGINEER: [
     "dashboard", "serviceRequests", "customers",
+    "copierTests",
     "hrSelfService",
   ],
 
   // موظف المبيعات — العملاء والمبيعات والعقود
   SALES_EMPLOYEE: [
     "dashboard", "customers", "sales", "contracts", "machines", "returns", "tradeIns",
+    "copierTests",
     "hrSelfService",
   ],
 

@@ -24,6 +24,8 @@ const mocks = vi.hoisted(() => ({
       create: vi.fn(),
       update: vi.fn(),
       delete: vi.fn(),
+      count: vi.fn(),
+      aggregate: vi.fn(),
     },
   },
   requireAuth: vi.fn(),
@@ -53,6 +55,7 @@ vi.mock("@/lib/notifications", () => ({
 import { GET as listTests, POST as createTest } from "@/app/api/customers/[id]/tests/route";
 import { GET as latestTest } from "@/app/api/customers/[id]/tests/latest/route";
 import { GET as getTest, PUT as updateTest, DELETE as deleteTest } from "@/app/api/tests/[id]/route";
+import { GET as listAllTests } from "@/app/api/tests/route";
 
 const gm = { id: "gm_1", role: "GENERAL_MANAGER" };
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
@@ -255,9 +258,9 @@ describe("copier tests API", () => {
     expect(body.code).toBe("COUNTER_INVALID");
   });
 
-  it("DELETE is forbidden for non-admin roles", async () => {
-    mocks.requireRole.mockResolvedValue(null);
-    mocks.requireAuth.mockResolvedValue({ id: "u1", role: "ENGINEER" });
+  it("DELETE is forbidden for roles without tests access", async () => {
+    mocks.requirePageAccess.mockResolvedValue(null);
+    mocks.requireAuth.mockResolvedValue({ id: "u1", role: "ACCOUNTANT" });
     const res = await deleteTest(new Request("http://localhost/x", { method: "DELETE" }), params("t1"));
     expect(res.status).toBe(403);
     expect(mocks.prisma.copierTest.delete).not.toHaveBeenCalled();
@@ -269,5 +272,76 @@ describe("copier tests API", () => {
     const res = await deleteTest(new Request("http://localhost/x", { method: "DELETE" }), params("t1"));
     expect(res.status).toBe(200);
     expect(mocks.deleteCopierTestImage).toHaveBeenCalledWith("pub_1");
+  });
+
+  it("DELETE lets a workshop manager remove a test", async () => {
+    const workshop = { id: "u9", role: "WORKSHOP_MANAGER" };
+    mocks.requirePageAccess.mockImplementation(async (page: string) =>
+      page === "copierTests" ? workshop : null,
+    );
+    mocks.prisma.copierTest.findUnique.mockResolvedValue({ id: "t1", imagePublicId: null });
+    mocks.prisma.copierTest.delete.mockResolvedValue({ id: "t1" });
+    const res = await deleteTest(new Request("http://localhost/x", { method: "DELETE" }), params("t1"));
+    expect(res.status).toBe(200);
+  });
+
+  it("DELETE refuses a test of a customer that is not assigned to the engineer", async () => {
+    const engineerUser = { id: "u1", role: "ENGINEER" };
+    mocks.requirePageAccess.mockResolvedValue(engineerUser);
+    mocks.requireAuth.mockResolvedValue(engineerUser);
+    mocks.prisma.copierTest.findUnique.mockResolvedValue({ id: "t1", customerId: "c9" });
+    mocks.prisma.engineer.findUnique.mockResolvedValue({ id: "eng_1" });
+    mocks.prisma.customer.findUnique.mockResolvedValue({ id: "c9", engineerId: "eng_other" });
+    const res = await deleteTest(new Request("http://localhost/x", { method: "DELETE" }), params("t1"));
+    expect(res.status).toBe(403);
+    expect(mocks.prisma.copierTest.delete).not.toHaveBeenCalled();
+  });
+
+  it("GET /api/tests is forbidden without tests access", async () => {
+    mocks.requirePageAccess.mockResolvedValue(null);
+    mocks.requireAuth.mockResolvedValue({ id: "u1", role: "ACCOUNTANT" });
+    const res = await listAllTests(new Request("http://localhost/api/tests"));
+    expect(res.status).toBe(403);
+    expect(mocks.prisma.copierTest.count).not.toHaveBeenCalled();
+  });
+
+  it("GET /api/tests returns one page plus filtered totals", async () => {
+    mocks.prisma.copierTest.count.mockResolvedValue(42);
+    mocks.prisma.copierTest.findMany.mockResolvedValue([{ id: "t1", customer: { id: "c1", name: "عميل" } }]);
+    mocks.prisma.copierTest.aggregate.mockResolvedValue({
+      _count: { _all: 42 },
+      _sum: { collectedAmount: 300, blackCounter: 1500, colorCounter: 20 },
+    });
+    const res = await listAllTests(
+      new Request("http://localhost/api/tests?customerId=c1&page=2&pageSize=15"),
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.total).toBe(42);
+    expect(body.totalPages).toBe(3);
+    expect(body.summary.collectedTotal).toBe(300);
+    const where = mocks.prisma.copierTest.findMany.mock.calls[0][0].where;
+    expect(where.customerId).toBe("c1");
+    const findArgs = mocks.prisma.copierTest.findMany.mock.calls[0][0];
+    expect(findArgs.skip).toBe(15);
+    expect(findArgs.take).toBe(15);
+    expect(findArgs.include.customer.select.name).toBe(true);
+  });
+
+  it("GET /api/tests scopes engineers to their own customers", async () => {
+    const engineerUser = { id: "u1", role: "ENGINEER" };
+    mocks.requirePageAccess.mockResolvedValue(engineerUser);
+    mocks.requireAuth.mockResolvedValue(engineerUser);
+    mocks.prisma.engineer.findUnique.mockResolvedValue({ id: "eng_1" });
+    mocks.prisma.copierTest.count.mockResolvedValue(0);
+    mocks.prisma.copierTest.findMany.mockResolvedValue([]);
+    mocks.prisma.copierTest.aggregate.mockResolvedValue({
+      _count: { _all: 0 },
+      _sum: { collectedAmount: null, blackCounter: null, colorCounter: null },
+    });
+    const res = await listAllTests(new Request("http://localhost/api/tests"));
+    expect(res.status).toBe(200);
+    const where = mocks.prisma.copierTest.findMany.mock.calls[0][0].where;
+    expect(where.customer).toEqual({ engineerId: "eng_1" });
   });
 });

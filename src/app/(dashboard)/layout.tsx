@@ -12,6 +12,7 @@ const pageTitles: Record<string, string> = {
   "/customers": "customers.title",
   "/engineers": "engineers.title",
   "/service-requests": "serviceRequests.title",
+  "/tests": "copierTests.pageTitle",
   "/contracts": "contracts.title",
   "/purchases": "purchases.title",
   "/sales": "sales.title",

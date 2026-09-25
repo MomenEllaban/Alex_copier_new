@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, requirePageAccess, requireRole } from "@/lib/auth-helpers";
+import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
 import { deleteCopierTestImage } from "@/lib/copier-test-upload";
 
 const TEST_INCLUDE = {
@@ -14,6 +14,8 @@ async function guardWrite() {
   if (customersAccess) return { actor: customersAccess };
   const serviceAccess = await requirePageAccess("serviceRequests");
   if (serviceAccess) return { actor: serviceAccess };
+  const testsAccess = await requirePageAccess("copierTests");
+  if (testsAccess) return { actor: testsAccess };
   const authed = await requireAuth();
   return {
     actor: null,
@@ -22,6 +24,37 @@ async function guardWrite() {
       { status: authed ? 403 : 401 },
     ),
   };
+}
+
+function actorRole(actor: unknown): string {
+  return (actor as { role?: string } | null)?.role ?? "";
+}
+
+function actorId(actor: unknown): string {
+  return (actor as { id?: string } | null)?.id ?? "";
+}
+
+/**
+ * Engineers may only touch tests of the customers assigned to them
+ * (Customer.engineerId). Every other role passes through.
+ */
+async function engineerScopeCheck(actor: unknown, customerId: string) {
+  if (actorRole(actor) !== "ENGINEER") return null;
+  const mine = await prisma.engineer.findUnique({
+    where: { userId: actorId(actor) },
+    select: { id: true },
+  });
+  if (!mine) {
+    return NextResponse.json({ error: "حساب المهندس غير مرتبط", code: "ENGINEER_NOT_LINKED" }, { status: 403 });
+  }
+  const customer = await prisma.customer.findUnique({
+    where: { id: customerId },
+    select: { engineerId: true },
+  });
+  if (!customer || customer.engineerId !== mine.id) {
+    return NextResponse.json({ error: "هذا العميل غير مسند إليك", code: "CUSTOMER_NOT_ASSIGNED" }, { status: 403 });
+  }
+  return null;
 }
 
 export async function GET(
@@ -58,6 +91,8 @@ export async function PUT(
     if (!existing) {
       return NextResponse.json({ error: "الاختبار غير موجود" }, { status: 404 });
     }
+    const scoped = await engineerScopeCheck(actor, existing.customerId);
+    if (scoped) return scoped;
 
     const body = await request.json();
     const updateData: Record<string, unknown> = {};
@@ -156,20 +191,17 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const admin = await requireRole("GENERAL_MANAGER");
-    if (!admin) {
-      const authed = await requireAuth();
-      return NextResponse.json(
-        { error: authed ? "Forbidden" : "Unauthorized" },
-        { status: authed ? 403 : 401 },
-      );
-    }
+    // Whoever is allowed to record a test may remove a wrong entry.
+    const { actor, response } = await guardWrite();
+    if (!actor && response) return response;
     const { id } = await params;
 
     const existing = await prisma.copierTest.findUnique({ where: { id } });
     if (!existing) {
       return NextResponse.json({ error: "الاختبار غير موجود" }, { status: 404 });
     }
+    const scoped = await engineerScopeCheck(actor, existing.customerId);
+    if (scoped) return scoped;
 
     await prisma.copierTest.delete({ where: { id } });
     if (existing.imagePublicId) await deleteCopierTestImage(existing.imagePublicId);

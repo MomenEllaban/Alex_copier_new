@@ -329,22 +329,58 @@ describe("workshop daily API", () => {
       expect(res.status).toBe(200);
       expect(mocks.prisma.workshopTransaction.updateMany).toHaveBeenCalledWith({
         where: { id: "tx_1", status: "PENDING", book: { status: "OPEN" } },
-        data: { direction: "OUT", amount: 350, reason: "مستلزمات محدثة", categoryId: "cat_ws" },
+        data: {
+          direction: "OUT",
+          amount: 350,
+          reason: "مستلزمات محدثة",
+          categoryId: "cat_ws",
+          revenueType: null,
+          customerId: null,
+        },
       });
     });
 
     it("PUT clears the category when switching an entry to IN", async () => {
       mocks.prisma.workshopTransaction.findUnique.mockResolvedValue(pendingTx());
       const res = await editTx(
-        methodRequest("PUT", { direction: "IN", amount: 100, reason: "تمويل" }),
+        methodRequest("PUT", { direction: "IN", amount: 100, reason: "تمويل", revenueType: "SERVICE_REVENUE" }),
         txParams("tx_1"),
       );
       expect(res.status).toBe(200);
       expect(mocks.prisma.expenseCategory.findFirst).not.toHaveBeenCalled();
       expect(mocks.prisma.workshopTransaction.updateMany).toHaveBeenCalledWith({
         where: { id: "tx_1", status: "PENDING", book: { status: "OPEN" } },
-        data: { direction: "IN", amount: 100, reason: "تمويل", categoryId: null },
+        data: {
+          direction: "IN",
+          amount: 100,
+          reason: "تمويل",
+          categoryId: null,
+          revenueType: "SERVICE_REVENUE",
+          customerId: null,
+        },
       });
+    });
+
+    it("PUT requires a revenue type for IN entries", async () => {
+      const res = await editTx(
+        methodRequest("PUT", { direction: "IN", amount: 100, reason: "تمويل" }),
+        txParams("tx_1"),
+      );
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.code).toBe("REVENUE_TYPE_REQUIRED");
+      expect(mocks.prisma.workshopTransaction.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("PUT requires a customer for cash-collection entries", async () => {
+      const res = await editTx(
+        methodRequest("PUT", { direction: "IN", amount: 100, reason: "تحصيل", revenueType: "CASH_COLLECTION" }),
+        txParams("tx_1"),
+      );
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.code).toBe("CASH_COLLECTION_CUSTOMER_REQUIRED");
+      expect(mocks.prisma.workshopTransaction.updateMany).not.toHaveBeenCalled();
     });
 
     it("PUT validates the amount and reason", async () => {

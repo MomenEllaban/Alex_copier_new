@@ -19,6 +19,9 @@ async function guardWrite() {
   // Engineers (serviceRequests page) may record tests for visited customers.
   const serviceAccess = await requirePageAccess("serviceRequests");
   if (serviceAccess) return { actor: serviceAccess };
+  // The tests page itself (workshop staff recording the visit readings).
+  const testsAccess = await requirePageAccess("copierTests");
+  if (testsAccess) return { actor: testsAccess };
   const authed = await requireAuth();
   return {
     actor: null,

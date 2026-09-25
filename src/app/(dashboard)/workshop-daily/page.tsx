@@ -408,7 +408,7 @@ export default function WorkshopDailyPage() {
 
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div className="flex flex-col gap-3 border-b border-slate-200 p-4 md:flex-row md:items-center md:flex-wrap">
-              <div className="w-full md:w-72 md:flex-none">
+              <div className="w-full md:w-80 md:flex-none">
                 <SearchInput value={search} onChange={(v) => { setSearchInput(v); setPage(1); }} placeholder={t("workshopDaily.reason")} />
               </div>
               <FilterSelect
@@ -419,6 +419,7 @@ export default function WorkshopDailyPage() {
                   { value: "OUT", label: t("workshopDaily.out") },
                 ]}
                 allLabel={`${t("workshopDaily.direction")} — ${t("common.all")}`}
+                className="md:w-40"
               />
               <FilterSelect
                 value={statusFilter}
@@ -429,6 +430,7 @@ export default function WorkshopDailyPage() {
                   { value: "REJECTED", label: t("workshopDaily.rejected") },
                 ]}
                 allLabel={`${t("workshopDaily.status")} — ${t("common.all")}`}
+                className="md:w-44"
               />
               {hasActiveFilters && (
                 <button onClick={() => { setSearchInput(""); setDirectionFilter(""); setStatusFilter(""); setPage(1); }} className="text-sm font-medium text-blue-600 hover:underline">
