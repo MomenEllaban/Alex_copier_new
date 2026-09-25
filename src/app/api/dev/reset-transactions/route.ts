@@ -15,6 +15,12 @@ import { requireAuth, requireRole } from "@/lib/auth-helpers";
  */
 export async function POST() {
   try {
+    // Hard off-switch: this endpoint must never wipe production ledgers by
+    // accident. Staying dark (404) also keeps it out of the production API.
+    if (process.env.NODE_ENV === "production" && process.env.ENABLE_DATA_RESET !== "1") {
+      return NextResponse.json({ error: "غير متاح", code: "DISABLED" }, { status: 404 });
+    }
+
     const admin = await requireRole("GENERAL_MANAGER");
     if (!admin) {
       const authed = await requireAuth();

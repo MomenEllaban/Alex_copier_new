@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => {
   const db = {
@@ -27,6 +27,11 @@ const req = () => new Request("http://localhost/api/companies/c1/reset-transacti
 describe("POST /api/companies/[id]/reset-transactions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.unstubAllEnvs();
+    // The tests below exercise the endpoint on a non-production environment,
+    // where the guard lets it through.
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("ENABLE_DATA_RESET", "");
     mocks.requireRole.mockResolvedValue({ id: "u1", role: "GENERAL_MANAGER" });
     mocks.db.company.findUnique.mockResolvedValue({ id: "c1", name: "اليكس كوبير" });
     mocks.db.$transaction.mockImplementation(async (cb: (tx: typeof mocks.db) => Promise<unknown>) =>
@@ -38,6 +43,51 @@ describe("POST /api/companies/[id]/reset-transactions", () => {
     mocks.db.purchaseInvoice.deleteMany.mockResolvedValue({ count: 5 });
     mocks.db.purchaseOrder.deleteMany.mockResolvedValue({ count: 6 });
     mocks.db.salesOrder.deleteMany.mockResolvedValue({ count: 7 });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  describe("production off-switch", () => {
+    it("returns 404 in production without touching the database", async () => {
+      vi.stubEnv("NODE_ENV", "production");
+      vi.stubEnv("ENABLE_DATA_RESET", "");
+
+      const res = await POST(req(), { params: Promise.resolve({ id: "c1" }) });
+
+      expect(res.status).toBe(404);
+      expect((await res.json()).code).toBe("DISABLED");
+      expect(mocks.db.company.findUnique).not.toHaveBeenCalled();
+      expect(mocks.db.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("stays disabled in production when the opt-in is anything but exactly 1", async () => {
+      vi.stubEnv("NODE_ENV", "production");
+
+      for (const value of ["", "0", "true", "yes", " 1"]) {
+        vi.stubEnv("ENABLE_DATA_RESET", value);
+        expect((await POST(req(), { params: Promise.resolve({ id: "c1" }) })).status).toBe(404);
+      }
+      expect(mocks.db.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("allows the wipe in production only with ENABLE_DATA_RESET=1", async () => {
+      vi.stubEnv("NODE_ENV", "production");
+      vi.stubEnv("ENABLE_DATA_RESET", "1");
+
+      const res = await POST(req(), { params: Promise.resolve({ id: "c1" }) });
+
+      expect(res.status).toBe(200);
+      expect(mocks.db.$transaction).toHaveBeenCalled();
+    });
+
+    it("stays enabled outside production without the opt-in", async () => {
+      vi.stubEnv("NODE_ENV", "development");
+      vi.stubEnv("ENABLE_DATA_RESET", "");
+
+      expect((await POST(req(), { params: Promise.resolve({ id: "c1" }) })).status).toBe(200);
+    });
   });
 
   it("rejects non-general-managers with 403", async () => {
