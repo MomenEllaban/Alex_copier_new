@@ -58,6 +58,8 @@ next-env.d.ts
 !TESTING-GUIDE.md
 !CODE-AUDIT.md
 !HR_MODULE_GUIDE.md
+!PROGRESS.md
+!NEEDS_DECISION.md
 !docs/**/*.md
 !tests/**/*.md
 dev.log
