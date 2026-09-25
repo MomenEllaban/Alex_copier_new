@@ -1,36 +1,85 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# اليكس كوبير — Alex Copier ERP
 
-## Getting Started
+نظام ERP لشركة **اليكس كوبير** (بيع وصيانة ماكينات Copier و Printer في مصر).
 
-First, run the development server:
+| | |
+|---|---|
+| **🌐 الموقع الأونلاين** | **https://alex-copier.vercel.app/login** |
+| صفحة الاختبارات الجديدة | https://alex-copier.vercel.app/tests |
+| الريبو | https://github.com/MomenEllaban/Alex_copier_new |
+| دليل الاختبار | [TESTING-GUIDE.md](./TESTING-GUIDE.md) |
+
+> تسجيل الدخول السريع: صفحة الدخول نفسها فيها زرار لكل حساب تجريبي — اضغط الحساب وتدخل على طول.
+
+---
+
+## 👥 الحسابات التجريبية
+
+| المستخدم | الدور | صفحة الاختبارات |
+|---|---|---|
+| رضا | مدير عام — كل حاجة في السيستم | ✅ |
+| عمرو | مدير إداري — شركة القطاعى + الورشة | ✅ |
+| حاتم | محاسب — كل حاجة في السيستم | ❌ (مالي فقط) |
+| عمرو | محاسب — كل حاجة في السيستم | ❌ (مالي فقط) |
+| أحمد خالد | الورشة — تسجيل الاختبارات + يومية الورشة | ✅ |
+| مؤمن | مسؤول عن شركة قطع الغيار | ✅ |
+
+كلمة المرور لكل الحسابات التجريبية: `password123`
+
+---
+
+## 🧰 المميزات
+
+- **العملاء** والعقود وطلبات الصيانة والمهندسين والزيارات
+- **اختبارات العملاء** (`/tests`): تسجيل قراءات العدادات + صورة + بيان الإصلاح + قطع الغيار + المبلغ المحصل (بيتحوّل لتسوية وتنبيه للمحاسب) — ببحث وفلاتر وباجينيشن وتصدير
+- **الورشة** ويومية الورشة (خزنة يومية: وارد/صادر، تأكيد المحاسب، تسليم وإقفال اليوم)
+- **المبيعات والمشتريات والمرتجعات** والمخزون والمستودعات
+- **المالية**: المصروفات والتسويات والمستخدمون والشركات والمستثمرون
+- **الموارد البشرية**: الموظفون والحضور والإجازات والرواتب
+- **التقارير** وكشوف الحساب (للعميل/المورد/المهندس) برابط مشاركة
+- عربي (RTL) + إنجليزي، مع دعم **طباعة** و**تصدير CSV/Excel** في كل الصفحات
+
+## 🛠️ التقنيات
+
+- [Next.js 16](https://nextjs.org) (App Router) + React 19 + TypeScript
+- [Prisma 7](https://www.prisma.io) + PostgreSQL (Neon)
+- [NextAuth v5](https://next-auth.js.org) (Credentials) + bcryptjs
+- Tailwind CSS 4 + lucide-react
+- Cloudinary (صور الاختبارات) · pdfkit (كشوف الحساب) · zod
+- Vitest للاختبارات · ESLint
+
+## 💻 تشغيل محلي
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env   # أو عدّل .env: DATABASE_URL / AUTH_SECRET / CLOUDINARY_*
+npx prisma generate
+npm run dev            # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### أوامر مهمة
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run dev     # سيرفر التطوير
+npm run build   # prisma generate + build (ده الـ typecheck)
+npm run lint    # eslint
+npm test        # vitest
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+> ⚠️ `npm run build` هو التحقق من الأنواع — لازم يلمس قبل أي رفع.
 
-## Learn More
+## 🗂️ أهم المسارات
 
-To learn more about Next.js, take a look at the following resources:
+| المسار | الوصف |
+|---|---|
+| `src/app/(dashboard)/tests` | صفحة اختبارات العملاء |
+| `src/app/api/tests` | قائمة الاختبارات (فلترة وباجينيشن على السيرفر) |
+| `src/app/api/customers/[id]/tests` | إنشاء اختبار لعميل |
+| `src/lib/permissions.ts` | الأدوار وصفحات كل دور |
+| `src/i18n/{ar,en}.json` | كل نصوص الواجهة |
+| `.opencode/skills/*` | قواعد المشروع (استايل، صفحات، قواعد عمل) |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🚀 النشر
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+الـ deploy آلي من GitHub على Vercel (فرع `main`).
+المشروع مربوط بريبو `momendevelopertech/Alex_copier` — أي push على `main` بيعمل نشر تلقائي.
