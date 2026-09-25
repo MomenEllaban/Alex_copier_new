@@ -5,8 +5,14 @@ import { notifyLeaveRequested, notifyLeaveReviewed } from "@/lib/hr/hr-notificat
 
 export async function GET(request: Request) {
   try {
-    const actor = await requireAuth();
-    if (!actor) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const actor = await requirePageAccess("hrLeaves");
+    if (!actor) {
+      const authed = await requireAuth();
+      return NextResponse.json(
+        { error: authed ? "Forbidden" : "Unauthorized", code: authed ? "FORBIDDEN" : "UNAUTHORIZED" },
+        { status: authed ? 403 : 401 },
+      );
+    }
 
     const { searchParams } = new URL(request.url);
     const employeeId = searchParams.get("employeeId");
@@ -42,8 +48,14 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const actor = await requireAuth();
-    if (!actor) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const actor = await requirePageAccess("hrLeaves");
+    if (!actor) {
+      const authed = await requireAuth();
+      return NextResponse.json(
+        { error: authed ? "Forbidden" : "Unauthorized", code: authed ? "FORBIDDEN" : "UNAUTHORIZED" },
+        { status: authed ? 403 : 401 },
+      );
+    }
 
     const body = await request.json();
     const { employeeId, category, startDate: startStr, endDate: endStr, reason } = body;
@@ -106,8 +118,14 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const actor = await requireAuth();
-    if (!actor) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const actor = await requirePageAccess("hrLeaves");
+    if (!actor) {
+      const authed = await requireAuth();
+      return NextResponse.json(
+        { error: authed ? "Forbidden" : "Unauthorized", code: authed ? "FORBIDDEN" : "UNAUTHORIZED" },
+        { status: authed ? 403 : 401 },
+      );
+    }
 
     const body = await request.json();
     const { id, action, rejectReason } = body;

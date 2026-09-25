@@ -1,14 +1,20 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth-helpers";
+import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
 import { calculateEmployeePayroll, summarizePayrollRun, type PayrollCalcInput, type PayrollComponentInput } from "@/lib/hr/payroll-engine";
 import { notifyPayrollReady, notifyPayrollApproved } from "@/lib/hr/hr-notifications";
 import { PayrollItemFlag } from "@/generated/prisma/client";
 
 export async function GET(request: Request) {
   try {
-    const actor = await requireAuth();
-    if (!actor) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const actor = await requirePageAccess("hrPayroll");
+    if (!actor) {
+      const authed = await requireAuth();
+      return NextResponse.json(
+        { error: authed ? "Forbidden" : "Unauthorized", code: authed ? "FORBIDDEN" : "UNAUTHORIZED" },
+        { status: authed ? 403 : 401 },
+      );
+    }
 
     const { searchParams } = new URL(request.url);
     const monthStr = searchParams.get("month");
@@ -41,8 +47,14 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const actor = await requireAuth();
-    if (!actor) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const actor = await requirePageAccess("hrPayroll");
+    if (!actor) {
+      const authed = await requireAuth();
+      return NextResponse.json(
+        { error: authed ? "Forbidden" : "Unauthorized", code: authed ? "FORBIDDEN" : "UNAUTHORIZED" },
+        { status: authed ? 403 : 401 },
+      );
+    }
 
     const body = await request.json();
     const { action, companyId: requestedCompanyId, month, year } = body;
