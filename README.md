@@ -79,7 +79,16 @@ npm test        # vitest
 | `src/i18n/{ar,en}.json` | كل نصوص الواجهة |
 | `.opencode/skills/*` | قواعد المشروع (استايل، صفحات، قواعد عمل) |
 
-## 🚀 النشر
+## 🚀 النشر (Deploy)
 
-الـ deploy آلي من GitHub على Vercel (فرع `main`).
-المشروع مربوط بريبو `momendevelopertech/Alex_copier` — أي push على `main` بيعمل نشر تلقائي.
+| | |
+|---|---|
+| مستودع Vercel | [`MomenEllaban/Alex_copier_new`](https://github.com/MomenEllaban/Alex_copier_new) |
+| فرع الإنتاج | `main` |
+| نطاق الاستضافة | https://alex-copier.vercel.app |
+| طريقة النشر | تلقائي — أي `git push` على `main` بيعمل build ونشر (~3 دقايق) |
+
+> ⚠️ **مهم:** لازم الـ push يكون على الريبو `MomenEllaban/Alex_copier_new` (اللي اسمه `new` عندنا محليًا).
+> لو اتعمل push على أي ريبو تاني مش هيحصل نشر، لأن مشروع Vercel مربوط بالريبو ده بس.
+> الريبو `origin` المحلي (`momendevelopertech/Alex_copier`) بياخد نفس الكوميتات كنسخة احتياطية، بس **مش** بي نشر.
+
