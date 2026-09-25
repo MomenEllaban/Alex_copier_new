@@ -53,6 +53,13 @@ next-env.d.ts
 *.md
 *.xls
 *.xlsx
+# …لكن مستندات المشروع نفسها تُرفع (استثناء صريح)
+!README.md
+!TESTING-GUIDE.md
+!CODE-AUDIT.md
+!HR_MODULE_GUIDE.md
+!docs/**/*.md
+!tests/**/*.md
 dev.log
 eslint-report*.json
 test-api.ts
