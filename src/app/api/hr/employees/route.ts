@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
+import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
 
 export async function GET(request: Request) {
   try {
@@ -52,7 +52,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const actor = await requirePageAccess("hrEmployees");
+    const actor = await requireAction("hrEmployees", "add");
     if (!actor) {
       const authed = await requireAuth();
       return NextResponse.json(

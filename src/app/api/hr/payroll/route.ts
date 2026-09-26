@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
+import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
 import { calculateEmployeePayroll, summarizePayrollRun, type PayrollCalcInput, type PayrollComponentInput } from "@/lib/hr/payroll-engine";
 import { notifyPayrollReady, notifyPayrollApproved } from "@/lib/hr/hr-notifications";
 import { PayrollItemFlag } from "@/generated/prisma/client";
@@ -47,7 +47,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const actor = await requirePageAccess("hrPayroll");
+    const actor = await requireAction("hrPayroll", "add");
     if (!actor) {
       const authed = await requireAuth();
       return NextResponse.json(

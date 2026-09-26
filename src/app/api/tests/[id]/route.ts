@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
+import { requireAuth, requirePageAccess, requireAction, type ActionKey } from "@/lib/auth-helpers";
 import { deleteCopierTestImage } from "@/lib/copier-test-upload";
 
 const TEST_INCLUDE = {
@@ -9,12 +9,17 @@ const TEST_INCLUDE = {
   customer: { select: { id: true, name: true } },
 } as const;
 
-async function guardWrite() {
-  const customersAccess = await requirePageAccess("customers");
+/**
+ * A copier test is reachable from three pages, so holding the action on any one
+ * of them is enough — the same rule the sidebar and the page guard use. The
+ * action is a parameter so PUT and DELETE do not share a check.
+ */
+async function guardWrite(action: ActionKey) {
+  const customersAccess = await requireAction("customers", action);
   if (customersAccess) return { actor: customersAccess };
-  const serviceAccess = await requirePageAccess("serviceRequests");
+  const serviceAccess = await requireAction("serviceRequests", action);
   if (serviceAccess) return { actor: serviceAccess };
-  const testsAccess = await requirePageAccess("copierTests");
+  const testsAccess = await requireAction("copierTests", action);
   if (testsAccess) return { actor: testsAccess };
   const authed = await requireAuth();
   return {
@@ -89,7 +94,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { actor, response } = await guardWrite();
+    const { actor, response } = await guardWrite("edit");
     if (!actor && response) return response;
     const { id } = await params;
 
@@ -198,7 +203,7 @@ export async function DELETE(
 ) {
   try {
     // Whoever is allowed to record a test may remove a wrong entry.
-    const { actor, response } = await guardWrite();
+    const { actor, response } = await guardWrite("delete");
     if (!actor && response) return response;
     const { id } = await params;
 

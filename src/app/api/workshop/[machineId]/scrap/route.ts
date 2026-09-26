@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requirePageAccess } from "@/lib/auth-helpers";
+import { requireAction } from "@/lib/auth-helpers";
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ machineId: string }> }
 ) {
   try {
-    const actor = await requirePageAccess("workshop");
+    const actor = await requireAction("workshop", "scrap");
     if (!actor) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }

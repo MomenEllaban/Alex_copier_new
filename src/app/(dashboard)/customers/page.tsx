@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
@@ -14,7 +15,6 @@ import { useConfirm, useToast } from "@/components/UIProvider";
 import { useUrlParams, useSearchWithDefault } from "@/hooks/useUrlParams";
 import { apiErrorMessage } from "@/lib/api-client";
 import FormModal from "@/components/FormModal";
-import CopierTests from "@/components/CopierTests";
 import SubmitButton from "@/components/SubmitButton";
 import RefreshButton from "@/components/RefreshButton";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
@@ -93,6 +93,7 @@ const TYPE_LABELS: Record<string, string> = {
 
 export default function CustomersPage() {
   const { t, dir } = useI18n();
+  const router = useRouter();
   const confirmAction = useConfirm();
   const { success: toastSuccess, error: toastError } = useToast();
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -107,13 +108,6 @@ export default function CustomersPage() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Customer | null>(null);
-  const [testsCustomer, setTestsCustomer] = useState<{
-    id: string;
-    name: string;
-    machines: { id: string; serialNumber: string; model?: string | null }[];
-    engineerId?: string | null;
-    engineer?: { id: string; name: string } | null;
-  } | null>(null);
   const [page, setPage] = useState(1);
   const [typeFilter, setTypeFilter] = useState("");
   const [showImport, setShowImport] = useState(false);
@@ -301,36 +295,12 @@ export default function CustomersPage() {
   };
 
   const openTests = async (customer: Customer) => {
-    try {
-      const res = await fetch(`/api/customers/${customer.id}`);
-      if (res.ok) {
-        const data = await res.json();
-        setTestsCustomer({
-          id: data.id,
-          name: data.name,
-          machines: (data.machines || []).map(
-            (m: { id: string; serialNumber: string; model?: string | null }) => ({
-              id: m.id,
-              serialNumber: m.serialNumber,
-              model: m.model ?? null,
-            }),
-          ),
-          engineerId: data.engineerId ?? data.engineer?.id ?? null,
-          engineer: data.engineer ?? null,
-        });
-        return;
-      }
-    } catch {
-      /* fall through to row-data fallback */
-    }
-    setTestsCustomer({
-      id: customer.id,
-      name: customer.name,
-      machines: [],
-      engineerId: customer.engineerId ?? customer.engineer?.id ?? null,
-      engineer: customer.engineer ?? null,
-    });
+    // The customer now has a dedicated page: every test, all machines, with the
+    // filters and an inline add form. The modal used to open here and its table
+    // only ever showed the latest test.
+    router.push(`/customers/${customer.id}/tests`);
   };
+
 
   const resetLocForm = () => {
     setLocForm({ name: "", address: "", city: "", governorate: "", phone: "" });
@@ -808,17 +778,6 @@ export default function CustomersPage() {
         )}
       </FormModal>
 
-      <FormModal
-        open={!!testsCustomer}
-        onClose={() => setTestsCustomer(null)}
-        title={testsCustomer ? `${t("copierTests.title")} — ${testsCustomer.name}` : ""}
-        xl
-      >
-        {testsCustomer && (
-          <CopierTests customerId={testsCustomer.id} machines={testsCustomer.machines} defaultEngineerId={testsCustomer.engineerId ?? testsCustomer.engineer?.id ?? null} />
-        )}
-      </FormModal>
-
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-200 p-4 md:flex-row md:items-center md:flex-wrap">
           <div className="w-full md:w-80 md:flex-none">
@@ -905,7 +864,7 @@ export default function CustomersPage() {
                         <button onClick={() => openPaymentModal(customer)} className="inline-flex items-center gap-1 rounded-lg border border-green-200 bg-green-50 px-2.5 py-1.5 text-xs font-medium text-green-700 transition hover:bg-green-100" title="تسجيل دفعة">
                           دفع
                         </button>
-                        <button onClick={() => openTests(customer)} className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-xs font-medium text-violet-700 transition hover:bg-violet-100" title={t("copierTests.title")}>
+                        <button onClick={() => openTests(customer)} className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-xs font-medium text-violet-700 transition hover:bg-violet-100" title={t("copierTests.customerTestsSubtitle")}>
                           <Camera size={14} />{t("copierTests.title")}
                         </button>
                         <button onClick={() => openStatement(customer)} className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-xs font-medium text-sky-700 transition hover:bg-sky-100" title={t("statement.openStatement")}>

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
+import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
 import { findOrCreateMainWarehouse, receivePurchaseIntoStock, reversePurchaseFromStock } from "@/lib/stock-movement-helper";
 import { traceError } from "@/lib/prisma-errors";
 
@@ -34,7 +34,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const actor = await requirePageAccess("purchases");
+    const actor = await requireAction("purchases", "edit");
     if (!actor) {
       const authed = await requireAuth();
       return NextResponse.json({ error: authed ? "Forbidden" : "Unauthorized" }, { status: authed ? 403 : 401 });
@@ -164,7 +164,7 @@ export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {  try {
-    const actor = await requirePageAccess("purchases");
+    const actor = await requireAction("purchases", "delete");
     if (!actor) {
       const authed = await requireAuth();
       return NextResponse.json({ error: authed ? "Forbidden" : "Unauthorized" }, { status: authed ? 403 : 401 });

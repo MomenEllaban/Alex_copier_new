@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requirePageAccess, requireAuth } from "@/lib/auth-helpers";
+import { requireAuth, requireAction } from "@/lib/auth-helpers";
 import { issueStatementToken } from "@/lib/statement-token";
 
 export async function POST(
@@ -8,7 +8,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const actor = await requirePageAccess("engineers");
+    const actor = await requireAction("engineers", "share");
     if (!actor) {
       const authed = await requireAuth();
       return NextResponse.json(

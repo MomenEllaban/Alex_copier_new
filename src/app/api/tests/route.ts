@@ -12,6 +12,7 @@ import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
  *   q          free text → customer name, machine serial, engineer, statements, notes
  *   customerId exact customer
  *   engineerId exact engineer
+ *   machineId  exact machine
  *   from,to    YYYY-MM-DD bounds on testDate (falls back to createdAt when testDate is null)
  *   image      "with" | "without"
  *   collected  "with" | "without"
@@ -33,6 +34,7 @@ export async function GET(request: Request) {
     const q = (params.get("q") ?? "").trim();
     const customerId = (params.get("customerId") ?? "").trim();
     const engineerId = (params.get("engineerId") ?? "").trim();
+    const machineId = (params.get("machineId") ?? "").trim();
     const from = (params.get("from") ?? "").trim();
     const to = (params.get("to") ?? "").trim();
     const image = (params.get("image") ?? "").trim();
@@ -53,6 +55,10 @@ export async function GET(request: Request) {
     if (myEngineerId) where.customer = { engineerId: myEngineerId };
     if (customerId) where.customerId = customerId;
     if (engineerId) where.engineerId = engineerId;
+    // A test can be recorded without a machine, so "no machine" is a real
+    // choice in the filter rather than an empty option.
+    if (machineId === "__none__") where.machineId = null;
+    else if (machineId) where.machineId = machineId;
     if (image === "with") where.imageUrl = { not: null };
     if (image === "without") where.imageUrl = null;
     if (collected === "with") where.collectedAmount = { gt: 0 };

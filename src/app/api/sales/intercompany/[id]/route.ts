@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requirePageAccess, requireAuth } from "@/lib/auth-helpers";
+import { requireAuth, requireAction } from "@/lib/auth-helpers";
 import { recalculatePaymentStatus } from "@/lib/payment-status";
 import { computeCreditSplit, creditUsedNote } from "@/lib/customer-credit";
 import { traceError } from "@/lib/prisma-errors";
@@ -44,7 +44,7 @@ async function getCompanyAccounts(tx: PrismaTx, companyId: string): Promise<Acco
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const actor = await requirePageAccess("sales");
+    const actor = await requireAction("sales", "edit");
     if (!actor) {
       const authed = await requireAuth();
       return NextResponse.json({ error: authed ? "Forbidden" : "Unauthorized", code: authed ? "FORBIDDEN" : "UNAUTHORIZED" }, { status: authed ? 403 : 401 });

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSession } from "next-auth/react";
 import {
   Camera,
   Eye,
@@ -12,7 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { useI18n } from "@/i18n/context";
-import { hasPageAccess } from "@/lib/permissions";
+import { usePermissions } from "@/components/PermissionsProvider";
 import { apiErrorMessage } from "@/lib/api-client";
 import { notifyDataChanged } from "@/lib/data-events";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
@@ -68,15 +67,16 @@ const todayInput = () => {
 
 export default function CopierTestsPage() {
   const { t, locale, dir } = useI18n();
-  const { data: session } = useSession();
   const confirmAction = useConfirm();
   const { success: toastSuccess, error: toastError } = useToast();
 
-  const role = (session?.user as { role?: string } | undefined)?.role ?? "";
+  // Recording a test is reachable from three pages, so any one of them granting
+  // "add" is enough — the same shape the API guard uses.
+  const { canAct } = usePermissions();
   const canWrite =
-    hasPageAccess(role, "copierTests") ||
-    hasPageAccess(role, "customers") ||
-    hasPageAccess(role, "serviceRequests");
+    canAct("copierTests", "add") ||
+    canAct("customers", "add") ||
+    canAct("serviceRequests", "add");
 
   const urlParams = useUrlParams(["customer", "add"]);
 
@@ -445,9 +445,21 @@ export default function CopierTestsPage() {
         return;
       }
       closeForm();
+
+      // This table is the newest N tests across every customer, ordered by
+      // testDate, so a test just saved for one customer can land outside the
+      // current page and look like nothing happened. Scoping the list to the
+      // customer it was just saved for is what makes the new row appear.
+      const savedCustomerId = formCustomerId;
+      setCustomerFilter(savedCustomerId);
+      setPage(1);
       notifyDataChanged(["customers", "sales", "settlements"]);
       refresh();
-      toastSuccess(data?.settlementId ? t("copierTests.testSavedWithSettlement") : t("copierTests.testSaved"));
+      toastSuccess(
+        data?.settlementId
+          ? t("copierTests.testSavedWithSettlement")
+          : `${t("copierTests.testSaved")} — ${t("copierTests.filteredToCustomer")}`
+      );
     } finally {
       setSaving(false);
     }

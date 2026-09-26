@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useI18n } from "@/i18n/context";
-import { useSession, signOut } from "next-auth/react";
-import { hasPageAccess, type Page } from "@/lib/permissions";
+import { signOut } from "next-auth/react";
+import { usePermissions } from "@/components/PermissionsProvider";
+import type { Page } from "@/lib/permissions";
 import {
   LayoutDashboard,
   Printer,
@@ -35,6 +36,7 @@ import {
   Briefcase,
   Plus,
   Camera,
+  ShieldCheck,
 } from "lucide-react";
 
 interface NavItem {
@@ -43,6 +45,8 @@ interface NavItem {
   icon: typeof LayoutDashboard;
   page?: Page;
   canAdd?: boolean;
+  /** Only the general manager: for screens about the system, not a business page. */
+  adminOnly?: boolean;
 }
 
 const navGroups: { key: string; items: NavItem[] }[] = [
@@ -109,6 +113,9 @@ const navGroups: { key: string; items: NavItem[] }[] = [
       { key: "navigation.reports", href: "/reports", icon: BarChart3, page: "reports" },
       { key: "navigation.companies", href: "/companies", icon: Building2, page: "companies" },
       { key: "navigation.users", href: "/users", icon: Users, page: "settings", canAdd: true },
+      // Gated on the role, not on a page permission: the roles screen is about
+      // the system itself, and "settings" is also held by a company manager.
+      { key: "navigation.roles", href: "/settings/roles", icon: ShieldCheck, adminOnly: true },
     ],
   },
 ];
@@ -120,8 +127,8 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { t } = useI18n();
-  const { data: session } = useSession();
-  const userRole = (session?.user as { role?: string })?.role;
+  const { can, canAct, ready, roleKey } = usePermissions();
+  const isGeneralManager = roleKey === "GENERAL_MANAGER";
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(min-width: 1024px)");
@@ -177,7 +184,13 @@ export default function Sidebar() {
 
       <nav className="flex-1 overflow-y-auto overflow-x-hidden py-4 sidebar-scroll">
         {navGroups.map((group, groupIndex) => {
-          const items = group.items.filter((item) => !item.page || hasPageAccess(userRole, item.page));
+          // Hold the nav back until permissions arrive, otherwise the full list
+          // flashes on every page load for users who should see far less.
+          if (!ready) return null;
+          const items = group.items.filter((item) => {
+            if (item.adminOnly) return isGeneralManager;
+            return !item.page || can(item.page);
+          });
           if (items.length === 0) return null;
           return (
             <div
@@ -209,7 +222,7 @@ export default function Sidebar() {
                       <Icon size={isCollapsed ? 22 : 20} className="shrink-0" />
                       {!isCollapsed && <span className="text-sm whitespace-nowrap">{t(item.key)}</span>}
                     </Link>
-                    {!isCollapsed && item.canAdd && (
+                    {!isCollapsed && item.canAdd && item.page && canAct(item.page, "add") && (
                       <button
                         onClick={(e) => {
                           e.preventDefault();

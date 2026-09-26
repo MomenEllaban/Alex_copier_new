@@ -15,6 +15,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/auth-helpers", () => ({
   requireAuth: mocks.requireAuth,
   requirePageAccess: mocks.requirePageAccess,
+  // Action guards delegate to the page guard: these tests decide who is
+  // allowed, not which action, and the page answer is what they mean.
+  requireAction: (page: string) => mocks.requirePageAccess(page),
+  requireAnyAction: (page: string) => mocks.requirePageAccess(page),
   requireAnyPage: mocks.requireAnyPage,
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: mocks.db }));
@@ -95,11 +99,21 @@ function wireGuardsFor(user: { id: string; role: string } | null) {
 describe("CODE-AUDIT 1.7 — every read is page-checked", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // clearAllMocks only clears call history, not implementations, so a guard
+    // left wired for a previous user leaks into the next test.
+    mocks.requireAuth.mockReset();
+    mocks.requirePageAccess.mockReset();
+    mocks.requireAnyPage.mockReset();
     mocks.db.engineer.findUnique.mockResolvedValue({ id: "e1", name: "x" });
     mocks.db.company.findUnique.mockResolvedValue({ id: "c1", name: "x" });
   });
 
-  describe.each(ROUTES)("%s", (_name, call, pages) => {
+  // The guard stubs above are module-level singletons shared by every case in
+  // this file, and each route is imported lazily. The cases therefore cannot
+  // overlap: one test's wireGuardsFor() would otherwise replace the stubs while
+  // another test's route was still awaiting them, and the route would answer
+  // with the wrong user's permissions.
+  describe.sequential.each(ROUTES)("%s", (_name, call, pages) => {
     /** Does the employee role legitimately hold any of this route's pages? */
     const employeeAllowed = pages.some((p) => hasPageAccess("EMPLOYEE", p as never));
 

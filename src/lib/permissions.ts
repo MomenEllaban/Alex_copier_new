@@ -135,6 +135,15 @@ export const ROLE_LABELS_AR: Record<Role, string> = {
   EMPLOYEE: "موظف",
 };
 
+/**
+ * Static-table lookup, used only as the pre-RBAC fallback for a user row with
+ * no roleId (see getFallbackPermissions in permissions-server.ts).
+ *
+ * Do NOT use this for authorisation. The database is the source of truth: a
+ * permission removed in the matrix must stop being granted immediately, and this
+ * table cannot reflect that. Use requirePageAccess / requireAction on the server
+ * and usePermissions().can / .canAct in the client.
+ */
 export function hasPageAccess(role: string | undefined, page: Page): boolean {
   if (!role) return false;
   const permissions = ROLE_PERMISSIONS[role as Role];

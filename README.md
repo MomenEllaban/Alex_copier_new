@@ -70,6 +70,44 @@ npm test        # vitest
 
 > ⚠️ `npm run build` هو التحقق من الأنواع — لازم يلمس قبل أي رفع.
 
+## 🔐 نظام الأدوار والصلاحيات
+
+الصلاحيات **مش مكتوبة بالكود** — المدير العام بيتحكم فيها من
+`/settings/roles`. كل صفحة في السيستم (31) وكل إجراء جواها (107) بيتسجلوا
+تلقائيًا من الكود نفسه عن طريق سكربت الـ scan، مش مكتوبين بإيد.
+
+```bash
+npm run rbac:scan           # scan فقط: بيطبع الصفحات والإجراءات ومفيش drift
+npm run rbac:sync           # scan + تحديث جداول Page/Action في الداتابيز
+npm run db:seed:rbac            # يملا الأدوار وصلاحياتها المبدئية (idempotent)
+npm run db:seed:rbac -- --reset # يرجّع الصلاحيات للافتراضي (بيمسح تعديلات المدير)
+npm run verify:rbac             # اختبار حي: دخول كل دور + 403 على الأفعال الممنوعة
+npm run verify:matrix           # اختبار حي: تعديل صلاحيات والتأكد إنها اتطبقت فورًا
+```
+
+**الشكل في الداتابيز:** `Role` و `Page` و `Action` و `RolePage` (canView) و
+`RoleActionPermission` (isAllowed). `User.role` (الـ enum القديم) لسه موجود
+للتوافق، و `User.roleId` هو اللي شغّال.
+
+**القواعد المهمة:**
+
+- **المدير العام محمي.** مش بيتغير اسمه ولا بيتشال، وصلاحياته مش بتقل — الـ API
+  بيرفض أي محاولة تعديل (`403`).
+- **الزر المخفي مش هو الحماية.** كل endpoint بيعمل تعديل بيتشيك على
+  *الإجراء* مش الصفحة بس، فالطلب المباشر من Postman بيرجع `403`.
+- **الصفحة مقفولة = كل إجراءاتها مقفولة.** في الماتريكس، لما تطفئ صفحة كل
+  الـ switches بتاعتها بتقفل.
+- **fallback:** لو `roleId` مش موجود (يوزر قديم)، النظام بيرجع للجدول الثابت
+  في `permissions.ts` — عشان ما يحصلش lockout.
+
+**اختبار Regression:** `tests/api/rbac-action-guards.test.ts` بيقرا كل الـ 88
+مسار و بيتأكد إن كل POST/PUT/PATCH/DELETE عنده action guard بالاسم الصح — يعني
+لو حد أضاف endpoint جديد بدون guard، الاختبار بيفشل.
+
+> ⚠️ في Flake قديم في `get-page-guards.test.ts` (موجود قبل الشغل ده، ومش
+> متعلق بيه) — شوف [`docs/TEST-FLAKE-NOTE.md`](docs/TEST-FLAKE-NOTE.md).
+> الحله: `npm test -- --no-file-parallelism`.
+
 ## 🗂️ أهم المسارات
 
 | المسار | الوصف |
@@ -77,7 +115,10 @@ npm test        # vitest
 | `src/app/(dashboard)/tests` | صفحة اختبارات العملاء |
 | `src/app/api/tests` | قائمة الاختبارات (فلترة وباجينيشن على السيرفر) |
 | `src/app/api/customers/[id]/tests` | إنشاء اختبار لعميل |
-| `src/lib/permissions.ts` | الأدوار وصفحات كل دور |
+| `src/lib/permissions.ts` | الأدوار وصفحات كل دور (fallback + نوع `Page`) |
+| `src/lib/permissions-server.ts` | حل الصلاحيات من الداتابيز مع كاش |
+| `src/app/(dashboard)/settings/roles` | شاشة الأدوار والصلاحيات (للمدير العام فقط) |
+| `scripts/scan-permissions.ts` | سكربت الـ scan للصفحات والإجراءات |
 | `src/i18n/{ar,en}.json` | كل نصوص الواجهة |
 | `.opencode/skills/*` | قواعد المشروع (استايل، صفحات، قواعد عمل) |
 

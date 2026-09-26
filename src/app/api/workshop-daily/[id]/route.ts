@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
+import { requireAuth, requireAction, type ActionKey } from "@/lib/auth-helpers";
 
 const FINANCE_ROLES = ["ACCOUNTANT", "GENERAL_MANAGER", "COMPANY_MANAGER"] as const;
 
@@ -10,8 +10,11 @@ const TX_INCLUDE = {
   category: { select: { id: true, name: true } },
 } as const;
 
-async function authorize(): Promise<NextResponse | { actorId: string; isFinance: boolean }> {
-  const actor = await requirePageAccess("workshopDaily");
+/** PUT and DELETE share this check, so the verb's action is passed in. */
+async function authorize(
+  action: ActionKey
+): Promise<NextResponse | { actorId: string; isFinance: boolean }> {
+  const actor = await requireAction("workshopDaily", action);
   if (!actor) {
     const authed = await requireAuth();
     return NextResponse.json(
@@ -87,7 +90,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   try {
-    const auth = await authorize();
+    const auth = await authorize("edit");
     if (auth instanceof NextResponse) return auth;
     const { id } = await params;
 
@@ -165,7 +168,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
   try {
-    const auth = await authorize();
+    const auth = await authorize("delete");
     if (auth instanceof NextResponse) return auth;
     const { id } = await params;
 

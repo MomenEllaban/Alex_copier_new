@@ -2,10 +2,9 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
 import { Camera, History, ImagePlus, X } from "lucide-react";
 import { useI18n } from "@/i18n/context";
-import { hasPageAccess } from "@/lib/permissions";
+import { usePermissions } from "@/components/PermissionsProvider";
 import { apiErrorMessage } from "@/lib/api-client";
 import SubmitButton from "@/components/SubmitButton";
 import PrinterLoader from "@/components/PrinterLoader";
@@ -61,14 +60,15 @@ const todayInput = () => {
 export default function CopierTests({ customerId, machines = [], defaultEngineerId = null }: CopierTestsProps) {
   const { t, locale, dir } = useI18n();
   const router = useRouter();
-  const { data: session } = useSession();
   const { success: toastSuccess } = useToast();
 
-  const role = (session?.user as { role?: string } | undefined)?.role ?? "";
+  // A test can be recorded from the tests page, the customer, or the service
+  // request, so any one of those granting "add" is enough.
+  const { canAct } = usePermissions();
   const canWrite =
-    hasPageAccess(role, "copierTests") ||
-    hasPageAccess(role, "customers") ||
-    hasPageAccess(role, "serviceRequests");
+    canAct("copierTests", "add") ||
+    canAct("customers", "add") ||
+    canAct("serviceRequests", "add");
 
   const [tests, setTests] = useState<CopierTest[]>([]);
   const [engineers, setEngineers] = useState<EngineerOption[]>([]);

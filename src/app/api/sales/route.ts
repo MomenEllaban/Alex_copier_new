@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
+import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
 import { recalculatePaymentStatus } from "@/lib/payment-status";
 import { computeCreditSplit, creditUsedNote } from "@/lib/customer-credit";
 import { sanitizePaymentMethod } from "@/lib/payment-method";
@@ -55,7 +55,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const actor = await requirePageAccess("sales");
+    const actor = await requireAction("sales", "add");
     if (!actor) {
       const authed = await requireAuth();
       return NextResponse.json({ error: authed ? "Forbidden" : "Unauthorized", code: authed ? "FORBIDDEN" : "UNAUTHORIZED" }, { status: authed ? 403 : 401 });

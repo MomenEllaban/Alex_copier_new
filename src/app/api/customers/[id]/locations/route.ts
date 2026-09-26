@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
+import { requireAuth, requireAction } from "@/lib/auth-helpers";
 
 // Locations belong to a customer; service requests and machines reference them.
 export async function POST(
@@ -8,7 +8,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const actor = await requirePageAccess("customers");
+    const actor = await requireAction("customers", "add");
     if (!actor) {
       const authed = await requireAuth();
       return NextResponse.json(

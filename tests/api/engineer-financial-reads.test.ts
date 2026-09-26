@@ -11,6 +11,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/auth-helpers", () => ({
   requireAuth: mocks.requireAuth,
   requirePageAccess: mocks.requirePageAccess,
+  // Action guards delegate to the page guard: these tests decide who is
+  // allowed, not which action, and the page answer is what they mean.
+  requireAction: (page: string) => mocks.requirePageAccess(page),
+  requireAnyAction: (page: string) => mocks.requirePageAccess(page),
   requireAnyPage: mocks.requireAnyPage,
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: mocks.db }));

@@ -17,6 +17,10 @@ vi.mock("@/lib/auth-helpers", () => ({
   // 1.7: this report is reachable by "reports" or "companies"; these tests
   // cover the arithmetic, not the permission table.
   requirePageAccess: vi.fn(async () => mocks.requireAuth()),
+  // Action guards delegate to the page guard: these tests decide who is
+  // allowed, not which action, and the page answer is what they mean.
+  requireAction: vi.fn(async () => mocks.requireAuth()),
+  requireAnyAction: vi.fn(async () => mocks.requireAuth()),
   requireAnyPage: vi.fn(async () => mocks.requireAuth()),
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: mocks.db }));

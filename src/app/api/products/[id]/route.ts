@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
+import { requireAuth, requireAction } from "@/lib/auth-helpers";
 
 const PRODUCT_TYPES = ["MACHINE", "SPARE_PART"];
 const PRICE_FIELDS = ["purchasePrice"] as const;
@@ -56,7 +56,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const actor = await requirePageAccess("inventory");
+    const actor = await requireAction("inventory", "edit");
     if (!actor) {
       const authed = await requireAuth();
       return NextResponse.json(
@@ -190,7 +190,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const actor = await requirePageAccess("inventory");
+    const actor = await requireAction("inventory", "delete");
     if (!actor) {
       const authed = await requireAuth();
       return NextResponse.json(

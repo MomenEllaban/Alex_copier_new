@@ -22,6 +22,10 @@ vi.mock("@/lib/prisma", () => ({ prisma: mocks.prisma }));
 vi.mock("@/lib/auth-helpers", () => ({
   requireAuth: mocks.requireAuth,
   requirePageAccess: mocks.requirePageAccess,
+  // Action guards delegate to the page guard: these tests decide who is
+  // allowed, not which action, and the page answer is what they mean.
+  requireAction: (page: string) => mocks.requirePageAccess(page),
+  requireAnyAction: (page: string) => mocks.requirePageAccess(page),
   requireRole: mocks.requireRole,
 }));
 vi.mock("@/lib/prisma-errors", () => ({

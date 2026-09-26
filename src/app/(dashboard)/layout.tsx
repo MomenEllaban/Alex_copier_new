@@ -3,6 +3,7 @@
 import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import UIProvider from "@/components/UIProvider";
+import { PermissionsProvider } from "@/components/PermissionsProvider";
 import { useI18n } from "@/i18n/context";
 import { usePathname } from "next/navigation";
 
@@ -24,27 +25,40 @@ const pageTitles: Record<string, string> = {
   "/reports": "reports.title",
   "/users": "users.title",
   "/settings": "users.title",
+  "/settings/roles": "roles.title",
   "/companies": "companies.title",
   "/investors": "investors.title",
   "/suppliers": "suppliers.title",
   "/notifications": "notifications.title",
 };
 
+/**
+ * Dynamic routes cannot be listed above because their id is only known at
+ * runtime. Longest prefix wins, so `/customers/x/tests` matches before the
+ * generic `/customers`.
+ */
+const pageTitlePrefixes: [string, string][] = [
+  ["/customers/", "copierTests.title"],
+];
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { t } = useI18n();
 
-  const titleKey = pageTitles[pathname] || "dashboard.title";
+  const prefixTitle = pageTitlePrefixes.find(([prefix]) => pathname.startsWith(prefix))?.[1];
+  const titleKey = pageTitles[pathname] || prefixTitle || "dashboard.title";
 
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50" dir="rtl">
-      <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col min-h-0">
-        <Header title={t(titleKey)} />
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-5 lg:p-6">
-          <UIProvider>{children}</UIProvider>
-        </main>
-      </div>
+      <PermissionsProvider>
+        <Sidebar />
+        <div className="flex min-w-0 flex-1 flex-col min-h-0">
+          <Header title={t(titleKey)} />
+          <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-5 lg:p-6">
+            <UIProvider>{children}</UIProvider>
+          </main>
+        </div>
+      </PermissionsProvider>
     </div>
   );
 }

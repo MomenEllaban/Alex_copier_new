@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
+import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
 import { notifySettlementVerified } from "@/lib/notifications";
 import { traceError } from "@/lib/prisma-errors";
 
@@ -46,7 +46,7 @@ export async function PUT(
 ) {
   try {
     // Verification is a finance/management action on the settlements page.
-    const actor = await requirePageAccess("settlements");
+    const actor = await requireAction("settlements", "edit");
     if (!actor) {
       const authed = await requireAuth();
       return NextResponse.json({ error: authed ? "Forbidden" : "Unauthorized", code: authed ? "FORBIDDEN" : "UNAUTHORIZED" }, { status: authed ? 403 : 401 });
@@ -152,7 +152,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const actor = await requirePageAccess("settlements");
+    const actor = await requireAction("settlements", "delete");
     if (!actor) {
       const authed = await requireAuth();
       return NextResponse.json({ error: authed ? "Forbidden" : "Unauthorized" }, { status: authed ? 403 : 401 });

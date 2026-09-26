@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
+import { requireAuth, requireAction, requirePageAccess, type ActionKey } from "@/lib/auth-helpers";
 import { calcTotals, dayKey, getWorkshopCompany, startOfDay } from "@/lib/workshop-daily";
 
 const WORKSHOP_CATEGORY_NAME = "يومية الورشة";
@@ -13,8 +13,9 @@ const TX_INCLUDE = {
   customer: { select: { id: true, name: true } },
 } as const;
 
-async function guard() {
-  const actor = await requirePageAccess("workshopDaily");
+/** GET passes "view" and POST passes "add", so the verb's action is a parameter. */
+async function guard(action: ActionKey) {
+  const actor = await requireAction("workshopDaily", action);
   if (actor) return { actor };
   const authed = await requireAuth();
   return {
@@ -28,7 +29,7 @@ async function guard() {
 
 export async function GET() {
   try {
-    const { actor, response } = await guard();
+    const { actor, response } = await guard("view");
     if (!actor && response) return response;
 
     const company = await getWorkshopCompany();
@@ -93,7 +94,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { actor, response } = await guard();
+    const { actor, response } = await guard("add");
     if (!actor && response) return response;
     const actorId = (actor as { id?: string }).id ?? "";
 

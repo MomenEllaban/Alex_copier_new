@@ -1,16 +1,17 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth } from "@/lib/auth-helpers";
-import { hasPageAccess } from "@/lib/permissions";
+import { requireAction, requireAuth } from "@/lib/auth-helpers";
 import { parseCsvRecords, validateRecords, type ImportError } from "@/lib/import-schemas";
 
 export async function POST(request: Request) {
   try {
-    const user = await requireAuth();
-    if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const role = (user as { role?: string }).role;
-    if (!hasPageAccess(role, "suppliers")) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const user = await requireAction("suppliers", "import");
+    if (!user) {
+      const authed = await requireAuth();
+      return NextResponse.json(
+        { error: authed ? "Forbidden" : "Unauthorized", code: authed ? "FORBIDDEN" : "UNAUTHORIZED" },
+        { status: authed ? 403 : 401 }
+      );
     }
 
     const body = await request.json();

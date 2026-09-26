@@ -23,6 +23,10 @@ vi.mock("@/lib/auth-helpers", () => ({
   // 1.7: the dashboard now checks the "dashboard" page. These tests are about
   // the payload, not the permission table, so mirror requireAuth.
   requirePageAccess: vi.fn(async () => requireAuth()),
+  // Action guards delegate to the page guard: these tests decide who is
+  // allowed, not which action, and the page answer is what they mean.
+  requireAction: vi.fn(async () => requireAuth()),
+  requireAnyAction: vi.fn(async () => requireAuth()),
   requireAnyPage: vi.fn(async () => requireAuth()),
 }));
 

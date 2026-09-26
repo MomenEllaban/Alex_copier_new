@@ -1,9 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
+import { requireAuth, requirePageAccess, requireAction, type ActionKey } from "@/lib/auth-helpers";
 
-async function guardMutations() {
-  const actor = await requirePageAccess("customers");
+/**
+ * PUT and DELETE share this check, so the action is passed in rather than
+ * hard-coded — otherwise one of the two verbs would guard on the wrong
+ * permission.
+ */
+async function guardMutations(action: ActionKey) {
+  const actor = await requireAction("customers", action);
   if (actor) return { actor };
   const authed = await requireAuth();
   return {
@@ -68,7 +73,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { actor, response } = await guardMutations();
+    const { actor, response } = await guardMutations("edit");
     if (!actor && response) return response;
     const { id } = await params;
     const body = await request.json();
@@ -139,7 +144,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { actor, response } = await guardMutations();
+    const { actor, response } = await guardMutations("delete");
     if (!actor && response) return response;
     const { id } = await params;
 

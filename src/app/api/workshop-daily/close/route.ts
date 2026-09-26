@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
+import { requireAuth, requireAction } from "@/lib/auth-helpers";
 import { calcTotals, getWorkshopCompany } from "@/lib/workshop-daily";
 
 export async function POST(request: Request) {
   try {
-    const actor = await requirePageAccess("workshopDaily");
+    const actor = await requireAction("workshopDaily", "close");
     if (!actor) {
       const authed = await requireAuth();
       return NextResponse.json(

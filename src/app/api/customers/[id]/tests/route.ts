@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
+import { requireAuth, requirePageAccess, requireAction, type ActionKey } from "@/lib/auth-helpers";
 import { notifySettlementPendingVerification } from "@/lib/notifications";
 import {
   deleteCopierTestImage,
@@ -13,14 +13,15 @@ const TEST_INCLUDE = {
   machine: { select: { id: true, serialNumber: true, model: true } },
 } as const;
 
-async function guardWrite() {
-  const customersAccess = await requirePageAccess("customers");
+/** Recording a test is allowed from any of the three pages that offer it. */
+async function guardWrite(action: ActionKey) {
+  const customersAccess = await requireAction("customers", action);
   if (customersAccess) return { actor: customersAccess };
   // Engineers (serviceRequests page) may record tests for visited customers.
-  const serviceAccess = await requirePageAccess("serviceRequests");
+  const serviceAccess = await requireAction("serviceRequests", action);
   if (serviceAccess) return { actor: serviceAccess };
   // The tests page itself (workshop staff recording the visit readings).
-  const testsAccess = await requirePageAccess("copierTests");
+  const testsAccess = await requireAction("copierTests", action);
   if (testsAccess) return { actor: testsAccess };
   const authed = await requireAuth();
   return {
@@ -111,7 +112,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { actor, response } = await guardWrite();
+    const { actor, response } = await guardWrite("add");
     if (!actor && response) return response;
     const { id: customerId } = await params;
 

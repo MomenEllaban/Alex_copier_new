@@ -12,7 +12,20 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/prisma", () => ({ prisma: mocks.prisma }));
-vi.mock("@/lib/auth-helpers", () => ({ requireAuth: mocks.requireAuth }));
+// The route now guards on the "import" action rather than page access alone.
+// These tests decide who is allowed by role, so the action guard answers from
+// the same permission table the old inline check used.
+vi.mock("@/lib/auth-helpers", async () => {
+  const { hasPageAccess } = await import("@/lib/permissions");
+  return {
+    requireAuth: mocks.requireAuth,
+    requireAction: async (page: string) => {
+      const user = await mocks.requireAuth();
+      if (!user) return null;
+      return hasPageAccess((user as { role?: string }).role, page as never) ? user : null;
+    },
+  };
+});
 
 import { POST } from "@/app/api/customers/import/route";
 

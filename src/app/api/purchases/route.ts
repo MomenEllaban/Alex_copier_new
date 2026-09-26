@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
+import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
 import { findOrCreateMainWarehouse, receivePurchaseIntoStock } from "@/lib/stock-movement-helper";
 import { traceError } from "@/lib/prisma-errors";
 
@@ -75,7 +75,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
 
-    const actor = await requirePageAccess("purchases");
+    const actor = await requireAction("purchases", "add");
     if (!actor) {
       const authed = await requireAuth();
       return NextResponse.json({ error: authed ? "Forbidden" : "Unauthorized" }, { status: authed ? 403 : 401 });

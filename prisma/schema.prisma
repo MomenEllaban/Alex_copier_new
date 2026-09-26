@@ -86,6 +86,109 @@ model User {
   engineer            Engineer?
   employee            Employee?
   company             Company?       @relation(fields: [companyId], references: [id])
+
+  // Dynamic RBAC. `role` above stays as the enum so every existing user and
+  // every existing `role === "..."` comparison keeps working. `roleId` is the
+  // live link to the Role table and wins when set; that is what lets the super
+  // admin invent brand-new roles from the dashboard instead of only toggling
+  // the nine built-in ones. Backfilled by the migration from the enum value.
+  roleRef Role?   @relation(fields: [roleId], references: [id])
+  roleId  String?
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DYNAMIC RBAC — صلاحيات ديناميكي (أدوار وصفحات وإجراءات)
+//
+// كل صفحة/موديول موجود فعلاً في السيستم بيتسجل في جدول Page، وكل زرار/إجراء
+// جواها بيتسجل في Action. الدور بياخد canView على الصفحة و isAllowed على كل
+// إجراء. الجداول دي بتبقى متزامنة مع الكود عن طريق سكربت الـ scan
+// (scripts/scan-permissions.ts) والـ seeder، مش مكتوبة بإيد.
+// ═══════════════════════════════════════════════════════════════════════════
+
+model Role {
+  id          String   @id @default(cuid())
+  /// For built-in roles this equals the UserRole enum value (GENERAL_MANAGER…).
+  /// For roles invented in the UI it is a slug. Always the join key.
+  key         String   @unique
+  name        String
+  description String?
+  /// Protected: cannot be renamed, deleted, or have its permissions reduced.
+  isSystem    Boolean  @default(false)
+  sortOrder   Int      @default(100)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users             User[]
+  pages             RolePage[]
+  actionPermissions RoleActionPermission[]
+
+  @@index([sortOrder])
+}
+
+model Page {
+  id        String   @id @default(cuid())
+  /// Matches the `Page` union in src/lib/permissions.ts, e.g. "customers".
+  key       String   @unique
+  name      String
+  icon      String?
+  /// Sidebar section — navigation.group.* in the i18n files.
+  group     String?
+  sortOrder Int      @default(100)
+  /// Set false by the scanner when a page disappears from the code, so history
+  /// is kept but it stops showing up in the matrix.
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  actions Action[]
+  roles   RolePage[]
+
+  @@index([group, sortOrder])
+  @@index([isActive])
+}
+
+model Action {
+  id        String   @id @default(cuid())
+  pageId    String
+  /// view | add | edit | delete | export | print | import | approve | …
+  key       String
+  name      String?
+  sortOrder Int      @default(100)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  page  Page                   @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  roles RoleActionPermission[]
+
+  @@unique([pageId, key])
+  @@index([pageId, sortOrder])
+}
+
+model RolePage {
+  id      String  @id @default(cuid())
+  roleId  String
+  pageId  String
+  canView Boolean @default(false)
+
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, pageId])
+  @@index([pageId])
+}
+
+model RoleActionPermission {
+  id        String  @id @default(cuid())
+  roleId    String
+  actionId  String
+  isAllowed Boolean @default(false)
+
+  role   Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  action Action @relation(fields: [actionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, actionId])
+  @@index([actionId])
 }
 
 model Session {
@@ -176,34 +279,34 @@ model Company {
 }
 
 model Customer {
-  id              String       @id @default(cuid())
-  name            String
-  companyName     String?
-  contactPerson   String?
-  phone           String?
-  whatsapp        String?
-  email           String?
-  address         String?
-  city            String?
-  governorate     String?
-  notes           String?
-  gpsLat          Float?
-  gpsLng          Float?
-  taxNumber       String?
-  tradeRegister   String?
-  creditLimit     Float        @default(0)
-  paymentTerms    String?
-  customerType    CustomerType @default(INDIVIDUAL)
-  isActive        Boolean      @default(true)
-  totalDebt       Float        @default(0)
-  remainingDebt   Float        @default(0)
-  lastPaymentDate      DateTime?
-  statementToken       String?      @unique
+  id                      String       @id @default(cuid())
+  name                    String
+  companyName             String?
+  contactPerson           String?
+  phone                   String?
+  whatsapp                String?
+  email                   String?
+  address                 String?
+  city                    String?
+  governorate             String?
+  notes                   String?
+  gpsLat                  Float?
+  gpsLng                  Float?
+  taxNumber               String?
+  tradeRegister           String?
+  creditLimit             Float        @default(0)
+  paymentTerms            String?
+  customerType            CustomerType @default(INDIVIDUAL)
+  isActive                Boolean      @default(true)
+  totalDebt               Float        @default(0)
+  remainingDebt           Float        @default(0)
+  lastPaymentDate         DateTime?
+  statementToken          String?      @unique
   statementTokenCreatedAt DateTime?
   statementTokenExpiresAt DateTime?
-  engineerId           String?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  engineerId              String?
+  createdAt               DateTime     @default(now())
+  updatedAt               DateTime     @updatedAt
 
   engineer             Engineer?             @relation(fields: [engineerId], references: [id])
   locations            CustomerLocation[]
@@ -284,21 +387,21 @@ model Supplier {
 }
 
 model Engineer {
-  id                 String   @id @default(cuid())
-  userId             String?  @unique
-  name               String
-  phone              String?
-  email              String?
-  nationalId         String?
-  baseSalary         Float    @default(8000)
-  transportAllowance Float    @default(2000)
-  commissionRate     Float    @default(25)
-  isActive           Boolean  @default(true)
-  statementToken     String?  @unique
+  id                      String    @id @default(cuid())
+  userId                  String?   @unique
+  name                    String
+  phone                   String?
+  email                   String?
+  nationalId              String?
+  baseSalary              Float     @default(8000)
+  transportAllowance      Float     @default(2000)
+  commissionRate          Float     @default(25)
+  isActive                Boolean   @default(true)
+  statementToken          String?   @unique
   statementTokenCreatedAt DateTime?
   statementTokenExpiresAt DateTime?
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
   areas           EngineerArea[]
   skills          EngineerSkill[]

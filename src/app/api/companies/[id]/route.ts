@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
+import { requireAuth, requireAction } from "@/lib/auth-helpers";
 
 export async function PUT(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const actor = await requirePageAccess("companies");
+    const actor = await requireAction("companies", "edit");
     if (!actor) {
       const authed = await requireAuth();
       return NextResponse.json(
@@ -62,7 +62,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const actor = await requirePageAccess("companies");
+    const actor = await requireAction("companies", "delete");
     if (!actor) {
       const authed = await requireAuth();
       return NextResponse.json(

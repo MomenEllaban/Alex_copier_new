@@ -13,6 +13,10 @@ vi.mock("@/lib/auth-helpers", () => ({
   requireAuth: mocks.requireAuth,
   // 1.7: the customer list is now page-checked; these tests are about scoping.
   requirePageAccess: vi.fn(async () => mocks.requireAuth()),
+  // Action guards delegate to the page guard: these tests decide who is
+  // allowed, not which action, and the page answer is what they mean.
+  requireAction: vi.fn(async () => mocks.requireAuth()),
+  requireAnyAction: vi.fn(async () => mocks.requireAuth()),
   requireAnyPage: vi.fn(async () => mocks.requireAuth()),
 }));
 
