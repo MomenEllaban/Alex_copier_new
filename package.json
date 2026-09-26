@@ -12,6 +12,7 @@
     "rbac:sync": "tsx scripts/scan-permissions.ts --write",
     "verify:rbac": "tsx scripts/verify-rbac.ts",
     "verify:matrix": "tsx scripts/verify-matrix.ts",
+    "verify:prod": "tsx scripts/verify-prod.ts",
     "postinstall": "prisma generate",
     "start": "next start",
     "lint": "eslint",
