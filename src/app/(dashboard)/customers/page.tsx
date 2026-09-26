@@ -143,9 +143,13 @@ export default function CustomersPage() {
         companiesRes.json(),
         engineersRes.json(),
       ]);
-      setCustomers(customersData);
+      setCustomers(Array.isArray(customersData) ? customersData : []);
       setCompanies(Array.isArray(companiesData) ? companiesData : []);
       setEngineersList(Array.isArray(engineersData) ? engineersData.filter((e: { isActive?: boolean }) => e.isActive !== false) : []);
+    } catch {
+      setCustomers([]);
+      setCompanies([]);
+      setEngineersList([]);
     } finally {
       setLoading(false);
     }

@@ -104,7 +104,11 @@ export default function EngineersPage() {
     try {
       const res = await fetch("/api/engineers");
       const data = await res.json();
-      setEngineers(data);
+      // Guard the shape: a failed request resolves to an error object, and
+      // storing that would make the `.filter()` below throw and blank the page.
+      setEngineers(Array.isArray(data) ? data : []);
+    } catch {
+      setEngineers([]);
     } finally {
       setLoading(false);
     }
@@ -196,7 +200,7 @@ export default function EngineersPage() {
     ])
       .then(([engineerData, userData]) => {
         if (cancelled) return;
-        setEngineers(engineerData);
+        setEngineers(Array.isArray(engineerData) ? engineerData : []);
         if (Array.isArray(userData)) setLinkableUsers(userData);
         setLoading(false);
       })

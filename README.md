@@ -94,3 +94,24 @@ npm test        # vitest
 > لو اتعمل push على أي ريبو تاني مش هيحصل نشر، لأن مشروع Vercel مربوط بالريبو ده بس.
 > الريبو `origin` المحلي (`momendevelopertech/Alex_copier`) بياخد نفس الكوميتات كنسخة احتياطية، بس **مش** بي نشر.
 
+---
+
+## 🗄️ قواعد المايجريشن (لازم تتباع)
+
+> ⚠️ **الـ deploy على Vercel بيشغّل `prisma generate` بس — مش `migrate deploy`.**
+> يعني أي migration جديد في `prisma/schema.prisma` **مش** بيوصل لقاعدة بيانات الإنتاج تلقائيًا.
+> لو نسيت تشغّلها، الكود هيفشل بـ `P2022: The column "..." does not exist in the current database`
+> والصفحات اللي بتعمل `.filter()` على رد الـ API هتبقى بيضاء.
+
+| الخطوة | الأمر |
+|---|---|
+| 1. بعد ما تضيف أي حقل/جدول/enum في `schema.prisma` | `npx prisma migrate dev --name <اسم>` (بيعمل ملف المايجريشن) |
+| 2. **قبل** الـ push — تأكد إن المايجريشن متطبّقة على قاعدة الإنتاج | `npx prisma migrate status` |
+| 3. لو المايجريشن اتطبقت بالفعل (أو الـ DB اتعملت بـ `db push` قبل كده) | `npx prisma migrate resolve --applied <اسم_المايجريشن>` |
+| 4. اتأكد إن مفيش فرق بين الـ schema والـ DB | `npx prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script` → لازم يطلع `This is an empty migration.` |
+
+> ℹ️ **تاريخ القاعدة:** قاعدة الإنتاج اتعملت بـ `prisma db push`، يعني جدول `_prisma_migrations` مكانش
+> موجود. اتعمله baseline يدوي في 2026-09-26 بـ `migrate resolve --applied` للمهجرين
+> `20260906000000_phase1_stock_movement_purchase_order` و `20260925000000_statement_token_expiry`.
+> من غير الـ baseline دول، `migrate deploy` كان هيقع عند `already exists`.
+

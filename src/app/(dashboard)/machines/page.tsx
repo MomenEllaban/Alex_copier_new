@@ -107,8 +107,14 @@ const { success: toastSuccess } = useToast();
   const fetchMachines = async () => {
     try {
       const [mRes, cRes] = await Promise.all([fetch("/api/machines"), fetch("/api/customers")]);
-      setMachines(await mRes.json());
-      setCustomers(await cRes.json());
+      // Guard the shape: a failed request resolves to an error object, and
+      // storing that would make the `.filter()` below throw and blank the page.
+      const [machinesData, customersData] = await Promise.all([mRes.json(), cRes.json()]);
+      setMachines(Array.isArray(machinesData) ? machinesData : []);
+      setCustomers(Array.isArray(customersData) ? customersData : []);
+    } catch {
+      setMachines([]);
+      setCustomers([]);
     } finally {
       setLoading(false);
     }

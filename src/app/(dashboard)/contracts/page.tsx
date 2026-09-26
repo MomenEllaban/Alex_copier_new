@@ -146,9 +146,20 @@ export default function ContractsPage() {
   const fetchData = async () => {
     try {
       const [cRes, custRes, machineRes] = await Promise.all([fetch("/api/contracts"), fetch("/api/customers"), fetch("/api/machines")]);
-      setContracts(await cRes.json());
-      setCustomers(await custRes.json());
-      setMachines(await machineRes.json());
+      // Guard the shape: a failed request resolves to an error object, and
+      // storing that would make the `.filter()` below throw and blank the page.
+      const [contractsData, customersData, machinesData] = await Promise.all([
+        cRes.json(),
+        custRes.json(),
+        machineRes.json(),
+      ]);
+      setContracts(Array.isArray(contractsData) ? contractsData : []);
+      setCustomers(Array.isArray(customersData) ? customersData : []);
+      setMachines(Array.isArray(machinesData) ? machinesData : []);
+    } catch {
+      setContracts([]);
+      setCustomers([]);
+      setMachines([]);
     } finally {
       setLoading(false);
     }

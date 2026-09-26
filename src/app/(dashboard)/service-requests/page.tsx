@@ -129,10 +129,23 @@ export default function ServiceRequestsPage() {
         fetch("/api/engineers"),
         fetch("/api/machines"),
       ]);
-      setRequests(await reqRes.json());
-      setCustomers(await custRes.json());
-      setEngineers(await engRes.json());
-      setMachines(await machineRes.json());
+      // Guard the shape: a failed request resolves to an error object, and
+      // storing that would make the `.filter()` below throw and blank the page.
+      const [requestsData, customersData, engineersData, machinesData] = await Promise.all([
+        reqRes.json(),
+        custRes.json(),
+        engRes.json(),
+        machineRes.json(),
+      ]);
+      setRequests(Array.isArray(requestsData) ? requestsData : []);
+      setCustomers(Array.isArray(customersData) ? customersData : []);
+      setEngineers(Array.isArray(engineersData) ? engineersData : []);
+      setMachines(Array.isArray(machinesData) ? machinesData : []);
+    } catch {
+      setRequests([]);
+      setCustomers([]);
+      setEngineers([]);
+      setMachines([]);
     } finally {
       setLoading(false);
     }

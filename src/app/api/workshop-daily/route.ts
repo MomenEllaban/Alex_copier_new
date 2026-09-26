@@ -5,10 +5,12 @@ import { calcTotals, dayKey, getWorkshopCompany, startOfDay } from "@/lib/worksh
 
 const WORKSHOP_CATEGORY_NAME = "يومية الورشة";
 
+// `createdBy`/`confirmedBy` are scalar user-id columns, not relations, so they
+// cannot appear here — include only accepts relation fields. The caller maps
+// those ids to names with `userName` below.
 const TX_INCLUDE = {
   category: { select: { id: true, name: true } },
   customer: { select: { id: true, name: true } },
-  createdBy: { select: { name: true } },
 } as const;
 
 async function guard() {
