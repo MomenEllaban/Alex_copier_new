@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import {
   Check,
   ChevronDown,
@@ -57,12 +57,17 @@ function isViewOnly(page: MatrixPage, state: MatrixState): boolean {
 }
 
 /**
- * The switch is sized in logical units, not with a translate offset:
- *  • the knob is pinned with `start`/`end`, so it slides the right way in both
- *    RTL and LTR. A `translate-x-*` knob starts on the right in Arabic and ends
- *    up outside the track.
+ * A conventional pill toggle: opaque track, solid white knob inset by 2px on
+ * every side, knob shadow for depth. Track and knob are the Radix/shadcn
+ * dimensions (36x20 / 44x24) so it matches the toggle the rest of the web uses.
+ *
+ * Two traps this shape is built around:
  *  • `min-h-0` beats the global `button { min-height: 44px }` rule in
- *    globals.css, which would otherwise stretch the pill to a 44px circle.
+ *    globals.css, which would otherwise stretch the pill into a 44px circle.
+ *  • The knob sits at `start-0.5` and slides with a *direction-aware*
+ *    translate: in RTL the track is mirrored, so a plain `translate-x-*` would
+ *    push the knob out through the wrong end. The `rtl:` variants flip the
+ *    sign rather than the property, so one knob works in both directions.
  */
 function Switch({
   checked,
@@ -80,12 +85,17 @@ function Switch({
   label: string;
   size?: "sm" | "md";
 }) {
+  // track width - 2*2px inset - knob diameter
+  const travel = size === "sm" ? 16 : 20;
   const track = size === "sm" ? "h-5 w-9" : "h-6 w-11";
   const knob = size === "sm" ? "size-4" : "size-5";
+  // Hit area growth is capped to stay clear of the neighbouring row: a taller
+  // pseudo-element than the row pitch makes switches steal each other's clicks.
+  const hit = size === "sm" ? "after:-inset-y-1" : "after:-inset-y-1.5";
 
   const tone = checked
     ? locked
-      ? "bg-emerald-500/70 dark:bg-emerald-500/50"
+      ? "bg-emerald-500/60 dark:bg-emerald-500/40"
       : "bg-emerald-500 hover:bg-emerald-600 focus-visible:ring-emerald-500"
     : disabled
       ? "bg-slate-200 dark:bg-slate-700"
@@ -99,16 +109,21 @@ function Switch({
       aria-label={label}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex ${track} min-h-0 shrink-0 items-center rounded-full
-        after:absolute after:inset-x-0 after:-inset-y-2.5 after:content-['']
-        transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2
-        dark:focus-visible:ring-offset-slate-950 ${disabled ? "cursor-not-allowed" : ""} ${tone}`}
+      className={`relative inline-flex ${track} ${hit} min-h-0 shrink-0 items-center rounded-full
+        after:absolute after:inset-x-0 after:content-['']
+        transition-colors duration-200 focus:outline-none focus-visible:ring-2
+        focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950
+        ${disabled ? "cursor-not-allowed" : "cursor-pointer"} ${tone}`}
     >
       <span
         aria-hidden
-        className={`absolute top-1/2 -translate-y-1/2 ${knob} rounded-full shadow-sm ring-0
-          transition-[inset] duration-200 ease-out
-          ${checked ? "end-0.5" : "start-0.5"}`}
+        style={{ "--knob-travel": `${travel}px` } as CSSProperties}
+        className={`pointer-events-none absolute start-0.5 top-1/2 -translate-y-1/2 ${knob}
+          rounded-full bg-white shadow-[0_1px_2px_0_rgb(0_0_0/0.3)]
+          transition-transform duration-200 ease-out
+          ${checked
+            ? "translate-x-0 rtl:-translate-x-[var(--knob-travel)]"
+            : "translate-x-[var(--knob-travel)] rtl:translate-x-0"}`}
       />
     </button>
   );
