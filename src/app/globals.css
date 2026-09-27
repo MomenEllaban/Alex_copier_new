@@ -5,6 +5,15 @@
   --foreground: #0f172a;
 }
 
+/* The roles screen follows the OS colour scheme; the page background has to
+   come with it or the shell shows a white band on overscroll. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #020617;
+    --foreground: #e2e8f0;
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -64,6 +73,14 @@ input[type="checkbox"],
 input[type="radio"],
 [role="button"]:not([aria-disabled="true"]) {
   min-height: 44px;
+}
+
+/* Switches draw themselves, so the 44px floor above would stretch the pill
+   into a 44px circle with the knob floating outside it. Written here, unlayered
+   like the rule it corrects, so it wins over the Tailwind utility of the same
+   name. The extra tap area comes from a pseudo-element instead of the box. */
+button[role="switch"] {
+  min-height: 0;
 }
 
 img,

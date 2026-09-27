@@ -43,13 +43,16 @@ const pageTitlePrefixes: [string, string][] = [
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { t } = useI18n();
+  const { t, dir } = useI18n();
 
   const prefixTitle = pageTitlePrefixes.find(([prefix]) => pathname.startsWith(prefix))?.[1];
   const titleKey = pageTitles[pathname] || prefixTitle || "dashboard.title";
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-50" dir="rtl">
+    <div
+      className="flex h-screen overflow-hidden bg-gray-50 dark:bg-slate-950"
+      dir={dir}
+    >
       <PermissionsProvider>
         <Sidebar />
         <div className="flex min-w-0 flex-1 flex-col min-h-0">

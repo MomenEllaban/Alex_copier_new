@@ -24,8 +24,11 @@ export default function RolesPage() {
     if (status === "authenticated" && !isAdmin) router.replace("/unauthorized");
   }, [status, isAdmin, router]);
 
-  if (status === "loading") return <PrinterLoader fullScreen label="" />;
-  if (!isAdmin) return null;
+  if (status === "loading" || !isAdmin) {
+    // A non-admin keeps the loader up until router.replace lands, so the screen
+    // never flashes empty on the way to /unauthorized.
+    return <PrinterLoader fullScreen label="" />;
+  }
 
   return <RolesPermissionsPage />;
 }

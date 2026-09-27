@@ -198,13 +198,24 @@ export default function Header({ title }: { title: string }) {
   }, [session?.user?.id]);
 
   return (
-    <header className="flex items-center justify-between gap-2 border-b border-gray-200 bg-white py-3 pr-16 pl-3 shadow-sm sm:py-4 sm:pl-6 lg:px-6">
-      <h2 className="truncate text-[length:var(--text-subtitle)] font-semibold text-gray-800">{title}</h2>
+    <header
+      className="flex items-center justify-between gap-2 border-b border-gray-200 bg-white py-3
+        pr-16 pl-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:py-4 sm:pl-6 lg:px-6"
+    >
+      <h2
+        className="truncate text-[length:var(--text-subtitle)] font-semibold text-gray-800
+          dark:text-slate-100"
+      >
+        {title}
+      </h2>
 
       <div className="flex items-center gap-1 sm:gap-3 shrink-0">
         <button
           onClick={() => setLocale(locale === "ar" ? "en" : "ar")}
-          className="flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 sm:px-3"
+          aria-label={locale === "ar" ? "Switch to English" : "التبديل إلى العربية"}
+          className="flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-sm font-medium
+            text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900
+            dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white sm:px-3"
         >
           <Globe size={16} />
           {locale === "ar" ? "EN" : "AR"}
@@ -214,7 +225,9 @@ export default function Header({ title }: { title: string }) {
           <button
             aria-label={t("notifications.title")}
             onClick={() => setNotificationOpen((value) => !value)}
-            className="relative flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+            className="relative flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2
+            text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700
+            dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200"
           >
             <Bell size={20} />
             {unreadCount > 0 && (
@@ -225,9 +238,16 @@ export default function Header({ title }: { title: string }) {
           </button>
 
           {notificationOpen && (
-            <div className="fixed inset-x-2 top-16 z-50 rounded-xl border border-gray-200 bg-white py-2 shadow-xl sm:absolute sm:inset-x-auto sm:left-0 sm:top-full sm:mt-2 sm:w-96">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                <span className="text-sm font-semibold text-gray-800">
+            <div
+              className="fixed inset-x-2 top-16 z-50 rounded-xl border border-gray-200 bg-white py-2
+                shadow-xl dark:border-slate-700 dark:bg-slate-900 sm:absolute sm:inset-x-auto
+                sm:left-0 sm:top-full sm:mt-2 sm:w-96"
+            >
+              <div
+                className="flex items-center justify-between px-4 py-3 border-b border-gray-100
+                  dark:border-slate-800"
+              >
+                <span className="text-sm font-semibold text-gray-800 dark:text-slate-100">
                   {t("notifications.title")}
                   {unreadCount > 0 && (
                     <span className="ms-2 text-xs font-normal text-red-500">{unreadCount}</span>
@@ -270,17 +290,32 @@ export default function Header({ title }: { title: string }) {
                           router.push(notification.actionUrl);
                         }
                       }}
-                      className={`w-full text-start px-4 py-3 border-b border-gray-100 transition-colors hover:bg-gray-50 ${
-                        notification.isRead ? "bg-white" : "bg-blue-50/60"
-                      }`}
+                      className={`w-full text-start px-4 py-3 border-b border-gray-100
+                        transition-colors hover:bg-gray-50 dark:border-slate-800 dark:hover:bg-slate-800 ${
+                          notification.isRead
+                            ? "bg-white dark:bg-slate-900"
+                            : "bg-blue-50/60 dark:bg-blue-950/40"
+                        }`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold text-gray-800 inline-flex items-center gap-2">
-                            {!notification.isRead && <span className="w-1.5 h-1.5 bg-blue-500 rounded-full shrink-0" aria-hidden />}
+                          <p
+                            className="text-sm font-semibold text-gray-800 inline-flex items-center
+                              gap-2 dark:text-slate-100"
+                          >
+                            {!notification.isRead && (
+                              <span
+                                className="w-1.5 h-1.5 bg-blue-500 rounded-full shrink-0"
+                                aria-hidden
+                              />
+                            )}
                             {notification.title}
                           </p>
-                          <p className="mt-1 text-sm text-gray-600">{notification.message}</p>
+                          <p
+                            className="mt-1 text-sm text-gray-600 dark:text-slate-300"
+                          >
+                            {notification.message}
+                          </p>
                         </div>
                         {notification.priority && notification.priority !== "NORMAL" && (
                           <span className={`text-[10px] uppercase font-bold px-2 py-0.5 rounded-full whitespace-nowrap ${
@@ -309,7 +344,9 @@ export default function Header({ title }: { title: string }) {
               <Link
                 href="/notifications"
                 onClick={() => setNotificationOpen(false)}
-                className="block px-4 py-3 text-sm text-center text-blue-600 hover:text-blue-700 hover:bg-blue-50/50 border-t border-gray-100 font-medium"
+                className="block px-4 py-3 text-sm text-center text-blue-600 hover:text-blue-700
+                  hover:bg-blue-50/50 border-t border-gray-100 font-medium
+                  dark:text-blue-400 dark:hover:bg-slate-800/50 dark:border-slate-800"
               >
                 {t("notifications.viewAll")}
               </Link>
@@ -320,23 +357,34 @@ export default function Header({ title }: { title: string }) {
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setDropdownOpen(!dropdownOpen)}
-            className="flex min-h-11 items-center gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-gray-100 sm:px-3"
+            className="flex min-h-11 items-center gap-2 rounded-lg px-2 py-2 transition-colors
+              hover:bg-gray-100 dark:hover:bg-slate-800 sm:px-3"
           >
             <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center">
               <User size={16} className="text-white" />
             </div>
             <div className="text-start min-w-0">
-              <p className="text-sm font-medium text-gray-700 leading-tight truncate max-w-[100px] sm:max-w-none">{userName}</p>
-              {roleLabel && <p className="text-xs text-gray-400 leading-tight">{roleLabel}</p>}
+              <p
+                className="text-sm font-medium text-gray-700 leading-tight truncate max-w-[100px]
+                  sm:max-w-none dark:text-slate-200"
+              >
+                {userName}
+              </p>
+              {roleLabel && (
+                <p className="text-xs text-gray-400 leading-tight dark:text-slate-500">{roleLabel}</p>
+              )}
             </div>
             <ChevronDown size={16} className={`text-gray-400 transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
           </button>
 
           {dropdownOpen && (
-            <div className="absolute left-0 top-full z-50 mt-2 w-[min(14rem,calc(100vw-1rem))] rounded-xl border border-gray-200 bg-white py-2 shadow-lg">
-              <div className="px-4 py-3 border-b border-gray-100">
-                <p className="text-sm font-medium text-gray-800">{userName}</p>
-                {roleLabel && <p className="text-xs text-gray-500 mt-0.5">{roleLabel}</p>}
+            <div
+              className="absolute left-0 top-full z-50 mt-2 w-[min(14rem,calc(100vw-1rem))] rounded-xl
+                border border-gray-200 bg-white py-2 shadow-lg dark:border-slate-700 dark:bg-slate-900"
+            >
+              <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-800">
+                <p className="text-sm font-medium text-gray-800 dark:text-slate-100">{userName}</p>
+                {roleLabel && <p className="text-xs text-gray-500 mt-0.5 dark:text-slate-400">{roleLabel}</p>}
               </div>
               <button
                 onClick={() => signOut({ callbackUrl: "/login" })}

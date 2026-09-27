@@ -1,7 +1,15 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronDown, Minus, Search, X } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  Lock,
+  Minus,
+  Search,
+  ShieldCheck,
+  X,
+} from "lucide-react";
 import { useI18n } from "@/i18n/context";
 import { GROUP_LABELS, pageIcon } from "@/components/roles/page-icons";
 import { ACTION_LABELS, type ActionKey } from "@/lib/rbac-catalog";
@@ -48,22 +56,40 @@ function isViewOnly(page: MatrixPage, state: MatrixState): boolean {
   );
 }
 
+/**
+ * The switch is sized in logical units, not with a translate offset:
+ *  • the knob is pinned with `start`/`end`, so it slides the right way in both
+ *    RTL and LTR. A `translate-x-*` knob starts on the right in Arabic and ends
+ *    up outside the track.
+ *  • `min-h-0` beats the global `button { min-height: 44px }` rule in
+ *    globals.css, which would otherwise stretch the pill to a 44px circle.
+ */
 function Switch({
   checked,
   disabled,
+  locked,
   onChange,
   label,
   size = "md",
 }: {
   checked: boolean;
   disabled?: boolean;
+  /** On, but held by a protected system role: shown, not clickable. */
+  locked?: boolean;
   onChange: (next: boolean) => void;
   label: string;
   size?: "sm" | "md";
 }) {
   const track = size === "sm" ? "h-5 w-9" : "h-6 w-11";
-  const knob = size === "sm" ? "h-4 w-4" : "h-5 w-5";
-  const shift = size === "sm" ? "translate-x-4" : "translate-x-5";
+  const knob = size === "sm" ? "size-4" : "size-5";
+
+  const tone = checked
+    ? locked
+      ? "bg-emerald-500/70 dark:bg-emerald-500/50"
+      : "bg-emerald-500 hover:bg-emerald-600 focus-visible:ring-emerald-500"
+    : disabled
+      ? "bg-slate-200 dark:bg-slate-700"
+      : "bg-slate-300 hover:bg-slate-400 dark:bg-slate-600 dark:hover:bg-slate-500";
 
   return (
     <button
@@ -73,18 +99,16 @@ function Switch({
       aria-label={label}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex ${track} shrink-0 items-center rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 ${
-        disabled
-          ? "cursor-not-allowed bg-slate-200"
-          : checked
-            ? "bg-emerald-500 hover:bg-emerald-600"
-            : "bg-slate-300 hover:bg-slate-400"
-      }`}
+      className={`relative inline-flex ${track} min-h-0 shrink-0 items-center rounded-full
+        after:absolute after:inset-x-0 after:-inset-y-2.5 after:content-['']
+        transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2
+        dark:focus-visible:ring-offset-slate-950 ${disabled ? "cursor-not-allowed" : ""} ${tone}`}
     >
       <span
-        className={`inline-block ${knob} transform rounded-full bg-white shadow transition-transform ${
-          checked ? shift : "translate-x-0.5"
-        }`}
+        aria-hidden
+        className={`absolute top-1/2 -translate-y-1/2 ${knob} rounded-full shadow-sm ring-0
+          transition-[inset] duration-200 ease-out
+          ${checked ? "end-0.5" : "start-0.5"}`}
       />
     </button>
   );
@@ -168,29 +192,43 @@ export default function PermissionsMatrix({
   };
 
   const enabledCount = pages.filter((p) => state.pages[p.key]).length;
+  const allowedActionCount = pages.reduce(
+    (sum, p) =>
+      sum + p.actions.filter((a) => state.actions[`${p.key}:${a.key}`] === true).length,
+    0
+  );
+  const totalActionCount = pages.reduce((sum, p) => sum + p.actions.length, 0);
 
   return (
     <div className="space-y-4">
       {/* Toolbar */}
-      <div className="sticky top-0 z-20 -mx-1 space-y-3 rounded-xl border border-slate-200 bg-white/95 p-3 shadow-sm backdrop-blur">
+      <div
+        className="sticky top-0 z-20 rounded-xl border border-slate-200 bg-white/95 p-3 shadow-sm
+          backdrop-blur dark:border-slate-800 dark:bg-slate-900/95"
+      >
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="relative flex-1">
             <Search
               size={16}
-              className="pointer-events-none absolute top-1/2 start-3 -translate-y-1/2 text-slate-400"
+              className="pointer-events-none absolute top-1/2 start-3 -translate-y-1/2 text-slate-400 dark:text-slate-500"
             />
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={t("roles.searchPlaceholder")}
-              className="w-full rounded-lg border border-slate-300 py-2 pe-9 ps-9 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              aria-label={t("roles.searchPlaceholder")}
+              className="w-full rounded-lg border border-slate-300 bg-white py-2 pe-9 ps-9 text-sm text-slate-900
+                outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100
+                dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:focus:border-blue-500 dark:focus:ring-blue-950"
             />
             {query && (
               <button
                 type="button"
                 onClick={() => setQuery("")}
-                aria-label="clear"
-                className="absolute top-1/2 end-2 -translate-y-1/2 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                aria-label={t("roles.clearSearch")}
+                className="absolute top-1/2 end-2 flex h-6 w-6 -translate-y-1/2 items-center justify-center
+                  rounded text-slate-400 transition hover:bg-slate-100 hover:text-slate-600
+                  dark:hover:bg-slate-800 dark:hover:text-slate-200"
               >
                 <X size={14} />
               </button>
@@ -202,7 +240,10 @@ export default function PermissionsMatrix({
               type="button"
               disabled={readOnly}
               onClick={() => setEverything(true)}
-              className="flex-1 whitespace-nowrap rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
+              className="flex-1 whitespace-nowrap rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2
+                text-sm font-medium text-emerald-700 transition hover:bg-emerald-100
+                disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-800
+                dark:bg-emerald-950 dark:text-emerald-300 dark:hover:bg-emerald-900 sm:flex-none"
             >
               {t("roles.enableAll")}
             </button>
@@ -210,21 +251,37 @@ export default function PermissionsMatrix({
               type="button"
               disabled={readOnly}
               onClick={() => setEverything(false)}
-              className="flex-1 whitespace-nowrap rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
+              className="flex-1 whitespace-nowrap rounded-lg border border-slate-300 bg-slate-50 px-3 py-2
+                text-sm font-medium text-slate-700 transition hover:bg-slate-100
+                disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-700
+                dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 sm:flex-none"
             >
               {t("roles.disableAll")}
             </button>
           </div>
         </div>
 
-        <p className="text-xs text-slate-500">
-          {enabledCount} / {pages.length} {t("roles.pageCount")}
-        </p>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-2 text-xs text-slate-500 dark:text-slate-400">
+          <span>
+            <span className="font-semibold text-emerald-600 dark:text-emerald-400">{enabledCount}</span>
+            <span> / {pages.length} {t("roles.pageCount")}</span>
+          </span>
+          <span aria-hidden className="h-3 w-px bg-slate-300 dark:bg-slate-700" />
+          <span>
+            <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+              {allowedActionCount}
+            </span>
+            <span> / {totalActionCount} {t("roles.actionCount")}</span>
+          </span>
+        </div>
       </div>
 
       {/* Tree */}
       {grouped.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
+        <p
+          className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500
+            dark:border-slate-700 dark:text-slate-400"
+        >
           {t("roles.searchNoResults")}
         </p>
       ) : (
@@ -233,7 +290,10 @@ export default function PermissionsMatrix({
             const label = GROUP_LABELS[group] ?? GROUP_LABELS[""];
             return (
               <section key={group || "other"}>
-                <h3 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <h3
+                  className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-slate-500
+                    dark:text-slate-400"
+                >
                   {label[locale] ?? label.ar}
                 </h3>
                 <ul className="space-y-2">
@@ -248,12 +308,25 @@ export default function PermissionsMatrix({
                     return (
                       <li
                         key={page.key}
-                        className={`overflow-hidden rounded-xl border transition-colors ${
-                          canView ? "border-slate-200 bg-white" : "border-slate-200 bg-slate-50"
+                        className={`relative overflow-hidden rounded-xl border transition-colors ${
+                          canView
+                            ? "border-emerald-300 bg-white dark:border-emerald-800 dark:bg-slate-900"
+                            : "border-slate-200 bg-slate-50 dark:border-slate-800 dark:bg-slate-900/40"
                         }`}
                       >
+                        {/* Open pages carry a colour bar down the start edge;
+                            closed ones stay flat grey. */}
+                        <span
+                          aria-hidden
+                          className={`absolute inset-y-0 start-0 w-1 transition-colors ${
+                            canView
+                              ? "bg-emerald-500"
+                              : "bg-slate-300 dark:bg-slate-700"
+                          }`}
+                        />
+
                         {/* Page row */}
-                        <div className="flex items-center gap-2 p-3">
+                        <div className="flex items-center gap-2 ps-4 pe-3 py-2.5">
                           <button
                             type="button"
                             onClick={() => setOpen((prev) => ({ ...prev, [page.key]: !isOpen }))}
@@ -263,26 +336,57 @@ export default function PermissionsMatrix({
                           >
                             <ChevronDown
                               size={16}
-                              className={`shrink-0 text-slate-400 transition-transform ${
-                                isOpen ? "" : "-rotate-90"
+                              className={`shrink-0 text-slate-400 transition-transform dark:text-slate-500 ${
+                                isOpen ? "" : "ltr:-rotate-90 rtl:rotate-90"
                               }`}
                             />
                             <span
-                              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-                                canView ? "bg-emerald-50 text-emerald-600" : "bg-slate-200 text-slate-500"
+                              className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${
+                                canView
+                                  ? "bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400"
+                                  : "bg-slate-200 text-slate-500 dark:bg-slate-700 dark:text-slate-400"
                               }`}
                             >
                               <Icon size={17} />
                             </span>
                             <span className="min-w-0 flex-1">
-                              <span
-                                className={`block truncate text-sm font-medium ${
-                                  canView ? "text-slate-900" : "text-slate-500"
-                                }`}
-                              >
-                                {page.name}
+                              <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                <span
+                                  className={`truncate text-sm font-medium ${
+                                    canView
+                                      ? "text-slate-900 dark:text-slate-50"
+                                      : "text-slate-500 dark:text-slate-400"
+                                  }`}
+                                >
+                                  {page.name}
+                                </span>
+                                {canView ? (
+                                  <span
+                                    className="rounded-full bg-emerald-100 px-1.5 py-px text-[10px]
+                                      font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                                  >
+                                    {t("roles.enabled")}
+                                  </span>
+                                ) : (
+                                  <span
+                                    className="rounded-full bg-slate-200 px-1.5 py-px text-[10px]
+                                      font-semibold text-slate-500 dark:bg-slate-700 dark:text-slate-300"
+                                  >
+                                    {t("roles.disabled")}
+                                  </span>
+                                )}
+                                {readOnly && canView && (
+                                  <span
+                                    className="inline-flex items-center gap-0.5 rounded-full bg-blue-100
+                                      px-1.5 py-px text-[10px] font-semibold text-blue-700
+                                      dark:bg-blue-950 dark:text-blue-300"
+                                  >
+                                    <Lock size={9} />
+                                    {t("roles.locked")}
+                                  </span>
+                                )}
                               </span>
-                              <span className="block truncate text-xs text-slate-400">
+                              <span className="block truncate text-xs text-slate-400 dark:text-slate-500">
                                 {canView
                                   ? `${allowedActions}/${page.actions.length} ${t("roles.actionCount")}`
                                   : page.key}
@@ -290,19 +394,26 @@ export default function PermissionsMatrix({
                             </span>
                           </button>
 
-                          <button
-                            type="button"
-                            disabled={readOnly}
-                            onClick={() => setPageAll(page, !canView)}
-                            title={canView ? t("roles.disablePage") : t("roles.enablePage")}
-                            className="hidden shrink-0 rounded-lg border border-slate-300 px-2 py-1 text-xs text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 sm:block"
-                          >
-                            {canView ? t("roles.disablePage") : t("roles.enablePage")}
-                          </button>
+                          {!readOnly && (
+                            <button
+                              type="button"
+                              onClick={() => setPageAll(page, !canView)}
+                              title={canView ? t("roles.disablePage") : t("roles.enablePage")}
+                              className={`hidden min-h-0 shrink-0 rounded-lg border px-2 py-1.5 text-xs
+                                transition sm:block ${
+                                  canView
+                                    ? "border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950"
+                                    : "border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
+                                }`}
+                            >
+                              {canView ? t("roles.disablePage") : t("roles.enablePage")}
+                            </button>
+                          )}
 
                           <Switch
                             checked={canView}
                             disabled={readOnly}
+                            locked={readOnly}
                             onChange={(next) => setPage(page, next)}
                             label={page.name}
                           />
@@ -310,7 +421,7 @@ export default function PermissionsMatrix({
 
                         {/* Actions */}
                         {isOpen && page.actions.length > 0 && (
-                          <div className="border-t border-slate-100 bg-slate-50/60 px-3 py-2">
+                          <div className="border-t border-slate-100 bg-slate-50/60 px-3 py-2 dark:border-slate-800 dark:bg-slate-950/40">
                             <ul className="grid grid-cols-1 gap-1 sm:grid-cols-2 lg:grid-cols-3">
                               {page.actions.map((action) => {
                                 const ref = `${page.key}:${action.key}`;
@@ -318,16 +429,35 @@ export default function PermissionsMatrix({
                                 return (
                                   <li
                                     key={action.id}
-                                    className={`flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 ${
-                                      canView ? "" : "opacity-45"
-                                    }`}
-                                  >
-                                    <span
-                                      className={`truncate text-xs ${
-                                        allowed ? "font-medium text-slate-700" : "text-slate-400"
+                                    className={`flex items-center justify-between gap-2 rounded-lg
+                                      px-2 py-1.5 ${
+                                        canView
+                                          ? ""
+                                          : "opacity-50"
                                       }`}
-                                    >
-                                      {ACTION_LABELS[locale][action.key as ActionKey] ?? action.key}
+                                  >
+                                    <span className="flex min-w-0 items-center gap-1.5">
+                                      {allowed ? (
+                                        <Check
+                                          size={12}
+                                          className="shrink-0 text-emerald-600 dark:text-emerald-400"
+                                        />
+                                      ) : (
+                                        <X
+                                          size={12}
+                                          className="shrink-0 text-slate-300 dark:text-slate-600"
+                                        />
+                                      )}
+                                      <span
+                                        className={`truncate text-xs ${
+                                          allowed
+                                            ? "font-medium text-slate-700 dark:text-slate-200"
+                                            : "text-slate-400 dark:text-slate-500"
+                                        }`}
+                                      >
+                                        {ACTION_LABELS[locale][action.key as ActionKey] ??
+                                          action.key}
+                                      </span>
                                     </span>
                                     <Switch
                                       size="sm"
@@ -335,6 +465,7 @@ export default function PermissionsMatrix({
                                       // An action on a hidden page has no meaning,
                                       // so it cannot be switched on.
                                       disabled={readOnly || !canView}
+                                      locked={readOnly && canView}
                                       onChange={(next) => setAction(page, action, next)}
                                       label={`${page.name} — ${action.key}`}
                                     />
@@ -344,7 +475,10 @@ export default function PermissionsMatrix({
                             </ul>
 
                             {canView && isViewOnly(page, state) && (
-                              <p className="mt-2 flex items-center gap-1 px-2 text-[11px] text-amber-700">
+                              <p
+                                className="mt-2 flex items-center gap-1 px-2 text-[11px] text-amber-700
+                                  dark:text-amber-400"
+                              >
                                 <Minus size={11} />
                                 {t("roles.viewOnlyNotice")}
                               </p>
@@ -359,6 +493,16 @@ export default function PermissionsMatrix({
             );
           })}
         </div>
+      )}
+
+      {readOnly && (
+        <p
+          className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm
+            text-blue-800 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-200"
+        >
+          <ShieldCheck size={16} className="mt-0.5 shrink-0" />
+          {t("roles.systemRoleHint")}
+        </p>
       )}
     </div>
   );

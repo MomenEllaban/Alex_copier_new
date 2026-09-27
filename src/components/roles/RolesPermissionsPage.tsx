@@ -11,12 +11,22 @@ import PermissionsMatrix, {
   type MatrixState,
 } from "@/components/roles/PermissionsMatrix";
 import { apiErrorMessage } from "@/lib/api-client";
+import PrinterLoader from "@/components/PrinterLoader";
 
 interface Diff {
   pagesOn: number;
   pagesOff: number;
   actionsOn: number;
   actionsOff: number;
+}
+
+/**
+ * The general manager is the only role the API protects, so it is also the one
+ * worth landing on last: opening the screen should show an editable matrix, not
+ * a screen of switches that refuse to move.
+ */
+function preferredRole(roles: RoleRow[]): string | null {
+  return roles.find((r) => !r.isSystem)?.id ?? roles[0]?.id ?? null;
 }
 
 export default function RolesPermissionsPage() {
@@ -33,22 +43,31 @@ export default function RolesPermissionsPage() {
   const [saved, setSaved] = useState<MatrixState>({ pages: {}, actions: {} });
   const [draft, setDraft] = useState<MatrixState>({ pages: {}, actions: {} });
   const [loading, setLoading] = useState(true);
+  /** Which role's matrix is on screen, so the swap shows a loader. */
+  const [matrixFor, setMatrixFor] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState(false);
 
-  const loadRoles = useCallback(async () => {
-    const res = await fetch("/api/roles", { cache: "no-store" });
-    if (!res.ok) {
-      setLoadError(true);
-      return;
-    }
-    const data = (await res.json()) as RoleRow[];
+  const applyRoles = useCallback((data: RoleRow[]) => {
     setRoles(data);
     setSelectedId((current) =>
-      current && data.some((r) => r.id === current) ? current : data[0]?.id ?? null
+      current && data.some((r) => r.id === current) ? current : preferredRole(data)
     );
     setLoading(false);
   }, []);
+
+  const loadRoles = useCallback(async () => {
+    try {
+      const res = await fetch("/api/roles", { cache: "no-store" });
+      if (!res.ok) {
+        setLoadError(true);
+        return;
+      }
+      applyRoles((await res.json()) as RoleRow[]);
+    } catch {
+      setLoadError(true);
+    }
+  }, [applyRoles]);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,11 +78,7 @@ export default function RolesPermissionsPage() {
         return (await res.json()) as RoleRow[];
       })
       .then((data) => {
-        if (cancelled) return;
-        setRoles(data);
-        setSelectedId((current) =>
-          current && data.some((r) => r.id === current) ? current : data[0]?.id ?? null
-        );
+        if (!cancelled) applyRoles(data);
       })
       .catch(() => {
         if (!cancelled) setLoadError(true);
@@ -74,7 +89,7 @@ export default function RolesPermissionsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [applyRoles]);
 
   // Load the matrix whenever the selected role changes.
   useEffect(() => {
@@ -93,6 +108,7 @@ export default function RolesPermissionsPage() {
         setRoleMeta({ name: data.role.name, isSystem: data.role.isSystem });
         setSaved(initial);
         setDraft(initial);
+        setMatrixFor(selectedId);
       })
       .catch(() => {
         if (!cancelled) setLoadError(true);
@@ -102,6 +118,10 @@ export default function RolesPermissionsPage() {
       cancelled = true;
     };
   }, [selectedId]);
+
+  // Derived, not set inside the effect: a role swap shows the loader until the
+  // matrix on screen belongs to the role now selected.
+  const matrixLoading = Boolean(selectedId) && matrixFor !== selectedId;
 
   const diff = useMemo<Diff>(() => {
     let pagesOn = 0;
@@ -190,13 +210,16 @@ export default function RolesPermissionsPage() {
   };
 
   if (loading) {
-    return <p className="p-6 text-center text-sm text-slate-500">{t("roles.loading")}</p>;
+    return <PrinterLoader fullScreen label={t("roles.loading")} />;
   }
 
   if (loadError) {
     return (
       <div className="p-6">
-        <p className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <p
+          className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700
+            dark:border-red-900 dark:bg-red-950 dark:text-red-200"
+        >
           {t("roles.unauthorized")} — {t("roles.loadFailed")}
         </p>
       </div>
@@ -206,25 +229,46 @@ export default function RolesPermissionsPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-lg font-bold text-slate-900">{t("roles.title")}</h1>
+        <div>
+          <h1 className="text-lg font-bold text-slate-900 dark:text-slate-50">{t("roles.title")}</h1>
+          <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{t("roles.subtitle")}</p>
+        </div>
 
-        {selectedId && (
-          <select
-            value={selectedId}
-            onChange={(event) => setSelectedId(event.target.value)}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-          >
-            {roles.map((role) => (
-              <option key={role.id} value={role.id}>
-                {role.name} ({role.pageCount})
-              </option>
-            ))}
-          </select>
+        {roles.length > 0 && (
+          <div className="flex items-center gap-2">
+            <label
+              htmlFor="roles-role-picker"
+              className="text-sm text-slate-500 dark:text-slate-400"
+            >
+              {t("roles.roleLabel")}
+            </label>
+            <select
+              id="roles-role-picker"
+              value={selectedId ?? ""}
+              onChange={(event) => setSelectedId(event.target.value)}
+              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium
+                text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100
+                dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-blue-950"
+            >
+              {roles.map((role) => (
+                <option key={role.id} value={role.id}>
+                  {role.name} ({role.pageCount})
+                </option>
+              ))}
+            </select>
+          </div>
         )}
       </div>
 
-      {roles.length === 0 ? (
-        <RolesList roles={roles} onOpen={() => {}} onChanged={loadRoles} />
+      {matrixLoading ? (
+        <PrinterLoader label={t("roles.matrixLoading")} />
+      ) : roles.length === 0 || !selectedId ? (
+        <p
+          className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm
+            text-slate-500 dark:border-slate-700 dark:text-slate-400"
+        >
+          {t("roles.noPagesInRole")}
+        </p>
       ) : (
         <>
           <PermissionsMatrix
@@ -234,18 +278,15 @@ export default function RolesPermissionsPage() {
             readOnly={readOnly}
           />
 
-          {readOnly && (
-            <p className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800">
-              {t("roles.systemRoleHint")}
-            </p>
-          )}
-
           {/* Sticky save bar — the matrix is long enough that a save button at
               the top would scroll out of reach. */}
           {dirty && !readOnly && (
-            <div className="sticky bottom-0 z-30 -mx-1 mt-2 rounded-xl border border-amber-300 bg-amber-50/95 p-3 shadow-lg backdrop-blur">
+            <div
+              className="sticky bottom-0 z-30 mt-2 rounded-xl border border-amber-300 bg-amber-50/95
+                p-3 shadow-lg backdrop-blur dark:border-amber-700 dark:bg-amber-950/95"
+            >
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm font-medium text-amber-900">
+                <p className="text-sm font-medium text-amber-900 dark:text-amber-200">
                   {t("roles.unsavedChanges")} —{" "}
                   {t("roles.unsavedSummary")
                     .replace("{on}", String(diff.pagesOn + diff.actionsOn))
@@ -255,7 +296,9 @@ export default function RolesPermissionsPage() {
                   <button
                     type="button"
                     onClick={() => setDraft(saved)}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300
+                      bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50
+                      dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                   >
                     <Undo2 size={15} />
                     {t("roles.discard")}
@@ -264,7 +307,9 @@ export default function RolesPermissionsPage() {
                     type="button"
                     onClick={save}
                     disabled={saving}
-                    className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:opacity-50 sm:flex-none"
+                    className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg
+                      bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition
+                      hover:bg-emerald-700 disabled:opacity-50 sm:flex-none"
                   >
                     <Save size={15} />
                     {saving ? t("roles.saving") : t("roles.save")}
@@ -278,14 +323,15 @@ export default function RolesPermissionsPage() {
 
       {/* Role administration sits below the matrix so the most-used screen —
           adjusting permissions — stays at the top. */}
-      <details className="rounded-xl border border-slate-200 bg-white">
-        <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-slate-800">
-          <span className="inline-flex items-center gap-2">
-            <ArrowRight size={15} className="text-slate-400" />
-            {t("roles.addRole")}
-          </span>
+      <details className="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+        <summary
+          className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm
+            font-semibold text-slate-800 dark:text-slate-200"
+        >
+          <ArrowRight size={15} className="text-slate-400 dark:text-slate-500 rtl:rotate-180" />
+          {t("roles.manageRoles")}
         </summary>
-        <div className="border-t border-slate-100 p-4">
+        <div className="border-t border-slate-100 p-4 dark:border-slate-800">
           <RolesList roles={roles} onOpen={(role) => setSelectedId(role.id)} onChanged={loadRoles} />
         </div>
       </details>
