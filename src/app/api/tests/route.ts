@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
+import { ownEngineerId } from "@/lib/engineer-scope";
 
 /**
  * List every copier test with server-side search / filters / pagination.
@@ -46,9 +47,7 @@ export async function GET(request: Request) {
     const role = (user as { role?: string }).role;
     let myEngineerId: string | null = null;
     if (role === "ENGINEER") {
-      const userId = (user as { id?: string }).id ?? "";
-      const mine = await prisma.engineer.findUnique({ where: { userId }, select: { id: true } });
-      myEngineerId = mine?.id ?? "__none__";
+      myEngineerId = (await ownEngineerId((user as { id?: string }).id)) ?? "__none__";
     }
 
     const where: Record<string, unknown> = {};

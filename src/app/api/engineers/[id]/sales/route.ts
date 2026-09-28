@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireAnyPage } from "@/lib/auth-helpers";
+import { ownEngineerId } from "@/lib/engineer-scope";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -17,11 +18,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     // An engineer may read their own sales only; everyone else needs the
     // engineers/sales page.
     if ((user as { role?: string }).role === "ENGINEER") {
-      const mine = await prisma.engineer.findUnique({
-        where: { userId: (user as { id?: string }).id ?? "" },
-        select: { id: true },
-      });
-      if (!mine || mine.id !== id) {
+      const mine = await ownEngineerId((user as { id?: string }).id);
+      if (!mine || mine !== id) {
         return NextResponse.json({ error: "Forbidden", code: "FORBIDDEN" }, { status: 403 });
       }
     }

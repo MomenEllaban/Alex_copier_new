@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction, type ActionKey } from "@/lib/auth-helpers";
 import { notifySettlementPendingVerification } from "@/lib/notifications";
@@ -7,6 +7,7 @@ import {
   uploadCopierTestImage,
   validateCopierTestImage,
 } from "@/lib/copier-test-upload";
+import { ownEngineerId } from "@/lib/engineer-scope";
 
 const TEST_INCLUDE = {
   engineer: { select: { id: true, name: true } },
@@ -47,10 +48,7 @@ function actorId(actor: unknown): string {
  */
 async function engineerScopeCheck(actor: unknown, customerId: string) {
   if (actorRole(actor) !== "ENGINEER") return null;
-  const mine = await prisma.engineer.findUnique({
-    where: { userId: actorId(actor) },
-    select: { id: true },
-  });
+  const mine = await ownEngineerId(actorId(actor));
   if (!mine) {
     return NextResponse.json({ error: "حساب المهندس غير مرتبط", code: "ENGINEER_NOT_LINKED" }, { status: 403 });
   }
@@ -58,7 +56,7 @@ async function engineerScopeCheck(actor: unknown, customerId: string) {
     where: { id: customerId },
     select: { engineerId: true },
   });
-  if (!customer || customer.engineerId !== mine.id) {
+  if (!customer || customer.engineerId !== mine) {
     return NextResponse.json({ error: "هذا العميل غير مسند إليك", code: "CUSTOMER_NOT_ASSIGNED" }, { status: 403 });
   }
   return null;

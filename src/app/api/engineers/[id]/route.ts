@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
+import { denyUnlessSelfEngineer } from "@/lib/engineer-scope";
 
 export async function GET(
   request: Request,
@@ -16,6 +17,12 @@ export async function GET(
       );
     }
     const { id } = await params;
+    // An engineer may open only their own record. This response carries the
+    // engineer's customers, visits and settlement amounts, so without the check
+    // any engineer could read any other engineer's earnings.
+    const denied = await denyUnlessSelfEngineer(user, id);
+    if (denied) return denied;
+
     const engineer = await prisma.engineer.findUnique({
       where: { id },
       include: {

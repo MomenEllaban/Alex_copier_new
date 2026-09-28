@@ -37,9 +37,13 @@ export async function GET() {
           select: { id: true, name: true },
         })
       : null;
-
-    if (userRole === "ENGINEER" && engineer) {
-      const engineerId = engineer.id;
+    // Must be `userRole === "ENGINEER"` alone, not `&& engineer`: an engineer
+    // with no linked Engineer row used to fall through to the management branch
+    // below and receive every company, contract and finance figure. Every query
+    // in this branch filters on engineerId, so an unlinked engineer now gets
+    // zeroes via the "__none__" sentinel instead of the whole ERP.
+    if (userRole === "ENGINEER") {
+      const engineerId = engineer?.id ?? "__none__";
       const [myOpenRequests, myUrgentRequests, myVisits, myAssignedOpen, myRecentRequests] = await Promise.all([
         prisma.serviceRequest.count({ where: { engineerId, status: { in: openStatuses } } }),
         prisma.serviceRequest.count({ where: { engineerId, status: { in: openStatuses }, priority: { in: ["URGENT", "EMERGENCY"] } } }),
@@ -88,7 +92,7 @@ export async function GET() {
         engineerWorkload: buildEngineerWorkload(
           [{ engineerId, _count: { _all: myVisits } }],
           [{ engineerId, _count: { _all: myAssignedOpen[0]?._count._all ?? 0 } }],
-          [{ id: engineer.id, name: engineer.name }]
+          [{ id: engineer?.id ?? "__none__", name: engineer?.name ?? (user as { name?: string }).name ?? "—" }]
         ),
       };
 

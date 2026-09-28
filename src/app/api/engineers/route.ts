@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { hash } from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
+import { ownEngineerId } from "@/lib/engineer-scope";
 
 const OPEN_STATUSES = ["NEW", "ASSIGNED", "VISITED", "REASSIGNED"];
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -16,7 +17,18 @@ export async function GET() {
         { status: authed ? 403 : 401 }
       );
     }
+    // An engineer sees their own row only; the list leaks other engineers'
+    // customer counts and the login email behind each one.
+    const selfId =
+      (actor as { role?: string }).role === "ENGINEER"
+        ? await ownEngineerId((actor as { id?: string }).id)
+        : null;
+    if ((actor as { role?: string }).role === "ENGINEER" && !selfId) {
+      return NextResponse.json({ engineers: [] });
+    }
+
     const engineers = await prisma.engineer.findMany({
+      where: selfId ? { id: selfId } : undefined,
       include: {
         areas: true,
         skills: true,

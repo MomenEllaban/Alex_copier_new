@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
 import { generateStatementToken } from "@/lib/statement-token";
+import { engineerCustomerScope } from "@/lib/engineer-scope";
 
 export async function GET() {
   try {
@@ -17,9 +18,7 @@ export async function GET() {
     let engineerFilter: { engineerId: string } | undefined;
     const role = (user as { role?: string }).role;
     if (role === "ENGINEER") {
-      const userId = (user as { id?: string }).id ?? "";
-      const mine = await prisma.engineer.findUnique({ where: { userId }, select: { id: true } });
-      engineerFilter = { engineerId: mine?.id ?? "__none__" };
+      engineerFilter = await engineerCustomerScope(user);
     }
     const customers = await prisma.customer.findMany({
       where: engineerFilter,

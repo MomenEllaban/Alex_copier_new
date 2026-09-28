@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
 import { notifyServiceRequestCreated } from "@/lib/notifications";
 import { traceError } from "@/lib/prisma-errors";
+import { engineerRequestScope } from "@/lib/engineer-scope";
 
 export async function GET() {
   try {
@@ -18,12 +19,9 @@ export async function GET() {
     const role = (user as { role?: string }).role;
     // Engineers see only requests assigned to them (documented role scope).
     if (role === "ENGINEER") {
-      const engineer = await prisma.engineer.findUnique({
-        where: { userId: user.id },
-        select: { id: true },
-      });
+      const requestScope = await engineerRequestScope(user);
       const serviceRequests = await prisma.serviceRequest.findMany({
-        where: { engineerId: engineer?.id ?? "__none__" },
+        where: requestScope,
         include: {
           customer: true,
           location: true,

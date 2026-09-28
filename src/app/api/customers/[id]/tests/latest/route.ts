@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
+import { ownEngineerId } from "@/lib/engineer-scope";
 
 export async function GET(
   _request: Request,
@@ -28,9 +29,8 @@ export async function GET(
     // Engineers may only read tests of their assigned customers.
     const role = (user as { role?: string }).role;
     if (role === "ENGINEER") {
-      const userId = (user as { id?: string }).id ?? "";
-      const mine = await prisma.engineer.findUnique({ where: { userId }, select: { id: true } });
-      if (!mine || customer.engineerId !== mine.id) {
+      const mine = await ownEngineerId((user as { id?: string }).id);
+      if (!mine || customer.engineerId !== mine) {
         return NextResponse.json({ error: "هذا العميل غير مسند إليك", code: "CUSTOMER_NOT_ASSIGNED" }, { status: 403 });
       }
     }

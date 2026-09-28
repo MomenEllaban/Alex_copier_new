@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
 import { notifyServiceRequestAssigned, notifyServiceRequestStatusChanged } from "@/lib/notifications";
 import { traceError } from "@/lib/prisma-errors";
+import { ownEngineerId } from "@/lib/engineer-scope";
 
 async function getScopedRequest(id: string, user: { id: string; role?: string }) {
   const serviceRequest = await prisma.serviceRequest.findUnique({
@@ -23,8 +24,8 @@ async function getScopedRequest(id: string, user: { id: string; role?: string })
   if (!serviceRequest) return { notFound: true as const };
   // Engineers may only access requests assigned to them.
   if (user.role === "ENGINEER") {
-    const engineer = await prisma.engineer.findUnique({ where: { userId: user.id }, select: { id: true } });
-    if (serviceRequest.engineerId !== engineer?.id) return { forbidden: true as const };
+    const engineer = await ownEngineerId(user.id);
+    if (serviceRequest.engineerId !== engineer) return { forbidden: true as const };
   }
   return { serviceRequest };
 }
@@ -80,8 +81,8 @@ export async function PUT(
 
     // Engineers can only progress their own assigned requests through visit statuses.
     if (actorRole === "ENGINEER") {
-      const engineer = await prisma.engineer.findUnique({ where: { userId: actor.id }, select: { id: true } });
-      if (existing.engineerId !== engineer?.id) {
+      const engineer = await ownEngineerId(actor.id);
+      if (existing.engineerId !== engineer) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
       const allowedStatuses = ["VISITED", "RESOLVED", "NOT_RESOLVED"];

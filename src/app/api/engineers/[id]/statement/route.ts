@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireAnyPage } from "@/lib/auth-helpers";
 import { buildEngineerStatement } from "@/lib/engineer-statement";
+import { ownEngineerId } from "@/lib/engineer-scope";
 
 export async function GET(
   _request: Request,
@@ -22,11 +23,8 @@ export async function GET(
     // engineers/sales page. Without this, any engineer could read any other
     // engineer's earnings.
     if ((user as { role?: string }).role === "ENGINEER") {
-      const mine = await prisma.engineer.findUnique({
-        where: { userId: (user as { id?: string }).id ?? "" },
-        select: { id: true },
-      });
-      if (!mine || mine.id !== id) {
+      const mine = await ownEngineerId((user as { id?: string }).id);
+      if (!mine || mine !== id) {
         return NextResponse.json({ error: "Forbidden", code: "FORBIDDEN" }, { status: 403 });
       }
     }

@@ -1,23 +1,47 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction, type ActionKey } from "@/lib/auth-helpers";
+import { ownEngineerId } from "@/lib/engineer-scope";
 
 /**
  * PUT and DELETE share this check, so the action is passed in rather than
  * hard-coded — otherwise one of the two verbs would guard on the wrong
  * permission.
+ *
+ * An ENGINEER may only touch their own customers. GET already enforced that;
+ * without repeating it here the page-level `customers:edit` / `customers:delete`
+ * permission alone would let any engineer rewrite or remove any other
+ * engineer's customer.
  */
-async function guardMutations(action: ActionKey) {
+async function guardMutations(action: ActionKey, customerId: string) {
   const actor = await requireAction("customers", action);
-  if (actor) return { actor };
-  const authed = await requireAuth();
-  return {
-    actor: null,
-    response: NextResponse.json(
-      { error: authed ? "Forbidden" : "Unauthorized", code: authed ? "FORBIDDEN" : "UNAUTHORIZED" },
-      { status: authed ? 403 : 401 },
-    ),
-  };
+  if (!actor) {
+    const authed = await requireAuth();
+    return {
+      actor: null,
+      response: NextResponse.json(
+        { error: authed ? "Forbidden" : "Unauthorized", code: authed ? "FORBIDDEN" : "UNAUTHORIZED" },
+        { status: authed ? 403 : 401 },
+      ),
+    };
+  }
+  if ((actor as { role?: string }).role === "ENGINEER") {
+      const mine = await ownEngineerId((actor as { id?: string }).id);
+    const customer = await prisma.customer.findUnique({
+      where: { id: customerId },
+      select: { engineerId: true },
+    });
+    if (!mine || customer?.engineerId !== mine) {
+      return {
+        actor: null,
+        response: NextResponse.json(
+          { error: "هذا العميل غير مسند إليك", code: "CUSTOMER_NOT_ASSIGNED" },
+          { status: 403 },
+        ),
+      };
+    }
+  }
+  return { actor };
 }
 
 export async function GET(
@@ -73,9 +97,9 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { actor, response } = await guardMutations("edit");
-    if (!actor && response) return response;
     const { id } = await params;
+    const { actor, response } = await guardMutations("edit", id);
+    if (!actor && response) return response;
     const body = await request.json();
 
     if ("name" in body && (typeof body.name !== "string" || body.name.trim() === "")) {
@@ -108,7 +132,9 @@ export async function PUT(
     if (totalDebt !== undefined) updateData.totalDebt = Math.max(0, Number(totalDebt));
     if (remainingDebt !== undefined) updateData.remainingDebt = Math.max(0, Number(remainingDebt));
     if (notes !== undefined) updateData.notes = notes != null && String(notes).trim() !== "" ? String(notes).trim() : null;
-    if (engineerId !== undefined) {
+    // Reassigning is a management decision: an engineer editing their own
+    // customer could otherwise hand it (or take it) from another engineer.
+    if (engineerId !== undefined && (actor as { role?: string }).role !== "ENGINEER") {
       if (engineerId == null || String(engineerId).trim() === "") {
         updateData.engineerId = null;
       } else {
@@ -144,9 +170,9 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { actor, response } = await guardMutations("delete");
-    if (!actor && response) return response;
     const { id } = await params;
+    const { actor, response } = await guardMutations("delete", id);
+    if (!actor && response) return response;
 
     const [machinesCount, requestsCount, contractsCount, salesOrdersCount, settlementsCount] = await Promise.all([
       prisma.machine.count({ where: { currentOwnerId: id } }),
