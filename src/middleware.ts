@@ -24,10 +24,10 @@ export async function middleware(request: NextRequest) {
   }
 
   // لو مش مسجل دخول، رجعه لصفحة تسجيل الدخول
+  // ملاحظة: /api/* مستثنى من الـ matcher أدناه، فالـ middleware لا يحمي المسارات
+  // إطلاقًا. كل API route يحمي نفسه بـ requireAuth/requirePageAccess/requireAction،
+  // ويتحقق من ذلك في tests/api/route-auth-matrix.test.ts لكل method في كل route.
   if (!token) {
-    if (pathname.startsWith("/api/")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
