@@ -347,7 +347,7 @@ export default function PermissionsMatrix({
                             onClick={() => setOpen((prev) => ({ ...prev, [page.key]: !isOpen }))}
                             aria-expanded={isOpen}
                             aria-label={page.name}
-                            className="flex min-w-0 flex-1 items-center gap-3 rounded-lg p-1 text-start"
+                            className="flex min-w-0 shrink items-center gap-3 rounded-lg p-1 text-start"
                           >
                             <ChevronDown
                               size={16}
@@ -364,58 +364,66 @@ export default function PermissionsMatrix({
                             >
                               <Icon size={17} />
                             </span>
-                            <span className="min-w-0 flex-1">
-                              <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                                <span
-                                  className={`truncate text-sm font-medium ${
-                                    canView
-                                      ? "text-slate-900 dark:text-slate-50"
-                                      : "text-slate-500 dark:text-slate-400"
-                                  }`}
-                                >
-                                  {page.name}
-                                </span>
-                                {canView ? (
-                                  <span
-                                    className="rounded-full bg-emerald-100 px-1.5 py-px text-[10px]
-                                      font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
-                                  >
-                                    {t("roles.enabled")}
-                                  </span>
-                                ) : (
-                                  <span
-                                    className="rounded-full bg-slate-200 px-1.5 py-px text-[10px]
-                                      font-semibold text-slate-500 dark:bg-slate-700 dark:text-slate-300"
-                                  >
-                                    {t("roles.disabled")}
-                                  </span>
-                                )}
-                                {readOnly && canView && (
-                                  <span
-                                    className="inline-flex items-center gap-0.5 rounded-full bg-blue-100
-                                      px-1.5 py-px text-[10px] font-semibold text-blue-700
-                                      dark:bg-blue-950 dark:text-blue-300"
-                                  >
-                                    <Lock size={9} />
-                                    {t("roles.locked")}
-                                  </span>
-                                )}
-                              </span>
-                              <span className="block truncate text-xs text-slate-400 dark:text-slate-500">
-                                {canView
-                                  ? `${allowedActions}/${page.actions.length} ${t("roles.actionCount")}`
-                                  : page.key}
-                              </span>
+                            <span
+                              className={`min-w-0 truncate text-sm font-medium ${
+                                canView
+                                  ? "text-slate-900 dark:text-slate-50"
+                                  : "text-slate-500 dark:text-slate-400"
+                              }`}
+                            >
+                              {page.name}
                             </span>
                           </button>
+
+                          {canView ? (
+                            <span
+                              className="shrink-0 rounded-full bg-emerald-100 px-1.5 py-px text-[10px]
+                                font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300"
+                            >
+                              {t("roles.enabled")}
+                            </span>
+                          ) : (
+                            <span
+                              className="shrink-0 rounded-full bg-slate-200 px-1.5 py-px text-[10px]
+                                font-semibold text-slate-500 dark:bg-slate-700 dark:text-slate-300"
+                            >
+                              {t("roles.disabled")}
+                            </span>
+                          )}
+                          {readOnly && canView && (
+                            <span
+                              className="inline-flex shrink-0 items-center gap-0.5 rounded-full
+                                bg-blue-100 px-1.5 py-px text-[10px] font-semibold text-blue-700
+                                dark:bg-blue-950 dark:text-blue-300"
+                            >
+                              <Lock size={9} />
+                              {t("roles.locked")}
+                            </span>
+                          )}
+
+                          {/* The switch sits immediately after the label, not
+                              pushed to the far edge of the row. */}
+                          <Switch
+                            checked={canView}
+                            disabled={readOnly}
+                            locked={readOnly}
+                            onChange={(next) => setPage(page, next)}
+                            label={page.name}
+                          />
+
+                          <span className="shrink-0 text-xs text-slate-400 dark:text-slate-500">
+                            {canView
+                              ? `${allowedActions}/${page.actions.length} ${t("roles.actionCount")}`
+                              : page.key}
+                          </span>
 
                           {!readOnly && (
                             <button
                               type="button"
                               onClick={() => setPageAll(page, !canView)}
                               title={canView ? t("roles.disablePage") : t("roles.enablePage")}
-                              className={`hidden min-h-0 shrink-0 rounded-lg border px-2 py-1.5 text-xs
-                                transition sm:block ${
+                              className={`ms-auto hidden min-h-0 shrink-0 rounded-lg border px-2 py-1.5
+                                text-xs transition sm:block ${
                                   canView
                                     ? "border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-800 dark:text-emerald-300 dark:hover:bg-emerald-950"
                                     : "border-slate-300 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
@@ -424,14 +432,6 @@ export default function PermissionsMatrix({
                               {canView ? t("roles.disablePage") : t("roles.enablePage")}
                             </button>
                           )}
-
-                          <Switch
-                            checked={canView}
-                            disabled={readOnly}
-                            locked={readOnly}
-                            onChange={(next) => setPage(page, next)}
-                            label={page.name}
-                          />
                         </div>
 
                         {/* Actions */}
@@ -444,12 +444,9 @@ export default function PermissionsMatrix({
                                 return (
                                   <li
                                     key={action.id}
-                                    className={`flex items-center justify-between gap-2 rounded-lg
-                                      px-2 py-1.5 ${
-                                        canView
-                                          ? ""
-                                          : "opacity-50"
-                                      }`}
+                                    className={`flex items-center gap-2 rounded-lg px-2 py-1.5 ${
+                                      canView ? "" : "opacity-50"
+                                    }`}
                                   >
                                     <span className="flex min-w-0 items-center gap-1.5">
                                       {allowed ? (
@@ -474,6 +471,8 @@ export default function PermissionsMatrix({
                                           action.key}
                                       </span>
                                     </span>
+                                    {/* Hugs the action label instead of sitting
+                                        at the far edge of the grid cell. */}
                                     <Switch
                                       size="sm"
                                       checked={allowed}
