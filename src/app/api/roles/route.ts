@@ -44,7 +44,7 @@ export async function GET() {
     );
   } catch (error) {
     console.error("GET /api/roles failed", error);
-    return NextResponse.json({ error: "Failed to fetch roles" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to fetch roles", code: "FETCH_FAILED" }, { status: 500 });
   }
 }
 
@@ -59,14 +59,14 @@ export async function POST(request: Request) {
 
     if (!name) {
       return NextResponse.json(
-        { error: "اسم الدور مطلوب", code: "ROLE_NAME_REQUIRED" },
+        { error: "Role name is required", code: "ROLE_NAME_REQUIRED" },
         { status: 400 }
       );
     }
     if (!KEY_REGEX.test(key)) {
       return NextResponse.json(
         {
-          error: "مفتاح الدور لازم يكون حروف إنجليزية صغيرة وأرقام فقط، زي: sales_lead",
+          error: "Role key must be lowercase letters, digits and underscores",
           code: "ROLE_KEY_INVALID",
         },
         { status: 400 }
@@ -76,7 +76,7 @@ export async function POST(request: Request) {
     const existing = await prisma.role.findUnique({ where: { key } });
     if (existing) {
       return NextResponse.json(
-        { error: "يوجد دور بنفس المفتاح", code: "ROLE_KEY_TAKEN" },
+        { error: "Role key already taken", code: "ROLE_KEY_TAKEN" },
         { status: 409 }
       );
     }
@@ -120,6 +120,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ id: role.id, key: role.key, name: role.name }, { status: 201 });
   } catch (error) {
     console.error("POST /api/roles failed", error);
-    return NextResponse.json({ error: "Failed to create role" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to create role", code: "CREATE_FAILED" }, { status: 500 });
   }
 }

@@ -72,7 +72,7 @@ export async function GET(_request: Request, { params }: Params) {
     });
   } catch (error) {
     console.error("GET /api/roles/[id]/permissions failed", error);
-    return NextResponse.json({ error: "Failed to fetch permissions" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to fetch permissions", code: "FETCH_FAILED" }, { status: 500 });
   }
 }
 
@@ -98,7 +98,7 @@ export async function PUT(request: Request, { params }: Params) {
     }
     if (role.isSystem) {
       return NextResponse.json(
-        { error: "صلاحيات المدير العام كاملة ودايمًا ولا يمكن تعديلها", code: "SYSTEM_ROLE_PROTECTED" },
+        { error: "System role permissions are fixed", code: "SYSTEM_ROLE_PROTECTED" },
         { status: 403 }
       );
     }
@@ -109,7 +109,7 @@ export async function PUT(request: Request, { params }: Params) {
 
     if (!incomingPages || typeof incomingPages !== "object" || Array.isArray(incomingPages)) {
       return NextResponse.json(
-        { error: "الصفحات المرسلة غير صالحة", code: "PAGES_INVALID" },
+        { error: "Submitted page list is not an object", code: "PAGES_INVALID" },
         { status: 400 }
       );
     }
@@ -125,7 +125,7 @@ export async function PUT(request: Request, { params }: Params) {
     for (const key of Object.keys(incomingPages)) {
       if (!pageByKey.has(key)) {
         return NextResponse.json(
-          { error: `صفحة غير معروفة: ${key}`, code: "PAGE_UNKNOWN" },
+          { error: `Unknown page: ${key}`, code: "PAGE_UNKNOWN", name: key },
           { status: 400 }
         );
       }
@@ -140,13 +140,13 @@ export async function PUT(request: Request, { params }: Params) {
       const page = pageByKey.get(pageKey);
       if (!page) {
         return NextResponse.json(
-          { error: `صفحة غير معروفة: ${pageKey}`, code: "PAGE_UNKNOWN" },
+          { error: `Unknown page: ${pageKey}`, code: "PAGE_UNKNOWN", name: pageKey },
           { status: 400 }
         );
       }
       if (!actionKey || !isActionKey(actionKey)) {
         return NextResponse.json(
-          { error: `إجراء غير معروف: ${ref}`, code: "ACTION_UNKNOWN" },
+          { error: `Unknown action: ${ref}`, code: "ACTION_UNKNOWN", name: ref },
           { status: 400 }
         );
       }
@@ -275,6 +275,6 @@ export async function PUT(request: Request, { params }: Params) {
     return NextResponse.json({ ok: true, ...applied });
   } catch (error) {
     console.error("PUT /api/roles/[id]/permissions failed", error);
-    return NextResponse.json({ error: "Failed to save permissions" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to save permissions", code: "UPDATE_FAILED" }, { status: 500 });
   }
 }

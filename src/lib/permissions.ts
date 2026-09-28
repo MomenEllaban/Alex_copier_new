@@ -84,7 +84,7 @@ export const ROLE_PERMISSIONS: Record<Role, Page[]> = {
     "hrSelfService",
   ],
 
-  // مدير الورشة — الورشة والمخزون وengineers
+  // مدير الورشة — الورشة والمخزون والمهندسون
   WORKSHOP_MANAGER: [
     "dashboard", "workshop", "inventory", "warehouses", "products", "engineers", "machines", "workshopDaily",
     "copierTests",
@@ -134,6 +134,92 @@ export const ROLE_LABELS_AR: Record<Role, string> = {
   HR_MANAGER: "مدير الموارد البشرية",
   EMPLOYEE: "موظف",
 };
+
+/**
+ * `Role.name` in the database is the Arabic label above, so the roles screens
+ * showed Arabic role names to English users. This is the English side.
+ */
+export const ROLE_LABELS_EN: Record<Role, string> = {
+  GENERAL_MANAGER: "General Manager",
+  COMPANY_MANAGER: "Company Manager",
+  ACCOUNTANT: "Accountant",
+  MAINTENANCE_MANAGER: "Maintenance Manager",
+  WORKSHOP_MANAGER: "Workshop Manager",
+  ENGINEER: "Engineer",
+  SALES_EMPLOYEE: "Sales Employee",
+  HR_MANAGER: "HR Manager",
+  EMPLOYEE: "Employee",
+};
+
+export const ROLE_LABELS: Record<"ar" | "en", Record<Role, string>> = {
+  ar: ROLE_LABELS_AR,
+  en: ROLE_LABELS_EN,
+};
+
+/**
+ * Display name for a role, in the reader's language.
+ *
+ * Built-in roles come from the maps above. A role an admin created is not in
+ * them, so its own stored name is used — that is the name the admin typed.
+ */
+export function roleLabel(
+  roleKey: string,
+  locale: "ar" | "en",
+  storedName?: string | null,
+): string {
+  return ROLE_LABELS[locale][roleKey as Role] ?? storedName?.trim() ?? roleKey;
+}
+
+/**
+ * Same problem as the names, one level down: `Role.description` for the built-in
+ * roles is written in Arabic in the seed, so the English roles screen rendered
+ * Arabic paragraphs. The Arabic text is kept identical to the seed values so the
+ * two locales stay in step.
+ */
+export const ROLE_DESCRIPTIONS_AR: Record<Role, string> = {
+  GENERAL_MANAGER: "صلاحية كاملة على كل الصفحات والإجراءات. محمي ولا يمكن تعديله.",
+  COMPANY_MANAGER: "إدارة شاملة للشركة، بدون إعدادات النظام الحساسة.",
+  ACCOUNTANT: "المحاسبة والفواتير والتقارير المالية.",
+  MAINTENANCE_MANAGER: "إدارة الصيانة وطلبات الخدمة والمهندسين.",
+  WORKSHOP_MANAGER: "إدارة الورشة والمخزون والفنيين.",
+  ENGINEER: "متابعة مهامه وعملائه فقط.",
+  SALES_EMPLOYEE: "المبيعات والعملاء والعقود.",
+  HR_MANAGER: "إدارة الموارد البشرية.",
+  EMPLOYEE: "الخدمة الذاتية فقط.",
+};
+
+export const ROLE_DESCRIPTIONS_EN: Record<Role, string> = {
+  GENERAL_MANAGER:
+    "Full access to every page and action. Protected, and cannot be edited.",
+  COMPANY_MANAGER: "Company-wide management, without the sensitive system settings.",
+  ACCOUNTANT: "Accounting, invoicing and financial reports.",
+  MAINTENANCE_MANAGER: "Manages maintenance, service requests and engineers.",
+  WORKSHOP_MANAGER: "Manages the workshop, its stock and its technicians.",
+  ENGINEER: "Sees only their own tasks and their own customers.",
+  SALES_EMPLOYEE: "Sales, customers and contracts.",
+  HR_MANAGER: "Manages human resources.",
+  EMPLOYEE: "Self-service only.",
+};
+
+export const ROLE_DESCRIPTIONS: Record<"ar" | "en", Record<Role, string>> = {
+  ar: ROLE_DESCRIPTIONS_AR,
+  en: ROLE_DESCRIPTIONS_EN,
+};
+
+/**
+ * Display description for a role, in the reader's language. Custom roles have no
+ * entry here, so the text the admin typed is shown as-is.
+ */
+export function roleDescription(
+  roleKey: string,
+  locale: "ar" | "en",
+  storedDescription?: string | null,
+): string | null {
+  const known = ROLE_DESCRIPTIONS[locale][roleKey as Role];
+  if (known) return known;
+  const stored = storedDescription?.trim();
+  return stored ? stored : null;
+}
 
 /**
  * Static-table lookup, used only as the pre-RBAC fallback for a user row with

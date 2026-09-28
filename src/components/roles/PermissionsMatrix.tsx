@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties } from "react";
+import { useCallback, useMemo, useState, type CSSProperties } from "react";
 import {
   Check,
   ChevronDown,
@@ -11,7 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { useI18n } from "@/i18n/context";
-import { GROUP_LABELS, pageIcon } from "@/components/roles/page-icons";
+import { GROUP_LABELS, pageIcon, pageLabelKey } from "@/components/roles/page-icons";
 import { ACTION_LABELS, type ActionKey } from "@/lib/rbac-catalog";
 
 export interface MatrixAction {
@@ -145,14 +145,39 @@ export default function PermissionsMatrix({
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState<Record<string, boolean>>({});
 
+  /**
+   * A page's display name, in the reader's language.
+   *
+   * Never falls back to the key: `Page.name` from the API is the Arabic label
+   * the scanner stored, and the key is a camelCase identifier, so both would
+   * read as a foreign language in one locale or the other.
+   */
+  const pageLabel = useCallback(
+    (page: MatrixPage) => {
+      const key = pageLabelKey(page.key);
+      return key ? t(key) : page.name;
+    },
+    [t]
+  );
+
+  /**
+   * An action added to the database before this build knows its key would
+   * otherwise render the raw identifier, so it gets a named placeholder.
+   */
+  const actionLabel = useCallback(
+    (action: MatrixAction) =>
+      ACTION_LABELS[locale][action.key as ActionKey] ?? t("roles.unknownAction"),
+    [locale, t]
+  );
+
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     if (!needle) return pages;
     return pages.filter(
       (page) =>
-        page.name.toLowerCase().includes(needle) || page.key.toLowerCase().includes(needle)
+        pageLabel(page).toLowerCase().includes(needle) || page.key.toLowerCase().includes(needle)
     );
-  }, [pages, query]);
+  }, [pages, query, pageLabel]);
 
   /** Pages grouped by sidebar section, in catalog order. */
   const grouped = useMemo(() => {
@@ -314,6 +339,7 @@ export default function PermissionsMatrix({
                 <ul className="space-y-2">
                   {groupPages.map((page) => {
                     const Icon = pageIcon(page.icon);
+                    const name = pageLabel(page);
                     const canView = state.pages[page.key] === true;
                     const isOpen = open[page.key] ?? canView;
                     const allowedActions = page.actions.filter(
@@ -346,7 +372,7 @@ export default function PermissionsMatrix({
                             type="button"
                             onClick={() => setOpen((prev) => ({ ...prev, [page.key]: !isOpen }))}
                             aria-expanded={isOpen}
-                            aria-label={page.name}
+                            aria-label={name}
                             className="flex min-w-0 shrink items-center gap-3 rounded-lg p-1 text-start"
                           >
                             <ChevronDown
@@ -371,7 +397,7 @@ export default function PermissionsMatrix({
                                   : "text-slate-500 dark:text-slate-400"
                               }`}
                             >
-                              {page.name}
+                              {name}
                             </span>
                           </button>
 
@@ -408,13 +434,15 @@ export default function PermissionsMatrix({
                             disabled={readOnly}
                             locked={readOnly}
                             onChange={(next) => setPage(page, next)}
-                            label={page.name}
+                            label={name}
                           />
 
+                          {/* Always a count, never the raw page key: a disabled
+                              page used to show `serviceRequests` here. */}
                           <span className="shrink-0 text-xs text-slate-400 dark:text-slate-500">
                             {canView
                               ? `${allowedActions}/${page.actions.length} ${t("roles.actionCount")}`
-                              : page.key}
+                              : `0/${page.actions.length} ${t("roles.actionCount")}`}
                           </span>
 
                           {!readOnly && (
@@ -467,8 +495,7 @@ export default function PermissionsMatrix({
                                             : "text-slate-400 dark:text-slate-500"
                                         }`}
                                       >
-                                        {ACTION_LABELS[locale][action.key as ActionKey] ??
-                                          action.key}
+                                        {actionLabel(action)}
                                       </span>
                                     </span>
                                     {/* Hugs the action label instead of sitting
@@ -481,7 +508,7 @@ export default function PermissionsMatrix({
                                       disabled={readOnly || !canView}
                                       locked={readOnly && canView}
                                       onChange={(next) => setAction(page, action, next)}
-                                      label={`${page.name} — ${action.key}`}
+                                      label={`${name} — ${actionLabel(action)}`}
                                     />
                                   </li>
                                 );

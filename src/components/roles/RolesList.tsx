@@ -4,6 +4,8 @@ import { useState } from "react";
 import { Plus, Shield, Trash2, Users, Pencil } from "lucide-react";
 import { useI18n } from "@/i18n/context";
 import { useConfirm, useToast } from "@/components/UIProvider";
+import { roleLabel, roleDescription } from "@/lib/permissions";
+import { apiErrorMessage } from "@/lib/api-client";
 
 export interface RoleRow {
   id: string;
@@ -25,17 +27,25 @@ export default function RolesList({
   onOpen: (role: RoleRow) => void;
   onChanged: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const toast = useToast();
   const confirmAction = useConfirm();
   const [busy, setBusy] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<RoleRow | null>(null);
 
+  // `Role.name` is stored in Arabic, so an English reader would see Arabic role
+  // names. Built-in roles are labelled from the locale; a role an admin created
+  // keeps the name they typed.
+  const label = (role: RoleRow) => roleLabel(role.key, locale, role.name);
+
+  // Same story for the description of the built-in roles.
+  const desc = (role: RoleRow) => roleDescription(role.key, locale, role.description);
+
   const remove = async (role: RoleRow) => {
     const ok = await confirmAction({
       title: t("roles.deleteRole"),
-      message: t("roles.deleteRoleConfirm").replace("{role}", role.name),
+      message: t("roles.deleteRoleConfirm").replace("{role}", label(role)),
       confirmLabel: t("common.delete"),
     });
     if (!ok) return;
@@ -45,7 +55,11 @@ export default function RolesList({
       const res = await fetch(`/api/roles/${role.id}`, { method: "DELETE" });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        toast.error(data?.error || t("common.error"));
+        toast.error(
+          apiErrorMessage(data, t, "common.error", {
+            count: (data as { userCount?: number } | null)?.userCount ?? 0,
+          })
+        );
         return;
       }
       toast.success(t("roles.roleDeleted"));
@@ -122,7 +136,7 @@ export default function RolesList({
                           : "text-slate-900 dark:text-slate-50"
                       }`}
                     >
-                      {role.name}
+                      {label(role)}
                     </h3>
                     {role.isSystem && (
                       <span
@@ -133,9 +147,9 @@ export default function RolesList({
                       </span>
                     )}
                   </div>
-                  {role.description && (
+                  {desc(role) && (
                     <p className="mt-1 line-clamp-2 text-xs text-slate-500 dark:text-slate-400">
-                      {role.description}
+                      {desc(role)}
                     </p>
                   )}
                 </div>
@@ -232,7 +246,7 @@ function RoleForm({
   onCancel: () => void;
   onDone: () => void;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const toast = useToast();
   const [name, setName] = useState(role?.name ?? "");
   const [key, setKey] = useState(role?.key ?? "");
@@ -255,7 +269,7 @@ function RoleForm({
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
-        toast.error(data?.error || t("common.error"));
+        toast.error(apiErrorMessage(data, t));
         return;
       }
       toast.success(isEdit ? t("roles.roleUpdated") : t("roles.roleCreated"));
@@ -325,7 +339,7 @@ function RoleForm({
               <option value="">{t("roles.copyFromNone")}</option>
               {roles.map((r) => (
                 <option key={r.id} value={r.key}>
-                  {r.name}
+                  {roleLabel(r.key, locale, r.name)}
                 </option>
               ))}
             </select>

@@ -21,6 +21,9 @@
     "users": "Users",
     "companies": "Companies",
     "logout": "Logout",
+    "defaultUserName": "User",
+    "switchToEnglish": "Switch to English",
+    "switchToArabic": "Switch to Arabic",
     "notifications": "Notifications",
     "warehouses": "Warehouses",
     "products": "Products & Spare Parts",
@@ -42,7 +45,9 @@
     "hrLeaves": "Leaves & Offs",
     "hrPayroll": "Payroll",
     "hrDepartments": "Departments & Job Titles",
-    "copierTests": "Customer Tests"
+    "copierTests": "Customer Tests",
+    "hrReports": "HR Reports",
+    "hrSelfService": "My HR Requests"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -936,7 +941,8 @@
     "roleLabel": "Role",
     "managePermissions": "Manage permissions",
     "manageRoles": "Manage roles",
-    "clearSearch": "Clear search"
+    "clearSearch": "Clear search",
+    "unknownAction": "Unrecognised action"
   },
   "companies": {
     "title": "Companies",
@@ -1076,7 +1082,18 @@
     "REASON_REQUIRED": "Description is required",
     "REVENUE_TYPE_REQUIRED": "Revenue classification is required (workshop service / cash collection / other income)",
     "CASH_COLLECTION_CUSTOMER_REQUIRED": "Cash collection requires selecting the customer linked to the receivable",
-    "WORKSHOP_TX_NOT_FOUND": "Entry not found"
+    "WORKSHOP_TX_NOT_FOUND": "Entry not found",
+    "ROLE_NAME_REQUIRED": "Role name is required",
+    "ROLE_KEY_INVALID": "The role key must be lowercase letters, digits and underscores only, e.g. sales_lead",
+    "ROLE_KEY_TAKEN": "A role with this key already exists",
+    "ROLE_NOT_FOUND": "Role not found",
+    "ROLE_IN_USE": "{count} user(s) still hold this role. Move them to another role first.",
+    "SYSTEM_ROLE_PROTECTED": "The general manager always holds every permission and cannot be edited",
+    "SYSTEM_ROLE_RENAME": "This is a system role — its name cannot be changed",
+    "SYSTEM_ROLE_DELETE": "This is a system role — it cannot be deleted",
+    "PAGES_INVALID": "The submitted page list is not valid",
+    "PAGE_UNKNOWN": "Unknown page: {name}",
+    "ACTION_UNKNOWN": "Unknown action: {name}"
   },
   "statement": {
     "title": "Customer Statement",

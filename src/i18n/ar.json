@@ -21,6 +21,9 @@
     "users": "المستخدمون",
     "companies": "الشركات",
     "logout": "تسجيل الخروج",
+    "defaultUserName": "المستخدم",
+    "switchToEnglish": "التبديل للإنجليزية",
+    "switchToArabic": "التبديل للعربية",
     "notifications": "الإشعارات",
     "warehouses": "المستودعات",
     "products": "المنتجات وقطع الغيار",
@@ -36,13 +39,15 @@
       "admin": "التقارير والإدارة"
     },
     "expenses": "المصروفات",
-    "hrDashboard": "لوحة HR",
+    "hrDashboard": "لوحة الموارد البشرية",
     "hrEmployees": "الموظفون",
     "hrAttendance": "التحضير والبصمة",
     "hrLeaves": "الإجازات والاستئذانات",
     "hrPayroll": "الرواتب والمسيرات",
     "hrDepartments": "الأقسام والمسميات",
-    "copierTests": "اختبارات العملاء"
+    "copierTests": "اختبارات العملاء",
+    "hrReports": "تقارير الموارد البشرية",
+    "hrSelfService": "طلباتي من الموارد البشرية"
   },
   "dashboard": {
     "title": "لوحة التحكم",
@@ -586,7 +591,6 @@
     "searchPlaceholder": "ابحث برقم الطلب أو العميل أو المنتج أو النوع...",
     "companyFilter": "الشركة",
     "typeFilter": "نوع الطلب",
-    "dateFrom": "",
     "interCompanySale": "بيع داخلي",
     "interCompanyHint": "عملية بيع داخلي من شركة إلى أخرى ثم بيع عادي للعميل في نفس اللحظة. الكمية تُنقص من مخزون شركة المصدر.",
     "fromCompany": "شركة المصدر (صاحبة المخزون)",
@@ -928,7 +932,7 @@
     "loadFailed": "فشل تحميل البيانات",
     "saveFailed": "فشل حفظ الصلاحيات",
     "protectedRole": "هذا دور نظام محمي ولا يمكن تعديله",
-    "viewOnlyNotice": "عرض فقط —对这些 الصفحات ممنوع أي إجراء تعديل",
+    "viewOnlyNotice": "عرض فقط — ممنوع أي إجراء تعديل على هذه الصفحات",
     "unauthorized": "غير مصرح لك",
     "unauthorizedBody": "الصفحة دي مش متاحة لحسابك. لو شفت خطأ، كلّم مدير النظام.",
     "enabled": "مفعّلة",
@@ -937,7 +941,8 @@
     "roleLabel": "الدور",
     "managePermissions": "إدارة الصلاحيات",
     "manageRoles": "إدارة الأدوار",
-    "clearSearch": "مسح البحث"
+    "clearSearch": "مسح البحث",
+    "unknownAction": "إجراء غير معروف"
   },
   "companies": {
     "title": "الشركات",
@@ -1077,7 +1082,18 @@
     "REASON_REQUIRED": "البيان مطلوب",
     "REVENUE_TYPE_REQUIRED": "تصنيف الوارد مطلوب (خدمة ورشة / تحصيل نقدية / إيرادات أخرى)",
     "CASH_COLLECTION_CUSTOMER_REQUIRED": "حركة التحصيل النقدي تتطلب اختيار العميل المرتبط بالمديونية",
-    "WORKSHOP_TX_NOT_FOUND": "الحركة غير موجودة"
+    "WORKSHOP_TX_NOT_FOUND": "الحركة غير موجودة",
+    "ROLE_NAME_REQUIRED": "اسم الدور مطلوب",
+    "ROLE_KEY_INVALID": "مفتاح الدور لازم يكون حروف إنجليزية صغيرة وأرقام وشرطة سفلية فقط، زي: sales_lead",
+    "ROLE_KEY_TAKEN": "يوجد دور بنفس المفتاح",
+    "ROLE_NOT_FOUND": "الدور مش موجود",
+    "ROLE_IN_USE": "{count} مستخدم لسه مرتبط بالدور ده. انقلهم لدور تاني الأول.",
+    "SYSTEM_ROLE_PROTECTED": "المدير العام دايمًا ليه كل الصلاحيات ومش بتتعدّل",
+    "SYSTEM_ROLE_RENAME": "ده دور نظام — مش ينفع تغيّر اسمه",
+    "SYSTEM_ROLE_DELETE": "ده دور نظام — مش ينفع تحذفه",
+    "PAGES_INVALID": "قائمة الصفحات المرسلة غير صالحة",
+    "PAGE_UNKNOWN": "صفحة غير معروفة: {name}",
+    "ACTION_UNKNOWN": "إجراء غير معروف: {name}"
   },
   "statement": {
     "title": "كشف حساب العميل",

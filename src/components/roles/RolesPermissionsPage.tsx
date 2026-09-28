@@ -11,6 +11,7 @@ import PermissionsMatrix, {
   type MatrixState,
 } from "@/components/roles/PermissionsMatrix";
 import { apiErrorMessage } from "@/lib/api-client";
+import { roleLabel } from "@/lib/permissions";
 import PrinterLoader from "@/components/PrinterLoader";
 
 interface Diff {
@@ -30,14 +31,16 @@ function preferredRole(roles: RoleRow[]): string | null {
 }
 
 export default function RolesPermissionsPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const toast = useToast();
   const confirmAction = useConfirm();
 
   const [roles, setRoles] = useState<RoleRow[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pages, setPages] = useState<MatrixPage[]>([]);
-  const [roleMeta, setRoleMeta] = useState<{ name: string; isSystem: boolean } | null>(null);
+  const [roleMeta, setRoleMeta] = useState<{ key: string; name: string; isSystem: boolean } | null>(
+    null
+  );
 
   /** The saved state, so a diff can be computed and Discard can restore it. */
   const [saved, setSaved] = useState<MatrixState>({ pages: {}, actions: {} });
@@ -99,13 +102,16 @@ export default function RolesPermissionsPage() {
     fetch(`/api/roles/${selectedId}/permissions`, { cache: "no-store" })
       .then(async (res) => {
         if (!res.ok) throw new Error("failed");
-        return (await res.json()) as { role: { name: string; isSystem: boolean }; pages: MatrixPage[] };
+        return (await res.json()) as {
+          role: { key: string; name: string; isSystem: boolean };
+          pages: MatrixPage[];
+        };
       })
       .then((data) => {
         if (cancelled) return;
         const initial = emptyMatrix(data.pages);
         setPages(data.pages);
-        setRoleMeta({ name: data.role.name, isSystem: data.role.isSystem });
+        setRoleMeta({ key: data.role.key, name: data.role.name, isSystem: data.role.isSystem });
         setSaved(initial);
         setDraft(initial);
         setMatrixFor(selectedId);
@@ -156,7 +162,7 @@ export default function RolesPermissionsPage() {
       title: t("roles.confirmTitle"),
       message: `${t("roles.confirmBody")
         .replace("{count}", String(changes))
-        .replace("{role}", roleMeta?.name ?? "")}\n${t("roles.unsavedSummary")
+        .replace("{role}", roleMeta ? roleLabel(roleMeta.key, locale, roleMeta.name) : "")}\n${t("roles.unsavedSummary")
         .replace("{on}", String(diff.pagesOn + diff.actionsOn))
         .replace("{off}", String(diff.pagesOff + diff.actionsOff))}`,
     });
@@ -252,7 +258,7 @@ export default function RolesPermissionsPage() {
             >
               {roles.map((role) => (
                 <option key={role.id} value={role.id}>
-                  {role.name} ({role.pageCount})
+                  {roleLabel(role.key, locale, role.name)} ({role.pageCount})
                 </option>
               ))}
             </select>

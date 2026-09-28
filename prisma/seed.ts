@@ -958,8 +958,8 @@ async function main() {
     { settlementNumber: 'STL-2024-006', companyId: company1.id, customerId: 'cust-1', engineerId: 'eng-1', amount: 2000, paymentMethod: 'CASH' as const, reason: 'بيع قطع غيار — درام يونيتس', status: 'VERIFIED' as const, collectedBy: user7.id, verifiedBy: user3.id },
     { settlementNumber: 'STL-2024-007', companyId: company1.id, engineerId: 'eng-4', amount: 3500, paymentMethod: 'CASH' as const, reason: 'تحصيل إيجار شهري — mach-09', status: 'INITIAL' as const, collectedBy: user4.id },
     { settlementNumber: 'STL-2024-008', companyId: company1.id, customerId: 'cust-8', engineerId: 'eng-3', amount: 125000, paymentMethod: 'MIXED' as const, reason: 'بيع جهاز Konica C250i — الأعمال', status: 'VERIFIED' as const, collectedBy: user1.id, verifiedBy: user3.id },
-    { settlementNumber: 'STL-2024-009', companyId: company1.id, customerId: 'cust-5', amount: 7500, paymentMethod: 'CREDIT' as const, reason: 'مبيعة قطع غيار — رولرات —曙光', status: 'INITIAL' as const, collectedBy: user7.id },
-    { settlementNumber: 'STL-2024-010', companyId: company1.id, customerId: 'cust-9', engineerId: 'eng-2', amount: 82000, paymentMethod: 'CASH' as const, reason: 'بيع جهاز Ricoh 3055 — المizrab', status: 'INITIAL' as const, collectedBy: user1.id },
+    { settlementNumber: 'STL-2024-009', companyId: company1.id, customerId: 'cust-5', amount: 7500, paymentMethod: 'CREDIT' as const, reason: 'مبيعة قطع غيار - رولرات', status: 'INITIAL' as const, collectedBy: user7.id },
+    { settlementNumber: 'STL-2024-010', companyId: company1.id, customerId: 'cust-9', engineerId: 'eng-2', amount: 82000, paymentMethod: 'CASH' as const, reason: 'بيع جهاز Ricoh 3055 - المعرض', status: 'INITIAL' as const, collectedBy: user1.id },
 
     // ===== شركة جملة قطع غيار (company2) — 10 تسوية =====
     { settlementNumber: 'STL-2024-011', companyId: company2.id, customerId: 'cust-6', amount: 50000, paymentMethod: 'CASH' as const, reason: 'قسط أول — جهاز Sharp MX-3071 — الأمان', status: 'VERIFIED' as const, collectedBy: user2.id, verifiedBy: user3.id },
@@ -999,7 +999,7 @@ async function main() {
     { companyId: company1.id, categoryId: 'expcat-1', category: 'RENT', description: 'إيجار المكتب - يونيو 2024', amount: 15000, paidBy: user1.id, date: new Date('2024-06-01') },
     { companyId: company1.id, categoryId: 'expcat-2', category: 'UTILITIES', description: 'فواتير الكهرباء والمياه - يونيو', amount: 3500, paidBy: user3.id, date: new Date('2024-06-05') },
     { companyId: company1.id, categoryId: 'expcat-4', category: 'TRANSPORT', description: 'مصاريف النقل للعملاء', amount: 2800, paidBy: user4.id, date: new Date('2024-06-10') },
-    { companyId: company1.id, categoryId: 'expcat-5', category: 'MAINTENANCE', description: 'صيانة الورشةworkshop', amount: 4500, paidBy: user5.id, date: new Date('2024-06-12') },
+    { companyId: company1.id, categoryId: 'expcat-5', category: 'MAINTENANCE', description: 'صيانة الورشة', amount: 4500, paidBy: user5.id, date: new Date('2024-06-12') },
     { companyId: company1.id, categoryId: 'expcat-3', category: 'SALARY', description: 'رواتب الموظفين - يونيو', amount: 85000, paidBy: user1.id, date: new Date('2024-06-28') },
     { companyId: company2.id, categoryId: 'expcat-8', category: 'RENT', description: 'إيجار المكتب - يونيو 2024', amount: 8000, paidBy: user2.id, date: new Date('2024-06-01') },
     { companyId: company2.id, categoryId: 'expcat-9', category: 'UTILITIES', description: 'فواتير الكهرباء - يونيو', amount: 2000, paidBy: user2.id, date: new Date('2024-06-05') },

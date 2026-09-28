@@ -32,7 +32,7 @@ export async function PATCH(request: Request, { params }: Params) {
         typeof body.description === "string" ? body.description.trim() : role.description ?? "";
       if (typeof body.name === "string" && body.name.trim() !== role.name) {
         return NextResponse.json(
-          { error: "دور النظام محمي ولا يمكن تغيير اسمه", code: "SYSTEM_ROLE_PROTECTED" },
+          { error: "System role name is fixed", code: "SYSTEM_ROLE_RENAME" },
           { status: 403 }
         );
       }
@@ -43,7 +43,7 @@ export async function PATCH(request: Request, { params }: Params) {
 
     const name = typeof body.name === "string" ? body.name.trim() : role.name;
     if (!name) {
-      return NextResponse.json({ error: "اسم الدور مطلوب", code: "ROLE_NAME_REQUIRED" }, { status: 400 });
+      return NextResponse.json({ error: "Role name is required", code: "ROLE_NAME_REQUIRED" }, { status: 400 });
     }
     const description =
       typeof body.description === "string" ? body.description.trim() : role.description ?? "";
@@ -59,7 +59,7 @@ export async function PATCH(request: Request, { params }: Params) {
     return NextResponse.json({ id: updated.id, name: updated.name, description: updated.description });
   } catch (error) {
     console.error("PATCH /api/roles/[id] failed", error);
-    return NextResponse.json({ error: "Failed to update role" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to update role", code: "UPDATE_FAILED" }, { status: 500 });
   }
 }
 
@@ -78,7 +78,7 @@ export async function DELETE(_request: Request, { params }: Params) {
 
     if (role.isSystem) {
       return NextResponse.json(
-        { error: "دور النظام محمي ولا يمكن حذفه", code: "SYSTEM_ROLE_PROTECTED" },
+        { error: "System roles cannot be deleted", code: "SYSTEM_ROLE_DELETE" },
         { status: 403 }
       );
     }
@@ -86,7 +86,9 @@ export async function DELETE(_request: Request, { params }: Params) {
     if (role._count.users > 0) {
       return NextResponse.json(
         {
-          error: `يوجد ${role._count.users} مستخدم مرتبط بهذا الدور. انقلهم لدور تاني الأول.`,
+          // The count travels separately so the client can render "{count} users"
+          // in the reader's language.
+          error: "Role is still assigned to users",
           code: "ROLE_IN_USE",
           userCount: role._count.users,
         },
@@ -101,6 +103,6 @@ export async function DELETE(_request: Request, { params }: Params) {
     return NextResponse.json({ ok: true });
   } catch (error) {
     console.error("DELETE /api/roles/[id] failed", error);
-    return NextResponse.json({ error: "Failed to delete role" }, { status: 500 });
+    return NextResponse.json({ error: "Failed to delete role", code: "DELETE_FAILED" }, { status: 500 });
   }
 }

@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/context";
 import { useSession, signOut } from "next-auth/react";
 import { Bell, User, ChevronDown, LogOut, Globe, CheckCheck, Volume2, VolumeX } from "lucide-react";
-import { ROLE_LABELS_AR } from "@/lib/permissions";
+import { roleLabel } from "@/lib/permissions";
 
 type NotificationItem = {
   id: string;
@@ -60,9 +60,11 @@ export default function Header({ title }: { title: string }) {
   const hasInitialLoadRef = useRef(false);
   const previousUnreadCountRef = useRef(0);
 
-  const userName = session?.user?.name || "المستخدم";
-  const userRole = (session?.user as { role?: string })?.role as keyof typeof ROLE_LABELS_AR | undefined;
-  const roleLabel = userRole ? ROLE_LABELS_AR[userRole] : "";
+  const userName = session?.user?.name || t("common.defaultUserName");
+  const userRole = session?.user?.role;
+  // Rendered from the locale maps: the header used to read ROLE_LABELS_AR
+  // directly, so an English user saw an Arabic role under their name.
+  const roleName = userRole ? roleLabel(userRole, locale) : "";
 
   useEffect(() => {
     let cancelled = false;
@@ -212,7 +214,7 @@ export default function Header({ title }: { title: string }) {
       <div className="flex items-center gap-1 sm:gap-3 shrink-0">
         <button
           onClick={() => setLocale(locale === "ar" ? "en" : "ar")}
-          aria-label={locale === "ar" ? "Switch to English" : "التبديل إلى العربية"}
+          aria-label={locale === "ar" ? t("common.switchToEnglish") : t("common.switchToArabic")}
           className="flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-sm font-medium
             text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900
             dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white sm:px-3"
@@ -370,9 +372,9 @@ export default function Header({ title }: { title: string }) {
               >
                 {userName}
               </p>
-              {roleLabel && (
-                <p className="text-xs text-gray-400 leading-tight dark:text-slate-500">{roleLabel}</p>
-              )}
+                {roleName && (
+                  <p className="text-xs text-gray-400 leading-tight dark:text-slate-500">{roleName}</p>
+                )}
             </div>
             <ChevronDown size={16} className={`text-gray-400 transition-transform ${dropdownOpen ? "rotate-180" : ""}`} />
           </button>
@@ -384,7 +386,7 @@ export default function Header({ title }: { title: string }) {
             >
               <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-800">
                 <p className="text-sm font-medium text-gray-800 dark:text-slate-100">{userName}</p>
-                {roleLabel && <p className="text-xs text-gray-500 mt-0.5 dark:text-slate-400">{roleLabel}</p>}
+                {roleName && <p className="text-xs text-gray-500 mt-0.5 dark:text-slate-400">{roleName}</p>}
               </div>
               <button
                 onClick={() => signOut({ callbackUrl: "/login" })}

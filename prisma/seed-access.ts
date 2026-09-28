@@ -386,7 +386,7 @@ async function main() {
     const f1 = val(r, "Field1");
     const testDate = parseAccessDate(val(r, "تاريخ الصيانة"));
     testRows.push({
-      id: `acct-${val(r, "IDكودالصيانة")}`,
+      id: `acct-${val(r, "ID")}`,
       customerId,
       engineerId,
       machineId,
