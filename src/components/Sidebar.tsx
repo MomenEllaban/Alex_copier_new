@@ -191,9 +191,9 @@ export default function Sidebar() {
    * A group is open unless the user closed it. The icon-only rail has no
    * header to click, so every group stays expanded there.
    *
-   * A closed group re-opens when one of its pages becomes the current route
-   * (see the effect below), so the active link is never stranded behind a
-   * collapsed header while the user can still close a group at will.
+   * Closing a group works from anywhere, including while one of its pages is
+   * open; navigating to a page inside a closed group opens it again (see the
+   * route adjustment below).
    */
   const isGroupOpen = (group: NavGroup) => {
     if (isCollapsed || !group.collapsible) return true;
@@ -208,8 +208,7 @@ export default function Sidebar() {
   // the current page is never stranded behind a collapsed header. Adjusting the
   // state during render (rather than in an effect) keeps it in sync with the
   // route without a second render pass.
-  const [lastPath, setLastPath] = useState(pathname);
-  if (pathname !== lastPath) {
+  const [lastPath, setLastPath] = useState(pathname);  if (pathname !== lastPath) {
     setLastPath(pathname);
     const owner = navGroups.find(
       (group) => group.collapsible && group.items.some((item) => isActive(item.href)),

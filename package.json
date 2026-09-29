@@ -17,7 +17,9 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "verify:reports": "tsx --env-file=.env scripts/verify-report-data.ts",
+    "db:push:demo": "node scripts/push-demo-schema.mjs"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.1",
