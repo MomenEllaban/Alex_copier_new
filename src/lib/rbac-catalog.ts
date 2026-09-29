@@ -252,7 +252,7 @@ function actionForGet(route: string): ActionKey {
   const last = segments[segments.length - 1] ?? "";
   if (last === "statement-token" || last === "statement") return "share";
   if (last === "report" || last === "statement" || last.includes("export")) return "print";
-  if (route === "reports") return "export";
+  if (route === "reports" || route.startsWith("reports/")) return "export";
   return "view";
 }
 

@@ -108,9 +108,22 @@ const navGroups: { key: string; items: NavItem[] }[] = [
     ],
   },
   {
-    key: "navigation.group.admin",
+    key: "navigation.group.reports",
     items: [
       { key: "navigation.reports", href: "/reports", icon: BarChart3, page: "reports" },
+      { key: "navigation.reportContracts", href: "/reports/contracts", icon: BarChart3, page: "reports" },
+      { key: "navigation.reportEngineers", href: "/reports/engineers", icon: BarChart3, page: "reports" },
+      { key: "navigation.reportCash", href: "/reports/cash", icon: BarChart3, page: "reports" },
+      { key: "navigation.reportInspection", href: "/reports/inspection", icon: BarChart3, page: "reports" },
+      { key: "navigation.reportWarranties", href: "/reports/warranties", icon: BarChart3, page: "reports" },
+      { key: "navigation.reportSatisfaction", href: "/reports/satisfaction", icon: BarChart3, page: "reports" },
+      { key: "navigation.reportInvestors", href: "/reports/investors", icon: BarChart3, page: "reports" },
+      { key: "navigation.reportSpareParts", href: "/reports/spare-parts", icon: BarChart3, page: "reports" },
+    ],
+  },
+  {
+    key: "navigation.group.admin",
+    items: [
       { key: "navigation.companies", href: "/companies", icon: Building2, page: "companies" },
       { key: "navigation.users", href: "/users", icon: Users, page: "settings", canAdd: true },
       // Gated on the role, not on a page permission: the roles screen is about
