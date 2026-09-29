@@ -10,12 +10,11 @@ import PrinterLoader from "@/components/PrinterLoader";
  * Quick-login buttons for the seeded demo accounts.
  *
  * These sign in as real, privileged accounts (including the general manager)
- * with a shared password, so the panel is opt-in for local development only:
- * it needs NEXT_PUBLIC_SHOW_TEST_ACCOUNTS="true" and never renders in a
- * production build, whatever the environment says.
+ * with a shared password, so the panel is opt-in through the deployment: it
+ * renders only when NEXT_PUBLIC_SHOW_TEST_ACCOUNTS is exactly "true", and stays
+ * hidden when the variable is unset or set to anything else.
  */
-const showTestAccounts =
-  process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_SHOW_TEST_ACCOUNTS === "true";
+const showTestAccounts = process.env.NEXT_PUBLIC_SHOW_TEST_ACCOUNTS === "true";
 
 const testAccounts = [
   { name: "رضا", email: "reza@alex-copier.com", password: "password123", role: "المدير العام — كل حاجة في السيستم", color: "bg-purple-100 text-purple-700" },
