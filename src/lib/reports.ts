@@ -264,7 +264,7 @@ export async function loadExpiringWarranties(withinDays = 60): Promise<ExpiringW
         machineName: machine.product?.name ?? machine.model ?? "—",
         warrantyEnd: endDate.toISOString(),
         daysLeft,
-        isExpiringSoon: daysLeft <= 30,
+        isExpiringSoon: daysLeft >= 0 && daysLeft <= 30,
       };
     })
     .filter((item) => item.daysLeft <= withinDays)
@@ -364,7 +364,8 @@ export async function loadReportsOverview(): Promise<ReportsOverview> {
     totalEngineers: engineers,
     totalOpenServiceRequests: openRequests,
     netCash: cash.netCash,
-    expiringWarranties: warranties.length,
+    // Only warranties still inside their term: an expired one is not "expiring".
+    expiringWarranties: warranties.filter((w) => w.daysLeft >= 0).length,
   };
 }
 

@@ -38,9 +38,9 @@ export default function ExpiringWarrantiesPage() {
           ) : r.isExpiringSoon ? (
             <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-700">{t("reports.expiringSoon")}</span>
           ) : (
-            <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">{t("reports.status")}</span>
+            <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-700">{t("reports.valid")}</span>
           ),
-        exportValue: (r) => (r.daysLeft < 0 ? "EXPIRED" : r.isExpiringSoon ? "EXPIRING_SOON" : "OK"),
+        exportValue: (r) => (r.daysLeft < 0 ? "EXPIRED" : r.isExpiringSoon ? "EXPIRING_SOON" : "VALID"),
       },
     ],
     [t, locale],
@@ -48,7 +48,11 @@ export default function ExpiringWarrantiesPage() {
 
   const summary = useCallback(
     (rows: Row[]): ReportSummaryCard[] => [
-      { label: t("reports.expiringWarranties"), value: numberFormatter(rows.length, locale), accent: "bg-amber-50 text-amber-700" },
+      {
+        label: t("reports.expiringWarranties"),
+        value: numberFormatter(rows.filter((r) => r.daysLeft >= 0).length, locale),
+        accent: "bg-amber-50 text-amber-700",
+      },
       {
         label: t("reports.expired"),
         value: numberFormatter(rows.filter((r) => r.daysLeft < 0).length, locale),
@@ -56,7 +60,7 @@ export default function ExpiringWarrantiesPage() {
       },
       {
         label: t("reports.expiringSoon"),
-        value: numberFormatter(rows.filter((r) => r.daysLeft >= 0 && r.isExpiringSoon).length, locale),
+        value: numberFormatter(rows.filter((r) => r.isExpiringSoon).length, locale),
         accent: "bg-blue-50 text-blue-700",
       },
     ],

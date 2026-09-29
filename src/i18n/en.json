@@ -36,7 +36,8 @@
       "maintenance": "Maintenance",
       "hr": "Human Resources",
       "finance": "Finance",
-      "admin": "Reports & Admin"
+      "reports": "Reports",
+      "admin": "Admin"
     },
     "expenses": "Expenses",
     "hrDashboard": "HR Dashboard",
@@ -860,6 +861,7 @@
     "daysLeft": "Days left",
     "expiringSoon": "Expiring soon",
     "expired": "Expired",
+    "valid": "Valid",
     "cycleDate": "Cycle date",
     "totalProfit": "Total profit",
     "investor": "Investor",

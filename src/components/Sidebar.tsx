@@ -37,6 +37,8 @@ import {
   Plus,
   Camera,
   ShieldCheck,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 interface NavItem {
@@ -49,7 +51,16 @@ interface NavItem {
   adminOnly?: boolean;
 }
 
-const navGroups: { key: string; items: NavItem[] }[] = [
+interface NavGroup {
+  key: string;
+  items: NavItem[];
+  /** The header becomes a toggle. Without it the group is always expanded. */
+  collapsible?: boolean;
+  /** Whether a collapsible group starts open. Defaults to open. */
+  defaultOpen?: boolean;
+}
+
+const navGroups: NavGroup[] = [
   {
     key: "navigation.group.general",
     items: [
@@ -109,6 +120,10 @@ const navGroups: { key: string; items: NavItem[] }[] = [
   },
   {
     key: "navigation.group.reports",
+    collapsible: true,
+    // Nine links would dominate the sidebar, so this group starts closed and
+    // opens on demand.
+    defaultOpen: false,
     items: [
       { key: "navigation.reports", href: "/reports", icon: BarChart3, page: "reports" },
       { key: "navigation.reportContracts", href: "/reports/contracts", icon: BarChart3, page: "reports" },
@@ -137,6 +152,8 @@ export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
+  /** Which collapsible groups the user has opened; unset means the group default. */
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const pathname = usePathname();
   const router = useRouter();
   const { t } = useI18n();
@@ -169,6 +186,40 @@ export default function Sidebar() {
     }
     return false;
   };
+
+  /**
+   * A group is open unless the user closed it. The icon-only rail has no
+   * header to click, so every group stays expanded there.
+   *
+   * A closed group re-opens when one of its pages becomes the current route
+   * (see the effect below), so the active link is never stranded behind a
+   * collapsed header while the user can still close a group at will.
+   */
+  const isGroupOpen = (group: NavGroup) => {
+    if (isCollapsed || !group.collapsible) return true;
+    return openGroups[group.key] ?? group.defaultOpen ?? true;
+  };
+
+  const toggleGroup = (key: string) => {
+    setOpenGroups((current) => ({ ...current, [key]: !(current[key] ?? false) }));
+  };
+
+  // Opening a page whose group the user had closed brings the group back, so
+  // the current page is never stranded behind a collapsed header. Adjusting the
+  // state during render (rather than in an effect) keeps it in sync with the
+  // route without a second render pass.
+  const [lastPath, setLastPath] = useState(pathname);
+  if (pathname !== lastPath) {
+    setLastPath(pathname);
+    const owner = navGroups.find(
+      (group) => group.collapsible && group.items.some((item) => isActive(item.href)),
+    );
+    if (owner) {
+      setOpenGroups((current) =>
+        current[owner.key] === false ? { ...current, [owner.key]: true } : current,
+      );
+    }
+  }
 
   const sidebarContent = (
     <div className="flex flex-col h-full">
@@ -205,6 +256,8 @@ export default function Sidebar() {
             return !item.page || can(item.page);
           });
           if (items.length === 0) return null;
+          const groupOpen = isGroupOpen(group);
+          const canToggle = group.collapsible && !isCollapsed;
           return (
             <div
               key={group.key}
@@ -212,46 +265,59 @@ export default function Sidebar() {
                 isCollapsed && groupIndex > 0 ? "mt-3 border-t border-gray-700 pt-3" : isCollapsed ? "" : "mb-4"
               }
             >
-              {!isCollapsed && (
-                <p className="px-6 mb-1 text-[11px] font-semibold tracking-wide text-gray-500">
-                  {t(group.key)}
-                </p>
+              {!isCollapsed && canToggle ? (
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(group.key)}
+                  aria-expanded={groupOpen}
+                  className="flex w-full items-center justify-between rounded-lg px-6 py-1.5 text-[11px] font-semibold tracking-wide text-gray-500 transition-colors hover:bg-gray-800 hover:text-gray-300 min-h-11"
+                >
+                  <span>{t(group.key)}</span>
+                  {groupOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </button>
+              ) : (
+                !isCollapsed && (
+                  <p className="px-6 mb-1 text-[11px] font-semibold tracking-wide text-gray-500">
+                    {t(group.key)}
+                  </p>
+                )
               )}
-              {items.map((item) => {
-                const Icon = item.icon;
-                const active = isActive(item.href);
-                return (
-                  <div key={item.href} className={`flex items-center ${isCollapsed ? "" : "mx-2"}`}>
-                    <Link
-                      href={item.href}
-                      onClick={() => setMobileOpen(false)}
-                      title={isCollapsed ? t(item.key) : undefined}
-                      className={`flex flex-1 items-center gap-3 rounded-lg transition-colors min-h-11 ${
-                        active
-                          ? "bg-blue-600 text-white"
-                          : "text-gray-300 hover:bg-gray-800 hover:text-white"
-                      } ${isCollapsed ? "justify-center px-0" : "px-4 py-2.5"}`}
-                    >
-                      <Icon size={isCollapsed ? 22 : 20} className="shrink-0" />
-                      {!isCollapsed && <span className="text-sm whitespace-nowrap">{t(item.key)}</span>}
-                    </Link>
-                    {!isCollapsed && item.canAdd && item.page && canAct(item.page, "add") && (
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setMobileOpen(false);
-                          router.push(`${item.href}?add=1`);
-                        }}
-                        title={`إضافة ${t(item.key)}`}
-                        className="ms-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-500 transition hover:bg-gray-800 hover:text-white"
+              {(!canToggle || groupOpen) &&
+                items.map((item) => {
+                  const Icon = item.icon;
+                  const active = isActive(item.href);
+                  return (
+                    <div key={item.href} className={`flex items-center ${isCollapsed ? "" : "mx-2"}`}>
+                      <Link
+                        href={item.href}
+                        onClick={() => setMobileOpen(false)}
+                        title={isCollapsed ? t(item.key) : undefined}
+                        className={`flex flex-1 items-center gap-3 rounded-lg transition-colors min-h-11 ${
+                          active
+                            ? "bg-blue-600 text-white"
+                            : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                        } ${isCollapsed ? "justify-center px-0" : "px-4 py-2.5"}`}
                       >
-                        <Plus size={14} />
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
+                        <Icon size={isCollapsed ? 22 : 20} className="shrink-0" />
+                        {!isCollapsed && <span className="text-sm whitespace-nowrap">{t(item.key)}</span>}
+                      </Link>
+                      {!isCollapsed && item.canAdd && item.page && canAct(item.page, "add") && (
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setMobileOpen(false);
+                            router.push(`${item.href}?add=1`);
+                          }}
+                          title={`إضافة ${t(item.key)}`}
+                          className="ms-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-500 transition hover:bg-gray-800 hover:text-white"
+                        >
+                          <Plus size={14} />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
             </div>
           );
         })}

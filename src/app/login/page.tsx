@@ -6,6 +6,17 @@ import { useRouter } from "next/navigation";
 import { Printer, Mail, Lock, LogIn, User, Shield } from "lucide-react";
 import PrinterLoader from "@/components/PrinterLoader";
 
+/**
+ * Quick-login buttons for the seeded demo accounts.
+ *
+ * These sign in as real, privileged accounts (including the general manager)
+ * with a shared password, so the panel is opt-in for local development only:
+ * it needs NEXT_PUBLIC_SHOW_TEST_ACCOUNTS="true" and never renders in a
+ * production build, whatever the environment says.
+ */
+const showTestAccounts =
+  process.env.NODE_ENV === "development" && process.env.NEXT_PUBLIC_SHOW_TEST_ACCOUNTS === "true";
+
 const testAccounts = [
   { name: "رضا", email: "reza@alex-copier.com", password: "password123", role: "المدير العام — كل حاجة في السيستم", color: "bg-purple-100 text-purple-700" },
   { name: "عمرو", email: "amr.manager@alex-copier.com", password: "password123", role: "مدير إداري — شركة القطاعي + الورشة", color: "bg-blue-100 text-blue-700" },
@@ -69,7 +80,7 @@ export default function LoginPage() {
     <div dir="rtl" className="min-h-screen flex flex-col lg:flex-row bg-gray-50">
       {loading && <PrinterLoader fullScreen label="جاري تسجيل الدخول..." />}
       {/* Right side — Logo + Form */}
-      <div className="w-full lg:w-1/2 flex flex-col items-center justify-center px-4 py-8 sm:p-8 lg:p-16">
+      <div className={`flex flex-col items-center justify-center px-4 py-8 sm:p-8 lg:p-16 ${showTestAccounts ? "w-full lg:w-1/2" : "w-full"}`}>
         <div className="w-full max-w-md">
           <div className="text-center mb-6 sm:mb-10">
             <div className="flex justify-center mb-4 sm:mb-5">
@@ -137,7 +148,8 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Left side — Test accounts */}
+      {/* Left side — Test accounts (opt-in only; see showTestAccounts) */}
+      {showTestAccounts && (
       <div className="w-full lg:w-1/2 bg-gradient-to-br from-gray-900 to-gray-800 px-4 py-8 sm:p-8 lg:p-16 flex flex-col justify-center">
         <div className="max-w-lg w-full mx-auto">
           <div className="flex items-center gap-3 mb-6 sm:mb-8">
@@ -176,6 +188,7 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 }
