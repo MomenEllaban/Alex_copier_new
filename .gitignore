@@ -60,6 +60,7 @@ next-env.d.ts
 !HR_MODULE_GUIDE.md
 !PROGRESS.md
 !NEEDS_DECISION.md
+!TASKS.md
 !docs/**/*.md
 !tests/**/*.md
 dev.log
