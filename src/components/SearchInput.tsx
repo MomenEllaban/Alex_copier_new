@@ -32,7 +32,7 @@ export default function SearchInput({ value, onChange, placeholder, className = 
           type="button"
           onClick={() => onChange("")}
           title="✕"
-          className="absolute start-[2rem] top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+          className="absolute end-[2rem] top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
         >
           ✕
         </button>
