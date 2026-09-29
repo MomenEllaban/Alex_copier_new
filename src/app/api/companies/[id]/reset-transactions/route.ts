@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireRole } from "@/lib/auth-helpers";
-import { isDataResetEnabled } from "@/lib/data-reset";
+import { isCompanyResetEnabled, isConfirmationValid } from "@/lib/data-reset";
 
 /**
  * POST /api/companies/[id]/reset-transactions
@@ -14,16 +14,16 @@ import { isDataResetEnabled } from "@/lib/data-reset";
  * Because every page (sales, purchases, settlements, returns, expenses) and the
  * financial report read straight from the database, deleting here immediately
  * reflects everywhere. Used by the admin to zero a company's numbers for
- * re-testing. Never exposed outside the GM role.
+ * re-testing. Never exposed outside the GM role, and never runs unless the
+ * request body carries the company's exact name in `confirm`.
  */
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Hard off-switch: this endpoint must never wipe production ledgers by
-    // accident. Staying dark (404) also keeps it out of the production API.
-    if (!isDataResetEnabled()) {
+    // A deployment can still lock this out entirely.
+    if (!isCompanyResetEnabled()) {
       return NextResponse.json({ error: "غير متاح", code: "DISABLED" }, { status: 404 });
     }
 
@@ -43,6 +43,21 @@ export async function POST(
     });
     if (!company) {
       return NextResponse.json({ error: "الشركة غير موجودة", code: "COMPANY_NOT_FOUND" }, { status: 404 });
+    }
+
+    // The caller has to type the company's name. This is the guard that makes
+    // the reset safe to leave enabled: a misclick cannot satisfy it, and a
+    // request that never rendered the page has no way to know the name.
+    const body = await request.json().catch(() => null);
+    if (!isConfirmationValid(body?.confirm, company.name)) {
+      return NextResponse.json(
+        {
+          error: "لازم تكتب اسم الشركة بالظبط للتأكيد",
+          code: "CONFIRMATION_REQUIRED",
+          companyName: company.name,
+        },
+        { status: 400 }
+      );
     }
 
     const counts = await prisma.$transaction(async (tx) => {

@@ -1031,8 +1031,11 @@
       "success": "Company transactions cleared successfully",
       "failed": "Failed to clear company data",
       "empty": "This company has no transactions",
-      "disabledHint": "Reset is switched off on this server. To enable it, add ENABLE_DATA_RESET=1 to the server environment."
-    }
+      "disabledHint": "Company reset is switched off on this server.",
+      "typeName": "Type the company name to confirm (cancelling a company zeroes all its transactions):",
+      "confirmMismatch": "That name does not match"
+    },
+    "purchases": "Purchases"
   },
   "warehouses": {
     "title": "Warehouses",

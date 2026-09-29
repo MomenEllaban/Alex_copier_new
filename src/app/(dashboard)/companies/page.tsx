@@ -67,9 +67,11 @@ export default function CompaniesPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [resettingId, setResettingId] = useState<string | null>(null);
-  // The wipe is switched off in production unless the deployment opts in, so the
-  // button is disabled with a reason instead of posting and getting a 404.
+  // A deployment can still lock the per-company wipe out (ENABLE_COMPANY_RESET=0).
   const [resetEnabled, setResetEnabled] = useState(true);
+  const [resetTarget, setResetTarget] = useState<CompanyData | null>(null);
+  const [resetConfirm, setResetConfirm] = useState("");
+  const [resetError, setResetError] = useState("");
   const { success: toastSuccess, error: toastError } = useToast();
   const confirmAction = useConfirm();
 
@@ -92,7 +94,9 @@ export default function CompaniesPage() {
     fetch("/api/data-reset", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (!cancelled && typeof data?.enabled === "boolean") setResetEnabled(data.enabled);
+        if (cancelled) return;
+        if (typeof data?.companyEnabled === "boolean") setResetEnabled(data.companyEnabled);
+        else if (typeof data?.enabled === "boolean") setResetEnabled(data.enabled);
       })
       // A failed probe leaves the button usable; the POST guard is the real check.
       .catch(() => {});
@@ -178,23 +182,33 @@ export default function CompaniesPage() {
     toastSuccess(t("common.deletedSuccessfully"));
   };
 
-  const handleReset = async (company: CompanyData) => {
-    if (resettingId) return;
-    if (
-      !(await confirmAction({
-        title: t("companies.resetData.confirmTitle"),
-        message: `${company.name}\n${t("companies.resetData.confirmMessage")}`,
-      }))
-    )
+  const handleReset = async () => {
+    const company = resetTarget;
+    if (!company || resettingId) return;
+
+    // The server requires the company name echoed back, so this cannot be a
+    // single stray click.
+    if (resetConfirm.trim() !== company.name.trim()) {
+      setResetError(t("companies.resetData.confirmMismatch"));
       return;
+    }
+
     setResettingId(company.id);
+    setResetError("");
     try {
-      const res = await fetch(`/api/companies/${company.id}/reset-transactions`, { method: "POST" });
+      const res = await fetch(`/api/companies/${company.id}/reset-transactions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirm: resetConfirm.trim() }),
+      });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         toastError(apiErrorMessage(data, t, "companies.resetData.failed"));
+        setResetError(apiErrorMessage(data, t, "companies.resetData.failed"));
         return;
       }
+      setResetTarget(null);
+      setResetConfirm("");
       refresh();
       notifyDataChanged(["companies"]);
       toastSuccess(t("companies.resetData.success"));
@@ -230,13 +244,39 @@ export default function CompaniesPage() {
         </button>
       </div>
 
+      {/* One set of cards only. "Expenses" has to include purchases: the
+          per-company cost is totalPurchases + totalExpenses and netProfit comes
+          from the same sum, so showing expenses alone made revenue − expenses
+          disagree with the profit below it. */}
       <StatsCards
         columns={4}
         stats={[
-          { label: t("companies.statsCount"), value: filtered.length.toLocaleString("ar-EG"), icon: <Building2 size={18} />, tone: "sky" },
-          { label: t("companies.revenue"), value: `${totalSales.toLocaleString("ar-EG")} ج.م`, icon: <TrendingUp size={18} />, tone: "green" },
-          { label: t("companies.expenses"), value: `${totalExpenses.toLocaleString("ar-EG")} ج.م`, icon: <TrendingDown size={18} />, tone: "red" },
-          { label: t("companies.netProfit"), value: `${totalNetProfit.toLocaleString("ar-EG")} ج.م`, icon: <Wallet size={18} />, tone: totalNetProfit >= 0 ? "emerald" : "rose" },
+          {
+            label: t("companies.statsCount"),
+            value: filtered.length.toLocaleString("ar-EG"),
+            sub: `${t("pagination.of")} ${companies.length.toLocaleString("ar-EG")}`,
+            icon: <Building2 size={18} />,
+            tone: "sky",
+          },
+          {
+            label: t("companies.revenue"),
+            value: `${totalSales.toLocaleString("ar-EG")} ج.م`,
+            icon: <TrendingUp size={18} />,
+            tone: "green",
+          },
+          {
+            label: t("companies.expenses"),
+            value: `${(totalPurchases + totalExpenses).toLocaleString("ar-EG")} ج.م`,
+            sub: `${t("companies.purchases")}: ${totalPurchases.toLocaleString("ar-EG")}`,
+            icon: <TrendingDown size={18} />,
+            tone: "red",
+          },
+          {
+            label: t("companies.netProfit"),
+            value: `${totalNetProfit.toLocaleString("ar-EG")} ج.م`,
+            icon: <Wallet size={18} />,
+            tone: totalNetProfit >= 0 ? "emerald" : "rose",
+          },
         ]}
       />
 
@@ -291,30 +331,97 @@ export default function CompaniesPage() {
         </form>
       </FormModal>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-gray-500">{t("companies.allCompanies")}</p>
-          <p className="text-3xl font-bold mt-1">{companies.length}</p>
+      {/* Destructive reset: the company name has to be typed, which is what makes
+          this safe to leave enabled. */}
+      {resetTarget && (
+        <div
+          className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/55 p-3"
+          onClick={() => {
+            if (resettingId) return;
+            setResetTarget(null);
+            setResetConfirm("");
+            setResetError("");
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="w-full max-w-md overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bg-gradient-to-r from-amber-50 to-orange-50 px-5 pb-4 pt-5">
+              <h2 className="flex items-center gap-2 text-base font-bold text-slate-900">
+                <Eraser size={18} className="text-amber-600" />
+                {t("companies.resetData.confirmTitle")}
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                {t("companies.resetData.confirmMessage")}
+              </p>
+            </div>
+
+            <div className="space-y-3 px-5 py-4">
+              <p className="text-sm text-slate-600">
+                {t("companies.resetData.typeName")}
+              </p>
+              <p
+                dir="ltr"
+                className="select-all rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-center font-mono text-sm font-bold text-slate-800"
+              >
+                {resetTarget.name}
+              </p>
+              <input
+                value={resetConfirm}
+                onChange={(e) => {
+                  setResetConfirm(e.target.value);
+                  setResetError("");
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void handleReset();
+                }}
+                placeholder={resetTarget.name}
+                aria-label={t("companies.resetData.typeName")}
+                className="w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm outline-none focus:border-amber-500 focus:ring-2 focus:ring-amber-100"
+              />
+              {resetError && (
+                <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {resetError}
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-col-reverse gap-2 border-t border-slate-100 px-5 py-4 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                disabled={!!resettingId}
+                onClick={() => {
+                  setResetTarget(null);
+                  setResetConfirm("");
+                  setResetError("");
+                }}
+                className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+              >
+                {t("common.cancel")}
+              </button>
+              <button
+                type="button"
+                disabled={!!resettingId || resetConfirm.trim() !== resetTarget.name.trim()}
+                onClick={() => void handleReset()}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {resettingId ? (
+                  <span
+                    className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <Eraser size={15} />
+                )}
+                {t("companies.resetData.action")}
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-gray-500">{t("companies.totalRevenue")}</p>
-          <p className="text-3xl font-bold mt-1 text-green-600">
-            {totalSales.toLocaleString("ar-EG")} <span className="text-base font-medium text-gray-400">ج.م</span>
-          </p>
-        </div>
-        <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <p className="text-sm text-gray-500">{t("companies.totalExpenses")}</p>
-          <p className="text-3xl font-bold mt-1 text-red-600">
-            {(totalPurchases + totalExpenses).toLocaleString("ar-EG")} <span className="text-base font-medium text-gray-400">ج.م</span>
-          </p>
-        </div>
-        <div className="rounded-2xl border border-emerald-600 bg-emerald-50/60 p-5 shadow-sm">
-          <p className="text-sm font-medium text-emerald-700">{t("companies.netProfit")}</p>
-          <p className={`text-3xl font-bold mt-1 ${totalNetProfit >= 0 ? "text-emerald-700" : "text-red-600"}`}>
-            {totalNetProfit.toLocaleString("ar-EG")} <span className="text-base font-medium text-gray-400">ج.م</span>
-          </p>
-        </div>
-      </div>
+      )}
 
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div className="w-full sm:max-w-md">
@@ -436,8 +543,8 @@ export default function CompaniesPage() {
                     {t("reports.financialReport")}
                   </button>
                   <button
-                    onClick={() => handleReset(company)}
-                    disabled={resettingId === company.id || !resetEnabled}
+                    onClick={() => setResetTarget(company)}
+                    disabled={!resetEnabled || resettingId === company.id}
                     title={resetEnabled ? undefined : t("companies.resetData.disabledHint")}
                     aria-disabled={!resetEnabled}
                     className={`flex w-full items-center justify-center gap-2 rounded-xl border-2 border-amber-500 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-700 transition ${

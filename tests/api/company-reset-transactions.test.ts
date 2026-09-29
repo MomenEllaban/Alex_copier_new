@@ -22,18 +22,33 @@ vi.mock("@/lib/prisma", () => ({ prisma: mocks.db }));
 
 import { POST } from "@/app/api/companies/[id]/reset-transactions/route";
 
-const req = () => new Request("http://localhost/api/companies/c1/reset-transactions", { method: "POST" });
+const COMPANY = "اليكس كوبير";
+
+/**
+ * A request echoing the company name, which is what the endpoint now demands.
+ * No default parameter: passing `undefined` explicitly has to produce a body
+ * with no `confirm`, not fall back to the company name.
+ */
+const req = (payload: unknown = { confirm: COMPANY }) =>
+  new Request("http://localhost/api/companies/c1/reset-transactions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+/** Shorthand for the common case: the name typed correctly. */
+const confirmed = () => req();
+
+const params = { params: Promise.resolve({ id: "c1" }) };
 
 describe("POST /api/companies/[id]/reset-transactions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllEnvs();
-    // The tests below exercise the endpoint on a non-production environment,
-    // where the guard lets it through.
     vi.stubEnv("NODE_ENV", "test");
-    vi.stubEnv("ENABLE_DATA_RESET", "");
+    vi.stubEnv("ENABLE_COMPANY_RESET", "");
     mocks.requireRole.mockResolvedValue({ id: "u1", role: "GENERAL_MANAGER" });
-    mocks.db.company.findUnique.mockResolvedValue({ id: "c1", name: "اليكس كوبير" });
+    mocks.db.company.findUnique.mockResolvedValue({ id: "c1", name: COMPANY });
     mocks.db.$transaction.mockImplementation(async (cb: (tx: typeof mocks.db) => Promise<unknown>) =>
       cb(mocks.db),
     );
@@ -49,52 +64,65 @@ describe("POST /api/companies/[id]/reset-transactions", () => {
     vi.unstubAllEnvs();
   });
 
-  describe("production off-switch", () => {
-    it("returns 404 in production without touching the database", async () => {
-      vi.stubEnv("NODE_ENV", "production");
-      vi.stubEnv("ENABLE_DATA_RESET", "");
+  /**
+   * The deployment-wide opt-in was replaced by a per-action confirmation: the
+   * endpoint used to answer 404 in production, which left the companies page
+   * showing "edit your server settings" to the only person allowed to use it.
+   * The protection against a misclick now comes from having to type the
+   * company name, which is tested below.
+   */
+  describe("confirmation", () => {
+    it("refuses a request with no confirmation and touches nothing", async () => {
+      const res = await POST(req({}), params);
 
-      const res = await POST(req(), { params: Promise.resolve({ id: "c1" }) });
+      expect(res.status).toBe(400);
+      expect((await res.json()).code).toBe("CONFIRMATION_REQUIRED");
+      expect(mocks.db.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("refuses a confirmation that is not the company name", async () => {
+      for (const wrong of ["", "  ", "اليكس", "اليكس كو", "اليكس كوبيير", "alix"]) {
+        const res = await POST(req({ confirm: wrong }), params);
+        expect(res.status, `"${wrong}" should not confirm`).toBe(400);
+      }
+      expect(mocks.db.$transaction).not.toHaveBeenCalled();
+    });
+
+    it("ignores surrounding whitespace, so a pasted name still works", async () => {
+      const res = await POST(req({ confirm: `  ${COMPANY}  ` }), params);
+      expect(res.status).toBe(200);
+      expect(mocks.db.$transaction).toHaveBeenCalled();
+    });
+
+    it("runs in production without any environment opt-in", async () => {
+      vi.stubEnv("NODE_ENV", "production");
+      vi.stubEnv("ENABLE_COMPANY_RESET", "");
+
+      const res = await POST(confirmed(), params);
+
+      expect(res.status).toBe(200);
+      expect(mocks.db.$transaction).toHaveBeenCalled();
+    });
+  });
+
+  describe("deployment lock-out", () => {
+    it("returns 404 without touching the database", async () => {
+      vi.stubEnv("ENABLE_COMPANY_RESET", "0");
+
+      const res = await POST(confirmed(), params);
 
       expect(res.status).toBe(404);
       expect((await res.json()).code).toBe("DISABLED");
       expect(mocks.db.company.findUnique).not.toHaveBeenCalled();
       expect(mocks.db.$transaction).not.toHaveBeenCalled();
     });
-
-    it("stays disabled in production when the opt-in is anything but exactly 1", async () => {
-      vi.stubEnv("NODE_ENV", "production");
-
-      for (const value of ["", "0", "true", "yes", " 1"]) {
-        vi.stubEnv("ENABLE_DATA_RESET", value);
-        expect((await POST(req(), { params: Promise.resolve({ id: "c1" }) })).status).toBe(404);
-      }
-      expect(mocks.db.$transaction).not.toHaveBeenCalled();
-    });
-
-    it("allows the wipe in production only with ENABLE_DATA_RESET=1", async () => {
-      vi.stubEnv("NODE_ENV", "production");
-      vi.stubEnv("ENABLE_DATA_RESET", "1");
-
-      const res = await POST(req(), { params: Promise.resolve({ id: "c1" }) });
-
-      expect(res.status).toBe(200);
-      expect(mocks.db.$transaction).toHaveBeenCalled();
-    });
-
-    it("stays enabled outside production without the opt-in", async () => {
-      vi.stubEnv("NODE_ENV", "development");
-      vi.stubEnv("ENABLE_DATA_RESET", "");
-
-      expect((await POST(req(), { params: Promise.resolve({ id: "c1" }) })).status).toBe(200);
-    });
   });
 
-  it("rejects non-general-managers with 403", async () => {
+  it("rejects non-general-managers with 403 before anything is deleted", async () => {
     mocks.requireRole.mockResolvedValue(null);
     mocks.requireAuth.mockResolvedValue({ id: "u1", role: "ACCOUNTANT" });
 
-    const res = await POST(req(), { params: Promise.resolve({ id: "c1" }) });
+    const res = await POST(confirmed(), params);
     expect(res.status).toBe(403);
     expect(mocks.db.$transaction).not.toHaveBeenCalled();
   });
@@ -102,18 +130,18 @@ describe("POST /api/companies/[id]/reset-transactions", () => {
   it("returns 404 when the company does not exist", async () => {
     mocks.db.company.findUnique.mockResolvedValue(null);
 
-    const res = await POST(req(), { params: Promise.resolve({ id: "c1" }) });
+    const res = await POST(confirmed(), params);
     expect(res.status).toBe(404);
     expect(mocks.db.$transaction).not.toHaveBeenCalled();
   });
 
   it("deletes only that company's transactions and returns counts", async () => {
-    const res = await POST(req(), { params: Promise.resolve({ id: "c1" }) });
+    const res = await POST(confirmed(), params);
     expect(res.status).toBe(200);
     const body = await res.json();
 
     expect(body.ok).toBe(true);
-    expect(body.company).toEqual({ id: "c1", name: "اليكس كوبير" });
+    expect(body.company).toEqual({ id: "c1", name: COMPANY });
     expect(body.counts).toEqual({
       sales: 7,
       purchases: 6,
@@ -155,7 +183,7 @@ describe("POST /api/companies/[id]/reset-transactions", () => {
       return Promise.resolve({ count: 0 });
     });
 
-    await POST(req(), { params: Promise.resolve({ id: "c1" }) });
+    await POST(confirmed(), params);
 
     expect(order.indexOf("returns")).toBeLessThan(order.indexOf("sales"));
     expect(order.indexOf("invoices")).toBeLessThan(order.indexOf("purchases"));
@@ -164,7 +192,7 @@ describe("POST /api/companies/[id]/reset-transactions", () => {
   it("maps database failures to a 500 error", async () => {
     mocks.db.$transaction.mockRejectedValue(new Error("connection refused"));
 
-    const res = await POST(req(), { params: Promise.resolve({ id: "c1" }) });
+    const res = await POST(confirmed(), params);
     expect(res.status).toBe(500);
   });
 });
