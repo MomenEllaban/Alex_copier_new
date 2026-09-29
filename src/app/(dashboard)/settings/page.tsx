@@ -75,6 +75,9 @@ const [modalOpen, setModalOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
   const [resetText, setResetText] = useState("");
   const [resetSaving, setResetSaving] = useState(false);
+  // The whole-database wipe is off in production unless the deployment opts in,
+  // so the button explains itself instead of failing with a 404.
+  const [resetEnabled, setResetEnabled] = useState(true);
 
   const fetchUsers = async () => {
     try {
@@ -105,6 +108,20 @@ setUsersLoaded(true);
       cancelled = true;
     };
   }, [usersLoaded]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/data-reset", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!cancelled && typeof data?.enabled === "boolean") setResetEnabled(data.enabled);
+      })
+      // A failed probe leaves the button usable; the POST guard is the real check.
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const filteredUsers = users.filter(
     (user) =>
@@ -437,11 +454,21 @@ setUsers((prev) => prev.filter((u) => u.id !== user.id));
             <p className="mt-1 text-sm text-gray-600 whitespace-pre-line">{t("settings.resetData.description")}</p>
             <button
               onClick={() => setResetOpen(true)}
-              className="mt-4 inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-red-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
+              disabled={!resetEnabled}
+              title={resetEnabled ? undefined : t("settings.resetData.disabledHint")}
+              aria-disabled={!resetEnabled}
+              className={`mt-4 inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 ${
+                resetEnabled
+                  ? "bg-red-600 hover:bg-red-700 focus-visible:outline-red-600"
+                  : "cursor-not-allowed bg-slate-300 focus-visible:outline-slate-300"
+              }`}
             >
               <Trash2 size={18} className="shrink-0" />
               {t("settings.resetData.button")}
             </button>
+            {!resetEnabled && (
+              <p className="mt-2 text-sm text-slate-600">{t("settings.resetData.disabledHint")}</p>
+            )}
           </div>
         </div>
         </div>

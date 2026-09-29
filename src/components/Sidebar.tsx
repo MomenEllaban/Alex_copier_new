@@ -37,6 +37,8 @@ import {
   Plus,
   Camera,
   ShieldCheck,
+  Search,
+  Star,
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
@@ -125,15 +127,17 @@ const navGroups: NavGroup[] = [
     // opens on demand.
     defaultOpen: false,
     items: [
+      // Each report gets its own icon: the icon rail shows only this group, and
+      // nine identical bar-chart icons read as one broken block.
       { key: "navigation.reports", href: "/reports", icon: BarChart3, page: "reports" },
-      { key: "navigation.reportContracts", href: "/reports/contracts", icon: BarChart3, page: "reports" },
-      { key: "navigation.reportEngineers", href: "/reports/engineers", icon: BarChart3, page: "reports" },
-      { key: "navigation.reportCash", href: "/reports/cash", icon: BarChart3, page: "reports" },
-      { key: "navigation.reportInspection", href: "/reports/inspection", icon: BarChart3, page: "reports" },
-      { key: "navigation.reportWarranties", href: "/reports/warranties", icon: BarChart3, page: "reports" },
-      { key: "navigation.reportSatisfaction", href: "/reports/satisfaction", icon: BarChart3, page: "reports" },
-      { key: "navigation.reportInvestors", href: "/reports/investors", icon: BarChart3, page: "reports" },
-      { key: "navigation.reportSpareParts", href: "/reports/spare-parts", icon: BarChart3, page: "reports" },
+      { key: "navigation.reportContracts", href: "/reports/contracts", icon: Receipt, page: "reports" },
+      { key: "navigation.reportEngineers", href: "/reports/engineers", icon: Wrench, page: "reports" },
+      { key: "navigation.reportCash", href: "/reports/cash", icon: Wallet, page: "reports" },
+      { key: "navigation.reportInspection", href: "/reports/inspection", icon: Search, page: "reports" },
+      { key: "navigation.reportWarranties", href: "/reports/warranties", icon: ShieldCheck, page: "reports" },
+      { key: "navigation.reportSatisfaction", href: "/reports/satisfaction", icon: Star, page: "reports" },
+      { key: "navigation.reportInvestors", href: "/reports/investors", icon: PieChart, page: "reports" },
+      { key: "navigation.reportSpareParts", href: "/reports/spare-parts", icon: Package, page: "reports" },
     ],
   },
   {
@@ -257,6 +261,10 @@ export default function Sidebar() {
           if (items.length === 0) return null;
           const groupOpen = isGroupOpen(group);
           const canToggle = group.collapsible && !isCollapsed;
+          // The icon rail has no header to click, so a collapsible group
+          // collapses to its own landing page instead of dumping every child
+          // into the rail as a run of near-identical icons.
+          const visibleItems = isCollapsed && group.collapsible ? items.slice(0, 1) : items;
           return (
             <div
               key={group.key}
@@ -282,9 +290,13 @@ export default function Sidebar() {
                 )
               )}
               {(!canToggle || groupOpen) &&
-                items.map((item) => {
+                visibleItems.map((item) => {
                   const Icon = item.icon;
-                  const active = isActive(item.href);
+                  // The rail shows one entry for a collapsible group, so it has
+                  // to light up for every page inside that group — otherwise
+                  // the reports icon goes blank while you are reading a report.
+                  const active =
+                    isActive(item.href) || (isCollapsed && group.collapsible && items.some((i) => isActive(i.href)));
                   return (
                     <div key={item.href} className={`flex items-center ${isCollapsed ? "" : "mx-2"}`}>
                       <Link

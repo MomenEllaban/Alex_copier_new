@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireRole } from "@/lib/auth-helpers";
+import { isDataResetEnabled } from "@/lib/data-reset";
 
 /**
  * POST /api/dev/reset-transactions
@@ -17,7 +18,7 @@ export async function POST() {
   try {
     // Hard off-switch: this endpoint must never wipe production ledgers by
     // accident. Staying dark (404) also keeps it out of the production API.
-    if (process.env.NODE_ENV === "production" && process.env.ENABLE_DATA_RESET !== "1") {
+    if (!isDataResetEnabled()) {
       return NextResponse.json({ error: "غير متاح", code: "DISABLED" }, { status: 404 });
     }
 

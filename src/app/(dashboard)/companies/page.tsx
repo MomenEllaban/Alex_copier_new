@@ -67,6 +67,9 @@ export default function CompaniesPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [resettingId, setResettingId] = useState<string | null>(null);
+  // The wipe is switched off in production unless the deployment opts in, so the
+  // button is disabled with a reason instead of posting and getting a 404.
+  const [resetEnabled, setResetEnabled] = useState(true);
   const { success: toastSuccess, error: toastError } = useToast();
   const confirmAction = useConfirm();
 
@@ -82,6 +85,20 @@ export default function CompaniesPage() {
 
   useEffect(() => {
     fetchCompanies();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/data-reset", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!cancelled && typeof data?.enabled === "boolean") setResetEnabled(data.enabled);
+      })
+      // A failed probe leaves the button usable; the POST guard is the real check.
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, []);
   const { refresh, refreshing } = useAutoRefresh(fetchCompanies, ["companies", "expenses"]);
 
@@ -420,10 +437,12 @@ export default function CompaniesPage() {
                   </button>
                   <button
                     onClick={() => handleReset(company)}
-                    disabled={resettingId === company.id}
-                    className={`flex w-full items-center justify-center gap-2 rounded-xl border-2 border-amber-500 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 ${
-                      resettingId === company.id ? "cursor-wait opacity-60" : ""
-                    }`}
+                    disabled={resettingId === company.id || !resetEnabled}
+                    title={resetEnabled ? undefined : t("companies.resetData.disabledHint")}
+                    aria-disabled={!resetEnabled}
+                    className={`flex w-full items-center justify-center gap-2 rounded-xl border-2 border-amber-500 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-700 transition ${
+                      resetEnabled ? "hover:bg-amber-100" : "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
+                    } ${resettingId === company.id ? "cursor-wait opacity-60" : ""}`}
                   >
                     {resettingId === company.id ? (
                       <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" aria-hidden="true" />
@@ -432,6 +451,9 @@ export default function CompaniesPage() {
                     )}
                     {t("companies.resetData.action")}
                   </button>
+                  {!resetEnabled && (
+                    <p className="text-center text-xs text-slate-500">{t("companies.resetData.disabledHint")}</p>
+                  )}
                 </div>
               </div>
             );

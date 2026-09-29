@@ -86,6 +86,7 @@ export const ACTION_LABELS: Record<"ar" | "en", Record<ActionKey, string>> = {
 export const EXACT_ROUTE_PAGE: Record<string, Page> = {
   dashboard: "dashboard",
   notifications: "dashboard",
+  "data-reset": "settings",
   upload: "customers",
   invoices: "finance",
   "expense-categories": "finance",
