@@ -50,12 +50,11 @@ export async function POST(
     // request that never rendered the page has no way to know the name.
     const body = await request.json().catch(() => null);
     if (!isConfirmationValid(body?.confirm, company.name)) {
+      // The name is deliberately NOT echoed back: returning it here would hand
+      // the answer to any caller, and the UI already has the name on screen to
+      // compare against locally.
       return NextResponse.json(
-        {
-          error: "لازم تكتب اسم الشركة بالظبط للتأكيد",
-          code: "CONFIRMATION_REQUIRED",
-          companyName: company.name,
-        },
+        { error: "لازم تكتب اسم الشركة بالظبط للتأكيد", code: "CONFIRMATION_REQUIRED" },
         { status: 400 }
       );
     }

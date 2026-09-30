@@ -80,6 +80,16 @@ describe("POST /api/companies/[id]/reset-transactions", () => {
       expect(mocks.db.$transaction).not.toHaveBeenCalled();
     });
 
+    it("never echoes the expected name back to the caller", async () => {
+      // The confirmation is only a guard if the server does not hand over the
+      // answer: a caller that never rendered the page could read it here and
+      // replay it. The UI compares locally, so it loses nothing.
+      const res = await POST(req({ confirm: "wrong" }), params);
+      const body = JSON.stringify(await res.json());
+
+      expect(body).not.toContain(COMPANY);
+    });
+
     it("refuses a confirmation that is not the company name", async () => {
       for (const wrong of ["", "  ", "اليكس", "اليكس كو", "اليكس كوبيير", "alix"]) {
         const res = await POST(req({ confirm: wrong }), params);

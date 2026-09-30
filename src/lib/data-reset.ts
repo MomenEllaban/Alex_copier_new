@@ -23,16 +23,14 @@ export function isDataResetEnabled(): boolean {
 
 /** The per-company wipe. Allowed unless a deployment locks it out. */
 export function isCompanyResetEnabled(): boolean {
-  if (process.env.ENABLE_COMPANY_RESET === "0") return false;
-  if (process.env.NODE_ENV !== "production") return true;
-  return true;
+  return process.env.ENABLE_COMPANY_RESET !== "0";
 }
 
 /**
  * The caller has to type the company's name exactly. This is the guard that
  * replaces the deployment-wide switch: it is per-action, so it protects against
- * a misclick without blocking legitimate use, and it cannot be satisfied by a
- * request that never read the page.
+ * a misclick without blocking legitimate use, and the server never hands the
+ * expected name back, so a caller that never rendered the page cannot skip it.
  */
 export function isConfirmationValid(typed: unknown, companyName: string): boolean {
   if (typeof typed !== "string") return false;
