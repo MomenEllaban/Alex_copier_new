@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
 import { traceError } from "@/lib/prisma-errors";
+import {
+  machineDeletionBlockers,
+  isMachineDeletable,
+  describeMachineBlockers,
+} from "@/lib/machine-replacement";
 
 export async function GET(
   request: Request,
@@ -128,24 +133,32 @@ export async function DELETE(
     });
 
     if (!existing) {
-      return NextResponse.json({ error: "Machine not found" }, { status: 404 });
+      return NextResponse.json({ error: "الماكينة غير موجودة", code: "MACHINE_NOT_FOUND" }, { status: 404 });
     }
 
-    // Check for service requests referencing this machine
-    const serviceRequestCount = await prisma.serviceRequest.count({
-      where: { machineId: id },
-    });
-    if (serviceRequestCount > 0) {
+    // A machine is only deletable when nothing in its life is kept. A machine
+    // under a contract is the important case: ContractMachine cascades, so
+    // deleting it would silently drop the customer's coverage with no trace.
+    // The 409 carries every blocker so the UI can offer the replacement flow
+    // instead of a bare "no".
+    const blockers = await machineDeletionBlockers(id);
+    if (!isMachineDeletable(blockers)) {
       return NextResponse.json(
-        { error: `لا يمكن حذف الجهاز لأنه مرتبط بـ ${serviceRequestCount} طلب صيانة`, code: "HAS_SERVICE_REQUESTS" },
-        { status: 400 }
+        {
+          error: `لا يمكن حذف الماكينة ${existing.serialNumber}: ${describeMachineBlockers(blockers)}`,
+          code: "MACHINE_HAS_HISTORY",
+          blockers,
+          deletable: false,
+          suggestion: blockers.contracts.length > 0 ? "replace" : "archive",
+        },
+        { status: 409 }
       );
     }
 
     await prisma.machine.delete({ where: { id } });
-    return NextResponse.json({ message: "Machine deleted" });
+    return NextResponse.json({ message: "تم حذف الماكينة", deleted: true });
   } catch (error) {
     console.error("Failed to delete machine:", error);
-    return NextResponse.json({ error: "Failed to delete machine" }, { status: 500 });
+    return NextResponse.json({ error: "فشل حذف الماكينة", code: "DELETE_FAILED" }, { status: 500 });
   }
 }

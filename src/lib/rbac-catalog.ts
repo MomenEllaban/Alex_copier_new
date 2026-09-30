@@ -109,6 +109,11 @@ export const EXACT_ROUTE_PAGE: Record<string, Page> = {
   "hr/loans": "hrPayroll",
   "hr/bonuses": "hrPayroll",
   "hr/penalties": "hrPayroll",
+  // The الاستبدال page reads its own route (it needs the warehouse position,
+  // which the products route does not return); the replacement history is part
+  // of what that page shows.
+  "trade-ins": "tradeIns",
+  "machine-replacements": "tradeIns",
 };
 
 /** Longest-prefix wins, so `customers/import` resolves before `customers`. */
@@ -172,7 +177,14 @@ export const NO_ACTION_ROUTES = [
  * that must still exist, so this cannot rot silently.
  */
 export const VIRTUAL_PAGE_ACTIONS: Partial<Record<Page, { actions: ActionKey[]; verify: string[] }>> = {
-  tradeIns: { actions: ["view", "add", "edit"], verify: ["products", "products/[id]"] },
+  // Reads go through its own `/api/trade-ins` (it needs the stock position,
+  // which `/api/products` does not return); removing a trade-in product still
+  // goes through `/api/products/[id]`, and a machine can be replaced into this
+  // page through `/api/machines/[id]/replace`.
+  tradeIns: {
+    actions: ["view", "add", "edit"],
+    verify: ["trade-ins", "products", "products/[id]", "machines/[id]/replace"],
+  },
 };
 
 /**
@@ -213,6 +225,9 @@ const ROUTE_ALLOWED_PAGES: Record<string, Page[]> = {
   "hr/penalties": ["hrPayroll"],
   notifications: ["dashboard"],
   "notifications/[id]": ["dashboard"],
+  "trade-ins": ["tradeIns"],
+  "machine-replacements": ["tradeIns", "machines"],
+  "machines/[id]/replace": ["machines", "tradeIns"],
 };
 
 /** Every page a route may be guarded by. Empty means "not in the matrix". */

@@ -284,6 +284,70 @@
       "underMaintenance": "Under Maintenance"
     }
   },
+  "replacement": {
+    "action": "Replace Machine",
+    "title": "Replace Machine",
+    "subtitle": "Take the old machine back as replacement stock and point the contract at the new one",
+    "oldMachine": "Returned machine",
+    "newMachine": "New machine",
+    "newMachineOptional": "Leave empty to detach the machine from the contract with no replacement",
+    "pickNewMachine": "Pick a replacement machine from the warehouse",
+    "contract": "Contract",
+    "allContracts": "All attached contracts",
+    "receivingCompany": "Receiving company",
+    "receivingCompanyHint": "The returned machine enters this company's products, warehouse and inventory",
+    "tradeInValue": "Trade-in value",
+    "condition": "Condition of returned machine",
+    "reason": "Reason for replacement",
+    "notes": "Notes",
+    "summary": "What will happen",
+    "summaryDetach": "Detach the machine from the contract and record it as replacement stock in that company's inventory",
+    "summarySwap": "Attach the new machine to the contract in its place, and record the old one as replacement stock in that company's inventory",
+    "submit": "Apply replacement",
+    "done": "Replacement applied",
+    "doneDetail": "{serial} was recorded as replacement stock in {company} with quantity {qty}",
+    "conditions": {
+      "excellent": "Excellent",
+      "good": "Good",
+      "fair": "Fair",
+      "poor": "Poor"
+    },
+    "reasons": {
+      "CUSTOMER_REQUEST": "Customer request",
+      "MACHINE_DEFECTIVE": "Machine defective",
+      "UPGRADE": "Upgrade",
+      "CONTRACT_ENDED": "Contract ended",
+      "OTHER": "Other"
+    },
+    "deleteBlockedTitle": "Machine cannot be deleted",
+    "deleteBlockedHint": "This machine is attached to records that must not be lost. Use Replace if it is under a customer contract.",
+    "blockers": {
+      "contracts": "Maintenance contracts",
+      "serviceRequests": "Service requests",
+      "meterReadings": "Meter readings",
+      "ownerHistory": "Ownership history",
+      "replacements": "Replacement records",
+      "copierTests": "Customer tests",
+      "scrapOrder": "Scrap order",
+      "warranty": "Warranty"
+    },
+    "noContracts": "This machine is not attached to any contract — it can be recorded as replacement stock directly",
+    "loadFailed": "Could not load replacement data"
+  },
+  "tradeInsHistory": {
+    "title": "Replacement log",
+    "oldMachine": "Returned machine",
+    "newMachine": "New machine",
+    "contract": "Contract",
+    "customer": "Customer",
+    "company": "Receiving company",
+    "warehouse": "Warehouse",
+    "stock": "Stock in warehouse",
+    "replacedWith": "Replaced with",
+    "noNewMachine": "Detached from contract only",
+    "by": "By",
+    "empty": "No replacements recorded"
+  },
   "machineDetails": {
     "view": "View lifecycle",
     "overview": "Machine overview",
@@ -1389,7 +1453,16 @@
     "total": "Total Products",
     "totalValue": "Total Trade-In Value",
     "active": "Active",
-    "classified": "Classified"
+    "classified": "Classified",
+    "subtitle": "Machines taken back from customers, and their stock in the receiving company's warehouse",
+    "warehouse": "Warehouse",
+    "stock": "Stock in warehouse",
+    "inStock": "available",
+    "outOfStock": "none",
+    "stockTotal": "Total stock units",
+    "holdingCompany": "Holding company",
+    "showHistory": "Replacement log",
+    "companyRoutingHint": "Every machine taken back from a customer is booked as a trade-in in the same company, and the product is created automatically in that company's main warehouse"
   },
   "hr": {
     "currency": "EGP",

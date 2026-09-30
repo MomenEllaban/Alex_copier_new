@@ -1,7 +1,7 @@
 {
   "navigation": {
     "dashboard": "لوحة التحكم",
-    "machines": "الأجهزة",
+    "machines": "الماكينات",
     "customers": "العملاء",
     "suppliers": "الموردون",
     "engineers": "المهندسون",
@@ -247,13 +247,13 @@
     "reasonPlaceholder": "سبب المرتجع أو ملاحظات الفحص..."
   },
   "machines": {
-    "title": "الأجهزة",
+    "title": "الماكينات",
     "serialNumber": "الرقم التسلسلي",
     "manufacturer": "الشركة المصنعة",
     "model": "الطراز",
     "status": "الحالة",
-    "addMachine": "إضافة جهاز",
-    "history": "سجل الجهاز",
+    "addMachine": "إضافة ماكينة",
+    "history": "سجل الماكينة",
     "meterReading": "قراءة العدّاد",
     "paperSize": "حجم الورق",
     "currentOwner": "المالك الحالي",
@@ -271,15 +271,79 @@
     "deliveryCounters": "عداد التسليم",
     "printer": "برنتر",
     "stats": {
-      "total": "إجمالي الأجهزة",
+      "total": "إجمالي الماكينات",
       "sold": "مباع",
       "inWarehouse": "في المستودع",
       "underMaintenance": "تحت الصيانة"
     }
   },
+  "replacement": {
+    "action": "استبدال الماكينة",
+    "title": "استبدال الماكينة",
+    "subtitle": "استرجع الماكينة القديمة كمنتج استبدال ووجّه الماكينة الجديدة على نفس العقد",
+    "oldMachine": "الماكينة المستردة",
+    "newMachine": "الماكينة الجديدة",
+    "newMachineOptional": "اتركها فارغة لفك الماكينة من العقد بدون ماكينة بديلة",
+    "pickNewMachine": "اختر ماكينة بديلة من المستودع",
+    "contract": "العقد",
+    "allContracts": "كل العقود المرتبطة",
+    "receivingCompany": "الشركة المستلمة",
+    "receivingCompanyHint": "الماكينة المستردة تدخل منتج ومستودع ومخزون هذه الشركة",
+    "tradeInValue": "قيمة الاستبدال",
+    "condition": "حالة الماكينة المستردة",
+    "reason": "سبب الاستبدال",
+    "notes": "ملاحظات",
+    "summary": "ما سيحدث",
+    "summaryDetach": "فك ربط الماكينة من العقد وتسجيلها كمنتج استبدال في مخزون الشركة",
+    "summarySwap": "ربط الماكينة الجديدة بالعقد بدلاً منها، وتسجيل القديمة كمنتج استبدال في مخزون الشركة",
+    "submit": "تنفيذ الاستبدال",
+    "done": "تم تنفيذ الاستبدال",
+    "doneDetail": "سُجلت {serial} كمنتج استبدال في {company} بكمية {qty}",
+    "conditions": {
+      "excellent": "ممتازة",
+      "good": "جيدة",
+      "fair": "مقبولة",
+      "poor": "ضعيفة"
+    },
+    "reasons": {
+      "CUSTOMER_REQUEST": "طلب العميل",
+      "MACHINE_DEFECTIVE": "عطل في الماكينة",
+      "UPGRADE": "تطوير / ترقية",
+      "CONTRACT_ENDED": "انتهاء العقد",
+      "OTHER": "أخرى"
+    },
+    "deleteBlockedTitle": "لا يمكن حذف الماكينة",
+    "deleteBlockedHint": "الماكينة مرتبطة بسجلات لا يمكن فقدانها. استخدم الاستبدال لو كانت تحت عقد عميل.",
+    "blockers": {
+      "contracts": "عقود الصيانة",
+      "serviceRequests": "طلبات الصيانة",
+      "meterReadings": "قراءات العداد",
+      "ownerHistory": "سجل الملكية",
+      "replacements": "عمليات الاستبدال",
+      "copierTests": "اختبارات العملاء",
+      "scrapOrder": "أمر الإتلاف",
+      "warranty": "الضمان"
+    },
+    "noContracts": "الماكينة غير مرتبطة بأي عقد — يمكن تسجيلها كمنتج استبدال مباشرة",
+    "loadFailed": "تعذر تحميل بيانات الاستبدال"
+  },
+  "tradeInsHistory": {
+    "title": "سجل عمليات الاستبدال",
+    "oldMachine": "الماكينة المستردة",
+    "newMachine": "الماكينة الجديدة",
+    "contract": "العقد",
+    "customer": "العميل",
+    "company": "الشركة المستلمة",
+    "warehouse": "المستودع",
+    "stock": "الكمية بالمستودع",
+    "replacedWith": "استُبدلت بـ",
+    "noNewMachine": "فقط فك من العقد",
+    "by": "بواسطة",
+    "empty": "لا توجد عمليات استبدال مسجلة"
+  },
   "machineDetails": {
     "view": "عرض سجل دورة الحياة",
-    "overview": "نظرة عامة على الجهاز",
+    "overview": "نظرة عامة على الماكينة",
     "customer": "العميل والموقع",
     "warranty": "الضمان",
     "contracts": "عقود الصيانة",
@@ -1389,7 +1453,16 @@
     "total": "إجمالي المنتجات",
     "totalValue": "إجمالي قيمة الاستبدال",
     "active": "منتجات نشطة",
-    "classified": "منتجات مصنّفة"
+    "classified": "منتجات مصنّفة",
+    "subtitle": "الماكينات المستردة من العملاء، ومخزونها في مستودع الشركة المستلمة",
+    "warehouse": "المستودع",
+    "stock": "الكمية بالمستودع",
+    "inStock": "متوفر",
+    "outOfStock": "غير متوفر",
+    "stockTotal": "إجمالي وحدات المخزون",
+    "holdingCompany": "الشركة الحاملة",
+    "showHistory": "سجل الاستبدال",
+    "companyRoutingHint": "كل ماكينة تُسترد من العميل تُسجَّل كمنتج استبدال في نفس الشركة، ويتم إنشاء المنتج تلقائياً في مستودعها الرئيسي"
   },
   "hr": {
     "currency": "ج.م",

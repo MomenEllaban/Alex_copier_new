@@ -7,7 +7,7 @@ import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
-import { Plus, Trash2, Upload, Save, Printer, Boxes, Hammer, BadgeCheck } from "lucide-react";
+import { Plus, Trash2, Upload, Save, Printer, Boxes, Hammer, BadgeCheck, RefreshCcw } from "lucide-react";
 import ExportButton from "@/components/ExportButton";
 import FormModal from "@/components/FormModal";
 import StatsCards from "@/components/StatsCards";
@@ -16,6 +16,10 @@ import ImportDialog from "@/components/ImportDialog";
 import PrinterLoader from "@/components/PrinterLoader";
 import { DateTimeCell } from "@/components/DateTimeCell";
 import { useConfirm, useToast } from "@/components/UIProvider";
+import ReplaceMachineModal, {
+  DeleteBlockedModal,
+  type MachineBlockers,
+} from "@/components/ReplaceMachineModal";
 import { useUrlParams, useSearchWithDefault } from "@/hooks/useUrlParams";
 import SubmitButton from "@/components/SubmitButton";
 import RefreshButton from "@/components/RefreshButton";
@@ -87,7 +91,7 @@ const emptyForm = {
 export default function MachinesPage() {
   const { t, dir, locale } = useI18n();
   const confirmAction = useConfirm();
-const { success: toastSuccess } = useToast();
+  const { success: toastSuccess, error: toastError } = useToast();
   
   const [machines, setMachines] = useState<Machine[]>([]);
   const [customers, setCustomers] = useState<{ id: string; name: string }[]>([]);
@@ -99,6 +103,12 @@ const { success: toastSuccess } = useToast();
   const [saving, setSaving] = useState(false);
   const [selected, setSelected] = useState<MachineDetails | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
+  // A refused delete, and the machine the replacement flow should open for.
+  const [blockedMachine, setBlockedMachine] = useState<{
+    blockers: MachineBlockers;
+    serialNumber: string;
+  } | null>(null);
+  const [replaceMachineId, setReplaceMachineId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("");
   const [showImport, setShowImport] = useState(false);
@@ -203,13 +213,30 @@ const { success: toastSuccess } = useToast();
     notifyDataChanged(["machines", "sales", "workshop", "contracts", "customers"]);
   };
 
-  const handleDelete = async (id: string) => {
-      if (!(await confirmAction({ message: t("common.deleteConfirm") }))) return;
-      await fetch(`/api/machines/${id}`, { method: "DELETE" });
-      refresh();
-      notifyDataChanged(["machines", "sales", "workshop", "contracts", "customers"]);
-      toastSuccess(t("common.deletedSuccessfully"));
-    };
+  /**
+   * A machine under a contract cannot be deleted — the contract link cascades
+   * and the customer would silently lose coverage. The API answers 409 with the
+   * full list of blockers, so a refused delete has to be surfaced as a refusal
+   * plus the replacement flow, never as a success toast.
+   */
+  const handleDelete = async (id: string, serialNumber: string) => {
+    if (!(await confirmAction({ message: t("common.deleteConfirm") }))) return;
+    const res = await fetch(`/api/machines/${id}`, { method: "DELETE" });
+    const json = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      if (json.code === "MACHINE_HAS_HISTORY" && json.blockers) {
+        setBlockedMachine({ blockers: json.blockers, serialNumber });
+        return;
+      }
+      toastError(json.error ?? t("common.error"));
+      return;
+    }
+
+    refresh();
+    notifyDataChanged(["machines", "sales", "workshop", "contracts", "customers"]);
+    toastSuccess(t("common.deletedSuccessfully"));
+  };
 
   const setField = (field: string, value: string | boolean) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -406,7 +433,15 @@ const { success: toastSuccess } = useToast();
                         {t("machineDetails.view")}
                       </button>
                       <button
-                        onClick={() => handleDelete(machine.id)}
+                        onClick={() => setReplaceMachineId(machine.id)}
+                        title={t("replacement.subtitle")}
+                        className="text-amber-600 hover:text-amber-800 text-sm me-3"
+                      >
+                        <RefreshCcw size={14} className="inline-block me-1" />
+                        {t("replacement.action")}
+                      </button>
+                      <button
+                        onClick={() => handleDelete(machine.id, machine.serialNumber)}
                         className="text-red-600 hover:text-red-800 text-sm"
                       >
                         <Trash2 size={14} className="inline-block me-1" />{t("common.delete")}
@@ -509,6 +544,31 @@ const { success: toastSuccess } = useToast();
         title={`${t("common.import")} — ${t("machines.title")}`}
         onImported={refresh}
       />
+
+      {blockedMachine && (
+        <DeleteBlockedModal
+          blockers={blockedMachine.blockers}
+          serialNumber={blockedMachine.serialNumber}
+          onClose={() => setBlockedMachine(null)}
+          onReplace={() => {
+            // The machine that was just refused is the one to offer replacing.
+            const target = machines.find((m) => m.serialNumber === blockedMachine.serialNumber);
+            setBlockedMachine(null);
+            if (target) setReplaceMachineId(target.id);
+          }}
+        />
+      )}
+
+      {replaceMachineId && (
+        <ReplaceMachineModal
+          machineId={replaceMachineId}
+          onClose={() => setReplaceMachineId(null)}
+          onDone={() => {
+            refresh();
+            setSelected(null);
+          }}
+        />
+      )}
     </div>
   );
 }

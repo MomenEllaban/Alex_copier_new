@@ -1,0 +1,11 @@
+-- CreateIndex
+-- SKU is unique per company rather than globally: two companies may both stock
+-- "A4 toner". The product importer already rejects a duplicate name inside one
+-- company, and this gives SKUs the same guarantee in the database.
+--
+-- Every existing Product has a NULL sku, and Postgres does not treat NULLs as
+-- equal in a unique index, so this cannot collide with current data.
+--
+-- It is also what lets a machine trade-in product be keyed on the machine's
+-- serial number, which is already unique per machine.
+CREATE UNIQUE INDEX "Product_companyId_sku_key" ON "Product"("companyId", "sku");

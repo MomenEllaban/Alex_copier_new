@@ -249,7 +249,10 @@ describe("RBAC — every mutating endpoint is action-guarded", () => {
         if (!implied) continue;
 
         // Sub-resource routes legitimately use a different verb mapping.
-        if (/(scrap|close|confirm|reject|reset-transactions|statement-token|import)$/.test(handler.route)) {
+        // `replace` is a lifecycle transition on an existing machine (take the
+        // old one back, put the new one on the same contract) rather than the
+        // creation of a new machine, so it is guarded as "edit".
+        if (/(scrap|close|confirm|reject|reset-transactions|statement-token|import|replace)$/.test(handler.route)) {
           continue;
         }
 

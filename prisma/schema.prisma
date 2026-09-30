@@ -94,6 +94,8 @@ model User {
   // the nine built-in ones. Backfilled by the migration from the enum value.
   roleRef Role?   @relation(fields: [roleId], references: [id])
   roleId  String?
+
+  machineReplacements MachineReplacement[]
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -280,6 +282,7 @@ model Company {
   employeeLoans         EmployeeLoan[]
   employeeBonuses       EmployeeBonus[]
   employeePenalties     EmployeePenalty[]
+  machineReplacements   MachineReplacement[]
   hrSetting             HrSetting?
 }
 
@@ -587,6 +590,13 @@ model Product {
   returnTransactions       ReturnTransaction[]
   sparePartCompatibilities SparePartCompatibility[] @relation("SparePartCompat")
   compatibleMachines       SparePartCompatibility[] @relation("CompatibleMachine")
+  machineReplacement       MachineReplacement[]
+
+  // SKU is unique per company, not globally: two companies may legitimately
+  // both stock "A4 toner". The import already rejects a duplicate name within a
+  // company, and this makes the same rule hold for SKUs at the database level.
+  // A machine trade-in product is keyed on the machine's serial number.
+  @@unique([companyId, sku])
 }
 
 model Machine {
@@ -621,6 +631,10 @@ model Machine {
   scrapOrder       ScrapOrder?
   warranty         Warranty?
   copierTests      CopierTest[]
+  // A machine can be taken back as a replacement more than once over its life,
+  // and can be the machine handed to the customer in a later swap.
+  replacedOut     MachineReplacement[] @relation("ReplacementOldMachine")
+  replacedIn      MachineReplacement[] @relation("ReplacementNewMachine")
 }
 
 model MachineOwnerHistory {
@@ -674,10 +688,11 @@ model Warehouse {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company            Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  company            Company                  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   inventory          WarehouseInventory[]
   stockMovements     StockMovement[]
   returnTransactions ReturnTransaction[]
+  machineReplacements MachineReplacement[]
 }
 
 model WarehouseInventory {
@@ -1004,6 +1019,8 @@ model Contract {
   customer Customer          @relation(fields: [customerId], references: [id], onDelete: Cascade)
   machines ContractMachine[]
   visits   Visit[]
+  // Set when the customer swaps the machine out; the contract itself survives.
+  machineReplacements MachineReplacement[]
 }
 
 model ContractMachine {
@@ -1015,6 +1032,66 @@ model ContractMachine {
   machine  Machine  @relation(fields: [machineId], references: [id], onDelete: Cascade)
 
   @@unique([contractId, machineId])
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// MACHINE REPLACEMENT (استبدال ماكينة)
+// ───────────────────────────────────────────────────────────────────────────
+// When a machine under a maintenance contract is swapped out, the machine that
+// comes back is kept as second-hand stock, not thrown away: it becomes a
+// `Product` flagged `isTradeIn` that belongs to the replacement-holding company
+// ("شركة القطاعي") and sits in that company's warehouse, so it shows up on the
+// replacement-products page and in that company's inventory.
+//
+// `contractId` is only set when the replacement was initiated from a contract —
+// a machine can also be taken back without one.
+//
+// `oldMachineId` is Restrict, never Cascade: this row is the audit trail of
+// which machine left a customer and went where, so the machine it names must
+// not be deletable out from under it.
+// ───────────────────────────────────────────────────────────────────────────
+
+enum MachineReplacementReason {
+  CUSTOMER_REQUEST
+  MACHINE_DEFECTIVE
+  UPGRADE
+  CONTRACT_ENDED
+  OTHER
+}
+
+model MachineReplacement {
+  id          String   @id @default(cuid())
+  oldMachineId String
+  newMachineId String?
+  contractId  String?
+  // The company that takes the returned machine in as replacement stock.
+  companyId   String
+  // The trade-in Product created for the returned machine, and where it is held.
+  productId   String
+  warehouseId String
+  tradeInValue Float?
+  condition   String?
+  reason      MachineReplacementReason @default(CUSTOMER_REQUEST)
+  notes       String?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  oldMachine Machine   @relation("ReplacementOldMachine", fields: [oldMachineId], references: [id], onDelete: Restrict)
+  newMachine Machine?  @relation("ReplacementNewMachine", fields: [newMachineId], references: [id], onDelete: SetNull)
+  contract   Contract? @relation(fields: [contractId], references: [id], onDelete: SetNull)
+  company    Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  // Restrict, not Cascade: a replacement record is the only link between a
+  // returned machine and the contract it came off. Cascading would let someone
+  // delete the trade-in product from the الاستبدال page and silently erase
+  // which machine and contract it belonged to.
+  product    Product   @relation(fields: [productId], references: [id], onDelete: Restrict)
+  warehouse  Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Restrict)
+  createdBy  User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([companyId, createdAt])
+  @@index([contractId])
+  @@index([oldMachineId])
 }
 
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
