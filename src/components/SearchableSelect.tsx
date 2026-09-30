@@ -65,7 +65,7 @@ export default function SearchableSelect({
    * enough that one very long name cannot swallow the page. A single
    * line-item still has a long option, and the row truncates at this point.
    */
-  const MAX_POPUP_WIDTH = 448;
+  const MAX_POPUP_WIDTH = 600;
 
   // Cap rendered rows so huge catalogs stay fast with a consistent scroll.
   const MAX_RENDER = 100;
@@ -241,9 +241,9 @@ export default function SearchableSelect({
           style={
             roomToEnd === null
               ? undefined
-              : { maxWidth: `min(${MAX_POPUP_WIDTH}px, ${roomToEnd}px, 92vw)` }
+              : { width: `min(${MAX_POPUP_WIDTH}px, ${roomToEnd}px, 92vw)` }
           }
-          className={`absolute z-[60] w-max min-w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl ${openUp ? "bottom-full mb-1.5" : "top-full mt-1.5"} ${dropdownClassName}`}
+          className={`absolute z-[60] min-w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl ${openUp ? "bottom-full mb-1.5" : "top-full mt-1.5"} ${dropdownClassName}`}
         >
           {/* search is always visible while typing */}
           <div className="border-b border-gray-100 p-2">
