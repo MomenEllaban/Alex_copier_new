@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePageAccess, requireAction } from "@/lib/auth-helpers";
+import { parseEgyptDateTimeLocal } from "@/lib/datetime";
 import { z } from "zod";
 
 const createSchema = z.object({
@@ -112,7 +113,7 @@ export async function POST(request: Request) {
     const movement = await prisma.workshopPartMovement.create({
       data: {
         ...parsed.data,
-        date: new Date(parsed.data.date),
+        date: parseEgyptDateTimeLocal(parsed.data.date),
         performedById: parsed.data.performedById || actor.id,
         performedByName: parsed.data.performedByName || (actor as { name?: string }).name || null,
         companyId: actor.companyId || null,

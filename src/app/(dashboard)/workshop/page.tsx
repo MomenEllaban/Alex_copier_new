@@ -18,6 +18,7 @@ import { notifyDataChanged } from "@/lib/data-events";
 import { useConfirm, useToast } from "@/components/UIProvider";
 import { apiErrorMessage } from "@/lib/api-client";
 import SearchableSelect from "@/components/SearchableSelect";
+import { getEgyptDateTimeLocal, formatEgyptDateTime } from "@/lib/datetime";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -317,7 +318,7 @@ export default function WorkshopPage() {
 
   const openAddForm = () => {
     setEditingMovement(null);
-    setForm({ ...emptyMovementForm, date: getCurrentDateTimeLocal() });
+    setForm({ ...emptyMovementForm, date: getEgyptDateTimeLocal() });
     setShowForm(true);
   };
 
@@ -372,7 +373,7 @@ export default function WorkshopPage() {
 
       toastSuccess(editingMovement ? t("common.updatedSuccessfully") : t("common.createdSuccessfully"));
       setShowForm(false);
-      setForm({ ...emptyMovementForm, date: getCurrentDateTimeLocal() });
+      setForm({ ...emptyMovementForm, date: getEgyptDateTimeLocal() });
       setEditingMovement(null);
       refresh();
       notifyDataChanged(["workshop"]);
@@ -626,8 +627,8 @@ export default function WorkshopPage() {
                             <div className="flex flex-col gap-0.5 min-w-0">
                               <span className="text-green-600 font-medium text-xs truncate">{m.receivedByName || m.receivedBy?.name || "—"}</span>
                               <span className="text-xs text-gray-400 whitespace-nowrap" dir="ltr">
-                                {new Date(m.receivedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Africa/Cairo" })}{" "}
-                                {new Date(m.receivedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Cairo" })}
+                                {formatEgyptDateTime(m.receivedAt).dateStr}{" "}
+                                {formatEgyptDateTime(m.receivedAt).timeStr}
                               </span>
                             </div>
                           ) : (
