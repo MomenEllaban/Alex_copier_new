@@ -489,72 +489,74 @@ export default function WorkshopPage() {
 
           {/* Filters */}
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="flex flex-col gap-3 border-b border-slate-200 p-4 md:flex-row md:items-center md:flex-wrap">
-              <div className="w-full md:w-64 md:flex-none">
-                <SearchInput
-                  value={search}
-                  onChange={(v) => { setSearch(v); setPage(1); }}
-                  placeholder={t("workshop.movements.searchPlaceholder")}
+            <div className="border-b border-slate-200 p-4">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+                <div className="xl:col-span-2">
+                  <SearchInput
+                    value={search}
+                    onChange={(v) => { setSearch(v); setPage(1); }}
+                    placeholder={t("workshop.movements.searchPlaceholder")}
+                  />
+                </div>
+                <FilterSelect
+                  value={movementTypeFilter}
+                  onChange={(v) => { setMovementTypeFilter(v); setPage(1); }}
+                  options={Object.entries(MOVEMENT_TYPE_LABELS).map(([value, label]) => ({ value, label }))}
+                  allLabel={`${t("workshop.movements.movementType")} — ${t("common.all")}`}
+                />
+                <FilterSelect
+                  value={engineerFilter}
+                  onChange={(v) => { setEngineerFilter(v); setPage(1); }}
+                  options={engineers.map((e) => ({ value: e.id, label: e.name }))}
+                  allLabel={`${t("workshop.movements.engineer")} — ${t("common.all")}`}
+                />
+                <FilterSelect
+                  value={customerFilter}
+                  onChange={(v) => { setCustomerFilter(v); setPage(1); }}
+                  options={customers.map((c) => ({ value: c.id, label: c.name }))}
+                  allLabel={`${t("workshop.movements.customer")} — ${t("common.all")}`}
+                />
+                <FilterSelect
+                  value={receiptFilter}
+                  onChange={(v) => { setReceiptFilter(v); setPage(1); }}
+                  options={[
+                    { value: "received", label: t("workshop.movements.received") },
+                    { value: "pending", label: t("workshop.movements.pending") },
+                  ]}
+                  allLabel={`${t("workshop.movements.receiptStatus")} — ${t("common.all")}`}
                 />
               </div>
-              <FilterSelect
-                value={movementTypeFilter}
-                onChange={(v) => { setMovementTypeFilter(v); setPage(1); }}
-                options={Object.entries(MOVEMENT_TYPE_LABELS).map(([value, label]) => ({ value, label }))}
-                allLabel={`${t("workshop.movements.movementType")} — ${t("common.all")}`}
-                className="md:w-40"
-              />
-              <FilterSelect
-                value={engineerFilter}
-                onChange={(v) => { setEngineerFilter(v); setPage(1); }}
-                options={engineers.map((e) => ({ value: e.id, label: e.name }))}
-                allLabel={`${t("workshop.movements.engineer")} — ${t("common.all")}`}
-                className="md:w-40"
-              />
-              <FilterSelect
-                value={customerFilter}
-                onChange={(v) => { setCustomerFilter(v); setPage(1); }}
-                options={customers.map((c) => ({ value: c.id, label: c.name }))}
-                allLabel={`${t("workshop.movements.customer")} — ${t("common.all")}`}
-                className="md:w-40"
-              />
-              <FilterSelect
-                value={receiptFilter}
-                onChange={(v) => { setReceiptFilter(v); setPage(1); }}
-                options={[
-                  { value: "received", label: t("workshop.movements.received") },
-                  { value: "pending", label: t("workshop.movements.pending") },
-                ]}
-                allLabel={`${t("workshop.movements.receiptStatus")} — ${t("common.all")}`}
-                className="md:w-40"
-              />
-              <div className="flex gap-2">
-                <input
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
-                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder={t("workshop.movements.dateFrom")}
-                />
-                <input
-                  type="date"
-                  value={dateTo}
-                  onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
-                  className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder={t("workshop.movements.dateTo")}
-                />
-              </div>
-              {hasActiveFilters && (
-                <button
-                  onClick={() => { setSearch(""); setMovementTypeFilter(""); setEngineerFilter(""); setCustomerFilter(""); setDateFrom(""); setDateTo(""); setReceiptFilter(""); setPage(1); }}
-                  className="text-sm text-gray-500 hover:text-gray-700 underline"
-                >
-                  {t("common.resetFilters")}
-                </button>
-              )}
-              <div className="flex flex-wrap gap-2 md:ms-auto mt-2 md:mt-0">
-                <RefreshButton onRefresh={refresh} refreshing={refreshing} />
-                <ExportButton filename="workshop-movements" getExport={exportMovements} disabled={filteredMovements.length === 0} />
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-gray-500">{t("workshop.movements.dateFrom")}:</label>
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-gray-500">{t("workshop.movements.dateTo")}:</label>
+                  <input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+                    className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                {hasActiveFilters && (
+                  <button
+                    onClick={() => { setSearch(""); setMovementTypeFilter(""); setEngineerFilter(""); setCustomerFilter(""); setDateFrom(""); setDateTo(""); setReceiptFilter(""); setPage(1); }}
+                    className="text-sm text-gray-500 hover:text-gray-700 underline"
+                  >
+                    {t("common.resetFilters")}
+                  </button>
+                )}
+                <div className="flex flex-wrap gap-2 ms-auto">
+                  <RefreshButton onRefresh={refresh} refreshing={refreshing} />
+                  <ExportButton filename="workshop-movements" getExport={exportMovements} disabled={filteredMovements.length === 0} />
+                </div>
               </div>
             </div>
 
@@ -573,63 +575,63 @@ export default function WorkshopPage() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1200px]">
+                <table className="w-full min-w-[1100px]">
                   <thead>
                     <tr className="bg-gray-50">
-                      <th className="text-start px-4 py-3 text-sm font-medium text-gray-500">{t("workshop.movements.date")}</th>
-                      <th className="text-start px-4 py-3 text-sm font-medium text-gray-500">{t("workshop.movements.engineer")}</th>
-                      <th className="text-start px-4 py-3 text-sm font-medium text-gray-500">{t("workshop.movements.customer")}</th>
-                      <th className="text-start px-4 py-3 text-sm font-medium text-gray-500">{t("workshop.movements.description")}</th>
-                      <th className="text-start px-4 py-3 text-sm font-medium text-gray-500">{t("workshop.movements.requestedBy")}</th>
-                      <th className="text-center px-4 py-3 text-sm font-medium text-gray-500">{t("workshop.movements.sale")}</th>
-                      <th className="text-center px-4 py-3 text-sm font-medium text-gray-500">{t("workshop.movements.replacement")}</th>
-                      <th className="text-center px-4 py-3 text-sm font-medium text-gray-500">{t("workshop.movements.return")}</th>
-                      <th className="text-start px-4 py-3 text-sm font-medium text-gray-500">{t("workshop.movements.performedBy")}</th>
-                      <th className="text-start px-4 py-3 text-sm font-medium text-gray-500">{t("workshop.movements.receipt")}</th>
-                      <th className="text-start px-4 py-3 text-sm font-medium text-gray-500">{t("common.actions")}</th>
+                      <th className="text-start px-3 py-2.5 text-xs font-medium text-gray-500 whitespace-nowrap">{t("workshop.movements.date")}</th>
+                      <th className="text-start px-3 py-2.5 text-xs font-medium text-gray-500 whitespace-nowrap">{t("workshop.movements.engineer")}</th>
+                      <th className="text-start px-3 py-2.5 text-xs font-medium text-gray-500 whitespace-nowrap">{t("workshop.movements.customer")}</th>
+                      <th className="text-start px-3 py-2.5 text-xs font-medium text-gray-500 min-w-[200px]">{t("workshop.movements.description")}</th>
+                      <th className="text-start px-3 py-2.5 text-xs font-medium text-gray-500 whitespace-nowrap">{t("workshop.movements.requestedBy")}</th>
+                      <th className="text-center px-3 py-2.5 text-xs font-medium text-gray-500 w-12">{t("workshop.movements.sale")}</th>
+                      <th className="text-center px-3 py-2.5 text-xs font-medium text-gray-500 w-12">{t("workshop.movements.replacement")}</th>
+                      <th className="text-center px-3 py-2.5 text-xs font-medium text-gray-500 w-12">{t("workshop.movements.return")}</th>
+                      <th className="text-start px-3 py-2.5 text-xs font-medium text-gray-500 whitespace-nowrap">{t("workshop.movements.performedBy")}</th>
+                      <th className="text-start px-3 py-2.5 text-xs font-medium text-gray-500 min-w-[140px]">{t("workshop.movements.receipt")}</th>
+                      <th className="text-start px-3 py-2.5 text-xs font-medium text-gray-500 w-20">{t("common.actions")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
                     {pagedMovements.map((m) => (
                       <tr key={m.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm whitespace-nowrap">
+                        <td className="px-3 py-2.5 text-sm whitespace-nowrap">
                           <DateTimeCell value={m.date} />
                         </td>
-                        <td className="px-4 py-3 text-sm">{m.engineerName || m.engineer?.name || "—"}</td>
-                        <td className="px-4 py-3 text-sm">{m.customerName || m.customer?.name || "—"}</td>
-                        <td className="px-4 py-3 text-sm max-w-xs truncate" title={m.description}>{m.description || "—"}</td>
-                        <td className="px-4 py-3 text-sm">{m.requestedBy || "—"}</td>
-                        <td className="px-4 py-3 text-center text-sm">{m.movementType === "SALE" ? "✓" : ""}</td>
-                        <td className="px-4 py-3 text-center text-sm">{m.movementType === "REPLACEMENT" ? "✓" : ""}</td>
-                        <td className="px-4 py-3 text-center text-sm">{m.movementType === "RETURN" ? "✓" : ""}</td>
-                        <td className="px-4 py-3 text-sm">{m.performedByName || m.performedBy?.name || "—"}</td>
-                        <td className="px-4 py-3 text-sm">
+                        <td className="px-3 py-2.5 text-sm whitespace-nowrap">{m.engineerName || m.engineer?.name || "—"}</td>
+                        <td className="px-3 py-2.5 text-sm whitespace-nowrap">{m.customerName || m.customer?.name || "—"}</td>
+                        <td className="px-3 py-2.5 text-sm max-w-[200px] truncate" title={m.description}>{m.description || "—"}</td>
+                        <td className="px-3 py-2.5 text-sm whitespace-nowrap">{m.requestedBy || "—"}</td>
+                        <td className="px-3 py-2.5 text-center text-sm">{m.movementType === "SALE" ? "✓" : ""}</td>
+                        <td className="px-3 py-2.5 text-center text-sm">{m.movementType === "REPLACEMENT" ? "✓" : ""}</td>
+                        <td className="px-3 py-2.5 text-center text-sm">{m.movementType === "RETURN" ? "✓" : ""}</td>
+                        <td className="px-3 py-2.5 text-sm whitespace-nowrap">{m.performedByName || m.performedBy?.name || "—"}</td>
+                        <td className="px-3 py-2.5 text-sm">
                           {m.receivedAt ? (
-                            <div className="flex flex-col">
-                              <span className="text-green-600 font-medium">{m.receivedByName || m.receivedBy?.name || "—"}</span>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-green-600 font-medium text-xs">{m.receivedByName || m.receivedBy?.name || "—"}</span>
                               <DateTimeCell value={m.receivedAt} className="text-xs text-gray-400" />
                             </div>
                           ) : (
                             <button
                               onClick={() => handleConfirmReceipt(m)}
-                              className="inline-flex items-center gap-1 rounded-lg bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700 transition hover:bg-green-100"
+                              className="inline-flex items-center gap-1 rounded-lg bg-green-50 px-2 py-1 text-xs font-medium text-green-700 transition hover:bg-green-100 whitespace-nowrap"
                             >
                               <CheckCircle2 size={12} />
                               {t("workshop.movements.confirmReceipt")}
                             </button>
                           )}
                         </td>
-                        <td className="px-4 py-3 text-sm">
+                        <td className="px-3 py-2.5 text-sm">
                           <div className="flex gap-1">
                             <button
                               onClick={() => openEditForm(m)}
-                              className="rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 transition hover:bg-blue-100"
+                              className="rounded-lg bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 transition hover:bg-blue-100 whitespace-nowrap"
                             >
                               {t("common.edit")}
                             </button>
                             <button
                               onClick={() => handleDelete(m)}
-                              className="rounded-lg bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700 transition hover:bg-red-100"
+                              className="rounded-lg bg-red-50 px-2 py-1 text-xs font-medium text-red-700 transition hover:bg-red-100"
                             >
                               <Trash2 size={12} />
                             </button>
@@ -762,31 +764,32 @@ export default function WorkshopPage() {
           />
 
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="flex flex-col gap-3 border-b border-slate-200 p-4 md:flex-row md:items-center md:flex-wrap">
-              <div className="w-full md:w-80 md:flex-none">
-                <SearchInput
-                  value={machineSearch}
-                  onChange={(v) => { setMachineSearch(v); setMachinePage(1); }}
-                  placeholder={`${t("common.search")} ${t("machines.serialNumber")} / ${t("machines.model")}...`}
+            <div className="border-b border-slate-200 p-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="w-full sm:w-auto sm:flex-1 sm:max-w-xs">
+                  <SearchInput
+                    value={machineSearch}
+                    onChange={(v) => { setMachineSearch(v); setMachinePage(1); }}
+                    placeholder={`${t("common.search")} ${t("machines.serialNumber")} / ${t("machines.model")}...`}
+                  />
+                </div>
+                <FilterSelect
+                  value={statusFilter}
+                  onChange={(v) => { setStatusFilter(v); setMachinePage(1); }}
+                  options={Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))}
+                  allLabel={`${t("machines.status")} — ${t("common.all")}`}
                 />
-              </div>
-              <FilterSelect
-                value={statusFilter}
-                onChange={(v) => { setStatusFilter(v); setMachinePage(1); }}
-                options={Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))}
-                allLabel={`${t("machines.status")} — ${t("common.all")}`}
-                className="md:w-44"
-              />
-              {machineSearch !== "" || statusFilter !== "" ? (
-                <button
-                  onClick={() => { setMachineSearch(""); setStatusFilter(""); setMachinePage(1); }}
-                  className="text-sm text-gray-500 hover:text-gray-700 underline"
-                >
-                  {t("common.resetFilters")}
-                </button>
-              ) : null}
-              <div className="flex flex-wrap gap-2 md:ms-auto mt-2 md:mt-0">
-                <RefreshButton onRefresh={fetchMachines} refreshing={false} />
+                {machineSearch !== "" || statusFilter !== "" ? (
+                  <button
+                    onClick={() => { setMachineSearch(""); setStatusFilter(""); setMachinePage(1); }}
+                    className="text-sm text-gray-500 hover:text-gray-700 underline"
+                  >
+                    {t("common.resetFilters")}
+                  </button>
+                ) : null}
+                <div className="ms-auto">
+                  <RefreshButton onRefresh={fetchMachines} refreshing={false} />
+                </div>
               </div>
             </div>
             {machinesLoading ? (
