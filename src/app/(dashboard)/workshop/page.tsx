@@ -626,8 +626,8 @@ export default function WorkshopPage() {
                             <div className="flex flex-col gap-0.5 min-w-0">
                               <span className="text-green-600 font-medium text-xs truncate">{m.receivedByName || m.receivedBy?.name || "—"}</span>
                               <span className="text-xs text-gray-400 whitespace-nowrap" dir="ltr">
-                                {new Date(m.receivedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })}{" "}
-                                {new Date(m.receivedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                                {new Date(m.receivedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Africa/Cairo" })}{" "}
+                                {new Date(m.receivedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Cairo" })}
                               </span>
                             </div>
                           ) : (

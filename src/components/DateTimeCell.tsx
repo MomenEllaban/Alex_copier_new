@@ -7,9 +7,9 @@ interface DateTimeCellProps {
   withSeconds?: boolean;
 }
 
-const dateFmt: Intl.DateTimeFormatOptions = { day: "2-digit", month: "2-digit", year: "numeric" };
+const dateFmt: Intl.DateTimeFormatOptions = { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Africa/Cairo" };
 const timeFmt = (withSeconds: boolean): Intl.DateTimeFormatOptions =>
-  withSeconds ? { hour: "2-digit", minute: "2-digit", second: "2-digit" } : { hour: "2-digit", minute: "2-digit" };
+  withSeconds ? { hour: "2-digit", minute: "2-digit", second: "2-digit", timeZone: "Africa/Cairo" } : { hour: "2-digit", minute: "2-digit", timeZone: "Africa/Cairo" };
 
 export function DateTimeCell({ value, className = "", timeClassName = "text-xs text-gray-400", withSeconds = false }: DateTimeCellProps) {
   if (!value) {
