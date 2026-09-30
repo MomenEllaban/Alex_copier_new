@@ -8,6 +8,7 @@
     "db:seed:access": "tsx prisma/seed-access.ts",
     "db:seed:hr": "tsx prisma/seed-hr.ts",
     "db:seed:rbac": "tsx prisma/seed-rbac.ts",
+    "catalogues:load": "tsx scripts/load-product-catalogues.ts",
     "rbac:scan": "tsx scripts/scan-permissions.ts",
     "rbac:sync": "tsx scripts/scan-permissions.ts --write",
     "verify:rbac": "tsx scripts/verify-rbac.ts",
