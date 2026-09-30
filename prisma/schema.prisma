@@ -96,6 +96,10 @@ model User {
   roleId  String?
 
   machineReplacements MachineReplacement[]
+  workshopPartMovementsPerformedBy WorkshopPartMovement[] @relation("WorkshopMovementPerformedBy")
+  workshopPartMovementsReceivedBy   WorkshopPartMovement[] @relation("WorkshopMovementReceivedBy")
+  workshopPartMovementsCreatedBy    WorkshopPartMovement[] @relation("WorkshopMovementCreatedBy")
+  workshopPartMovementsUpdatedBy    WorkshopPartMovement[] @relation("WorkshopMovementUpdatedBy")
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -284,6 +288,7 @@ model Company {
   employeePenalties     EmployeePenalty[]
   machineReplacements   MachineReplacement[]
   hrSetting             HrSetting?
+  workshopPartMovements WorkshopPartMovement[]
 }
 
 model Customer {
@@ -329,6 +334,7 @@ model Customer {
   payments             CustomerPayment[]
   copierTests          CopierTest[]
   workshopTransactions WorkshopTransaction[]
+  workshopPartMovements WorkshopPartMovement[]
 }
 
 model CustomerPayment {
@@ -424,6 +430,7 @@ model Engineer {
   copierTests     CopierTest[]
   customers       Customer[]
   employee        Employee?
+  workshopPartMovements WorkshopPartMovement[]
 }
 
 model EngineerArea {
@@ -2106,4 +2113,75 @@ model TraineeInfo {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
   Employee           Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PHASE 13 - WORKSHOP PARTS MOVEMENT (بيان حركة قطع غيار الورشة)
+// ═══════════════════════════════════════════════════════════════════════════
+// A digital replica of the paper logbook that tracks every spare part
+// movement in and out of the main workshop. Each row is one movement:
+// a sale, a replacement, or a return — the three types ticked by hand
+// on the paper form.
+//
+// `movementType` is a single enum, not three boolean flags: on the paper
+// form each row carries exactly one tick, so a movement that is both a
+// sale and a replacement would be written as two rows. The enum keeps
+// the database honest to that rule and makes filtering trivial.
+//
+// `engineerName` / `customerName` are denormalized snapshots. The paper
+// form records the name as written on the day; if the engineer or customer
+// is later renamed or deleted, the historical row must still read the same.
+// ═══════════════════════════════════════════════════════════════════════════
+
+enum WorkshopMovementType {
+  SALE
+  REPLACEMENT
+  RETURN
+}
+
+model WorkshopPartMovement {
+  id          String   @id @default(cuid())
+  /// The date of the movement, as written on the paper form.
+  date        DateTime
+  /// The engineer who took part in / requested the movement.
+  engineerId  String?
+  engineerName String?
+  /// The customer the movement relates to.
+  customerId  String?
+  customerName String?
+  /// Free-text description: part type, model, quantity, machine serial…
+  description String
+  /// The person who requested the part.
+  requestedBy String?
+  /// The single type of this movement (sale / replacement / return).
+  movementType WorkshopMovementType
+  /// The employee who executed the movement. Defaults to the current user.
+  performedById   String?
+  performedByName String?
+  /// Who confirmed workshop receipt (mainly for returns). Nullable.
+  receivedById   String?
+  receivedByName String?
+  receivedAt     DateTime?
+  companyId      String?
+  createdById    String?
+  updatedById    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  /// Soft delete: the row is hidden but kept for audit.
+  deletedAt      DateTime?
+
+  engineer   Engineer? @relation(fields: [engineerId], references: [id], onDelete: SetNull)
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  company    Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  performedBy User?    @relation("WorkshopMovementPerformedBy", fields: [performedById], references: [id], onDelete: SetNull)
+  receivedBy   User?    @relation("WorkshopMovementReceivedBy", fields: [receivedById], references: [id], onDelete: SetNull)
+  createdBy    User?    @relation("WorkshopMovementCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  updatedBy    User?    @relation("WorkshopMovementUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+
+  @@index([date])
+  @@index([movementType])
+  @@index([engineerId])
+  @@index([customerId])
+  @@index([deletedAt])
+  @@index([companyId])
 }

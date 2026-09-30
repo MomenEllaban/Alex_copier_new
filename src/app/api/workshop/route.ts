@@ -27,7 +27,7 @@ export async function GET() {
       },
       orderBy: { createdAt: "desc" },
     });
-    return NextResponse.json(machines);
+    return NextResponse.json({ data: machines });
   } catch (error) {
     return NextResponse.json({ error: "Failed to fetch workshop machines" }, { status: 500 });
   }
