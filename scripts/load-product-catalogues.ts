@@ -70,15 +70,18 @@ function toCsv(names: string[], company: string, type: string): string {
 async function main() {
   const write = process.argv.includes("--write");
   const archiveStale = process.argv.includes("--archive-stale");
+  const purge = process.argv.includes("--purge-archived");
   // Re-applies which products are active without importing anything, so a
   // previously run import can be corrected without creating duplicates.
   const syncOnly = process.argv.includes("--sync-only");
   console.log(
     syncOnly
       ? "MODE: SYNC ONLY (activation state only, nothing imported)\n"
-      : write
-        ? "MODE: WRITE\n"
-        : "MODE: DRY RUN (nothing will be written)\n"
+      : purge
+        ? "MODE: PURGE ARCHIVED (permanent delete, no undo)\n"
+        : write
+          ? "MODE: WRITE\n"
+          : "MODE: DRY RUN (nothing will be written)\n"
   );
 
   for (const catalogue of CATALOGUES) {
@@ -93,6 +96,16 @@ async function main() {
 
     if (!write && !syncOnly) {
       console.log("  would import  : " + names.length + " products at zero price and zero stock");
+      if (purge) {
+        const company = await prisma.company.findFirst({
+          where: { OR: [{ nameAr: catalogue.company }, { name: catalogue.company }] },
+          select: { id: true },
+        });
+        const archived = company
+          ? await prisma.product.count({ where: { companyId: company.id, isActive: false } })
+          : 0;
+        console.log(`  would purge   : ${archived} archived product(s) and their stock history`);
+      }
       console.log("");
       continue;
     }
@@ -153,6 +166,37 @@ async function main() {
         }
       }
     }
+    if (purge && write) {
+      // Hard delete. Every relation to Product cascades, so this also takes the
+      // product's stock movements, stock rows, custodies and compatibility links
+      // with it. Only run it once the archive has been reviewed.
+      const company = await prisma.company.findFirst({
+        where: { OR: [{ nameAr: catalogue.company }, { name: catalogue.company }] },
+        select: { id: true },
+      });
+      if (company) {
+        const archived = await prisma.product.findMany({
+          where: { companyId: company.id, isActive: false },
+          select: { id: true, name: true },
+        });
+        if (archived.length > 0) {
+          const gone = await prisma.product.deleteMany({
+            where: { id: { in: archived.map((p) => p.id) } },
+          });
+          console.log(`  purged         : ${gone.count} archived product(s), with their stock history`);
+        } else {
+          console.log("  purged         : 0 (nothing archived)");
+        }
+      }
+    }
+
+    const kept = await prisma.product.count({
+      where: { companyId: (await prisma.company.findFirst({
+        where: { OR: [{ nameAr: catalogue.company }, { name: catalogue.company }] },
+        select: { id: true },
+      }))?.id },
+    });
+    console.log(`  products now   : ${kept}`);
     console.log("");
   }
 
