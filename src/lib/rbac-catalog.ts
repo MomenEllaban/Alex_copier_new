@@ -100,10 +100,15 @@ export const EXACT_ROUTE_PAGE: Record<string, Page> = {
   "workshop-daily": "workshopDaily",
   "hr/departments": "hrSettings",
   "hr/job-titles": "hrSettings",
+  "hr/settings": "hrSettings",
   "hr/attendance": "hrAttendance",
   "hr/employees": "hrEmployees",
   "hr/leaves": "hrLeaves",
   "hr/payroll": "hrPayroll",
+  "hr/advances": "hrPayroll",
+  "hr/loans": "hrPayroll",
+  "hr/bonuses": "hrPayroll",
+  "hr/penalties": "hrPayroll",
 };
 
 /** Longest-prefix wins, so `customers/import` resolves before `customers`. */
@@ -196,10 +201,15 @@ const ROUTE_ALLOWED_PAGES: Record<string, Page[]> = {
   "engineers/linkable-users": ["engineers"],
   "hr/departments": ["hrSettings"],
   "hr/job-titles": ["hrSettings"],
+  "hr/settings": ["hrSettings"],
   "hr/attendance": ["hrAttendance"],
   "hr/employees": ["hrEmployees"],
   "hr/leaves": ["hrLeaves"],
   "hr/payroll": ["hrPayroll"],
+  "hr/advances": ["hrPayroll"],
+  "hr/loans": ["hrPayroll"],
+  "hr/bonuses": ["hrPayroll"],
+  "hr/penalties": ["hrPayroll"],
   notifications: ["dashboard"],
   "notifications/[id]": ["dashboard"],
 };

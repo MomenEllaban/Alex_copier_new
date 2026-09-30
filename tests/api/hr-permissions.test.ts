@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => {
     payrollPeriod: { findUnique: vi.fn() },
     employee: { findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
     leaveRequest: { findMany: vi.fn(), findUnique: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
-    attendance: { findMany: vi.fn(), create: vi.fn() },
+    dailyAttendanceRecord: { findMany: vi.fn(), upsert: vi.fn() },
     department: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn() },
     jobTitle: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn() },
     approvalLog: { create: vi.fn() },
@@ -64,8 +64,8 @@ const ENDPOINTS: {
   { label: "GET /api/hr/leaves", page: "hrLeaves", model: "leaveRequest", call: () => leaves.GET(GET()) },
   { label: "POST /api/hr/leaves", page: "hrLeaves", model: "leaveRequest", call: () => leaves.POST(POST()) },
   { label: "PATCH /api/hr/leaves", page: "hrLeaves", model: "leaveRequest", call: () => leaves.PATCH(PATCH()) },
-  { label: "GET /api/hr/attendance", page: "hrAttendance", model: "attendance", call: () => attendance.GET(GET()) },
-  { label: "POST /api/hr/attendance", page: "hrAttendance", model: "attendance", call: () => attendance.POST(POST()) },
+  { label: "GET /api/hr/attendance", page: "hrAttendance", model: "dailyAttendanceRecord", call: () => attendance.GET(GET()) },
+  { label: "POST /api/hr/attendance", page: "hrAttendance", model: "dailyAttendanceRecord", call: () => attendance.POST(POST()) },
   { label: "GET /api/hr/departments", page: "hrSettings", model: "department", call: () => departments.GET() },
   { label: "POST /api/hr/departments", page: "hrSettings", model: "department", call: () => departments.POST(POST()) },
   { label: "GET /api/hr/job-titles", page: "hrSettings", model: "jobTitle", call: () => jobTitles.GET() },
@@ -77,6 +77,8 @@ describe("HR API — page access is enforced on every endpoint", () => {
     vi.clearAllMocks();
     mocks.requireAuth.mockResolvedValue({ id: "u1", role: "GENERAL_MANAGER", companyId: "c1" });
     mocks.requirePageAccess.mockResolvedValue({ id: "u1", role: "GENERAL_MANAGER", companyId: "c1" });
+    mocks.db.payrollRun.findMany.mockResolvedValue([]);
+    mocks.db.dailyAttendanceRecord.findMany.mockResolvedValue([]);
   });
 
   describe.each(ENDPOINTS)("$label", ({ page, call, model }) => {

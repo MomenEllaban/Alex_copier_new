@@ -276,6 +276,11 @@ model Company {
   payrollPeriods        PayrollPeriod[]
   payrollRuns           PayrollRun[]
   salaryComponents      SalaryComponent[]
+  employeeAdvances      EmployeeAdvance[]
+  employeeLoans         EmployeeLoan[]
+  employeeBonuses       EmployeeBonus[]
+  employeePenalties     EmployeePenalty[]
+  hrSetting             HrSetting?
 }
 
 model Customer {
@@ -1501,6 +1506,7 @@ enum AdvanceStatus {
 enum InstallmentPayStatus {
   PENDING_PAY
   PAID
+  POSTPONED
   CANCELLED
 }
 
@@ -1627,6 +1633,8 @@ model Employee {
   SalaryComponents EmployeeSalaryComponent[]
   Advances         EmployeeAdvance[]
   Loans            EmployeeLoan[]
+  Bonuses          EmployeeBonus[]
+  Penalties        EmployeePenalty[]
   PayrollItems     PayrollItem[]
   TraineeInfo      TraineeInfo?
 
@@ -1728,55 +1736,172 @@ model EmployeeSalaryComponent {
 }
 
 model EmployeeAdvance {
-  id            String        @id @default(cuid())
-  employeeId    String
-  amount        Float
-  requestDate   DateTime
-  reason        String
-  status        AdvanceStatus @default(PENDING)
-  approvedBy    String?
-  approvedAt    DateTime?
-  deductMonth   Int?
-  deductYear    Int?
-  payrollItemId String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  Employee      Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  id                 String        @id @default(cuid())
+  companyId          String
+  employeeId         String
+  amount             Float
+  requestDate        DateTime
+  reason             String
+  status             AdvanceStatus @default(PENDING)
+  approvedBy         String?
+  approvedAt         DateTime?
+  disbursedBy        String?
+  disbursedAt        DateTime?
+  disbursementMethod String?
+  treasuryAccountId  String?
+  deductMonth        Int?
+  deductYear         Int?
+  payrollItemId      String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
 
+  Company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  Employee    Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  PayrollItem PayrollItem? @relation(fields: [payrollItemId], references: [id])
+
+  @@index([companyId, status])
   @@index([employeeId, status])
 }
 
 model EmployeeLoan {
-  id               String            @id @default(cuid())
-  employeeId       String
-  totalAmount      Float
-  installmentCount Int
-  monthlyAmount    Float
-  startDate        DateTime
-  reason           String
-  status           AdvanceStatus     @default(PENDING)
-  approvedBy       String?
-  approvedAt       DateTime?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  Employee         Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  Installments     LoanInstallment[]
+  id                 String            @id @default(cuid())
+  companyId          String
+  employeeId         String
+  totalAmount        Float
+  installmentCount   Int
+  monthlyAmount      Float
+  startDate          DateTime
+  reason             String
+  status             AdvanceStatus     @default(PENDING)
+  approvedBy         String?
+  approvedAt         DateTime?
+  disbursedBy        String?
+  disbursedAt        DateTime?
+  disbursementMethod String?
+  treasuryAccountId  String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  Company      Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  Employee     Employee          @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  Installments LoanInstallment[]
+
+  @@index([companyId, status])
+  @@index([employeeId, status])
 }
 
 model LoanInstallment {
-  id            String               @id @default(cuid())
-  loanId        String
-  installmentNo Int
-  amount        Float
-  dueDate       DateTime
-  paidDate      DateTime?
-  status        InstallmentPayStatus @default(PENDING_PAY)
-  payrollItemId String?
-  createdAt     DateTime             @default(now())
-  updatedAt     DateTime             @updatedAt
-  Loan          EmployeeLoan         @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  id              String               @id @default(cuid())
+  loanId          String
+  installmentNo   Int
+  amount          Float
+  dueDate         DateTime
+  paidDate        DateTime?
+  paidMonth       Int?
+  paidYear        Int?
+  status          InstallmentPayStatus @default(PENDING_PAY)
+  postponedReason String?
+  postponedAt     DateTime?
+  postponedBy     String?
+  payrollItemId   String?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  Loan        EmployeeLoan @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  PayrollItem PayrollItem? @relation(fields: [payrollItemId], references: [id])
 
   @@index([loanId, status])
+}
+
+model EmployeeBonus {
+  id            String          @id @default(cuid())
+  companyId     String
+  employeeId    String
+  title         String
+  bonusType     String          @default("PERFORMANCE")
+  calcType      CalculationType @default(FIXED_AMOUNT)
+  percentage    Float?
+  amount        Float
+  targetMonth   Int
+  targetYear    Int
+  reason        String?
+  status        AdvanceStatus   @default(PENDING)
+  approvedBy    String?
+  approvedAt    DateTime?
+  payrollItemId String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  Company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  Employee    Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  PayrollItem PayrollItem? @relation(fields: [payrollItemId], references: [id])
+
+  @@index([companyId, targetYear, targetMonth])
+  @@index([employeeId, status])
+}
+
+model EmployeePenalty {
+  id            String          @id @default(cuid())
+  companyId     String
+  employeeId    String
+  title         String
+  penaltyType   String          @default("ADMINISTRATIVE")
+  calcType      CalculationType @default(FIXED_AMOUNT)
+  deductionDays Float?
+  amount        Float
+  targetMonth   Int
+  targetYear    Int
+  reason        String
+  status        AdvanceStatus   @default(PENDING)
+  approvedBy    String?
+  approvedAt    DateTime?
+  payrollItemId String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  Company     Company      @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  Employee    Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  PayrollItem PayrollItem? @relation(fields: [payrollItemId], references: [id])
+
+  @@index([companyId, targetYear, targetMonth])
+  @@index([employeeId, status])
+}
+
+model HrSetting {
+  id                         String   @id @default(cuid())
+  companyId                  String   @unique
+  standardWorkingDays        Int      @default(30)
+  dailyWorkingHours          Float    @default(8.0)
+  overtimeWeekdayRate        Float    @default(1.5)
+  overtimeWeekendRate        Float    @default(2.0)
+  absenceDeductionMultiplier Float    @default(1.0)
+  lateGraceMinutes           Int      @default(15)
+  lateDeductionTiers         Json?
+  annualLeaveDefaultDays     Float    @default(21.0)
+  sickLeaveDefaultDays       Float    @default(7.0)
+  emergencyLeaveDefaultDays  Float    @default(5.0)
+  maxAdvancePercentOfSalary  Float    @default(50.0)
+  maxActiveLoansPerEmployee  Int      @default(1)
+  maxLoanSalaryMultiple      Float    @default(3.0)
+  insuranceEnabled           Boolean  @default(true)
+  insuranceEmployeeRate      Float    @default(11.0)
+  insuranceCompanyRate       Float    @default(18.75)
+  insuranceMinSalary         Float    @default(2000.0)
+  insuranceMaxSalary         Float    @default(12600.0)
+  taxEnabled                 Boolean  @default(true)
+  taxPersonalExemption       Float    @default(20000.0)
+  taxBrackets                Json?
+  payrollExpenseAccountId    String?
+  salariesPayableAccountId   String?
+  treasuryAccountId          String?
+  advancesAccountId          String?
+  loansAccountId             String?
+  socialInsuranceAccountId   String?
+  taxAuthorityAccountId      String?
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  Company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 }
 
 model PayrollPeriod {
@@ -1795,51 +1920,81 @@ model PayrollPeriod {
 }
 
 model PayrollRun {
-  id              String        @id @default(cuid())
-  periodId        String
-  status          PayrollStatus @default(DRAFT)
-  totalGross      Float         @default(0)
-  totalDeductions Float         @default(0)
-  totalNet        Float         @default(0)
-  employeeCount   Int           @default(0)
-  calculatedAt    DateTime?
-  calculatedBy    String?
-  approvedBy      String?
-  approvedAt      DateTime?
-  lockedBy        String?
-  lockedAt        DateTime?
-  journalEntryId  String?
-  notes           String?
-  companyId       String
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
-  Period          PayrollPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
-  Company         Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  Items           PayrollItem[]
+  id                     String        @id @default(cuid())
+  periodId               String
+  companyId              String
+  status                 PayrollStatus @default(DRAFT)
+  totalGross             Float         @default(0)
+  totalDeductions        Float         @default(0)
+  totalNet               Float         @default(0)
+  totalBasic             Float         @default(0)
+  totalAllowances        Float         @default(0)
+  totalBonuses           Float         @default(0)
+  totalOvertime          Float         @default(0)
+  totalAbsenceDeductions Float         @default(0)
+  totalLateDeductions    Float         @default(0)
+  totalPenalties         Float         @default(0)
+  totalAdvances          Float         @default(0)
+  totalLoanInstallments  Float         @default(0)
+  totalEmployeeInsurance Float         @default(0)
+  totalCompanyInsurance  Float         @default(0)
+  totalTax               Float         @default(0)
+  employeeCount          Int           @default(0)
+  calculatedAt           DateTime?
+  calculatedBy           String?
+  approvedBy             String?
+  approvedAt             DateTime?
+  lockedBy               String?
+  lockedAt               DateTime?
+  journalEntryId         String?
+  notes                  String?
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
 
+  Period  PayrollPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  Company Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  Items   PayrollItem[]
+
+  @@unique([companyId, periodId])
   @@index([companyId, status])
 }
 
 model PayrollItem {
-  id              String                 @id @default(cuid())
-  payrollRunId    String
-  employeeId      String
-  basicSalary     Float                  @default(0)
-  totalEarnings   Float                  @default(0)
-  totalDeductions Float                  @default(0)
-  grossSalary     Float                  @default(0)
-  netSalary       Float                  @default(0)
-  workedDays      Int                    @default(0)
-  absentDays      Int                    @default(0)
-  lateDays        Int                    @default(0)
-  overtimeHours   Float                  @default(0)
-  flag            PayrollItemFlag        @default(NONE)
-  notes           String?
-  createdAt       DateTime               @default(now())
-  updatedAt       DateTime               @updatedAt
-  PayrollRun      PayrollRun             @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
-  Employee        Employee               @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  Components      PayrollItemComponent[]
+  id                      String                 @id @default(cuid())
+  payrollRunId            String
+  employeeId              String
+  basicSalary             Float                  @default(0)
+  allowancesAmount        Float                  @default(0)
+  bonusesAmount           Float                  @default(0)
+  overtimeAmount          Float                  @default(0)
+  absenceAmount           Float                  @default(0)
+  lateAmount              Float                  @default(0)
+  penaltiesAmount         Float                  @default(0)
+  advancesAmount          Float                  @default(0)
+  loansAmount             Float                  @default(0)
+  employeeInsuranceAmount Float                  @default(0)
+  companyInsuranceAmount  Float                  @default(0)
+  taxAmount               Float                  @default(0)
+  totalEarnings           Float                  @default(0)
+  totalDeductions         Float                  @default(0)
+  grossSalary             Float                  @default(0)
+  netSalary               Float                  @default(0)
+  workedDays              Int                    @default(0)
+  absentDays              Int                    @default(0)
+  lateDays                Int                    @default(0)
+  overtimeHours           Float                  @default(0)
+  flag                    PayrollItemFlag        @default(NONE)
+  notes                   String?
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+
+  PayrollRun   PayrollRun             @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  Employee     Employee               @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  Components   PayrollItemComponent[]
+  Advances     EmployeeAdvance[]
+  Installments LoanInstallment[]
+  Bonuses      EmployeeBonus[]
+  Penalties    EmployeePenalty[]
 
   @@unique([payrollRunId, employeeId])
 }
@@ -1852,8 +2007,9 @@ model PayrollItemComponent {
   type              SalaryComponentType
   amount            Float               @default(0)
   createdAt         DateTime            @default(now())
-  PayrollItem       PayrollItem         @relation(fields: [payrollItemId], references: [id], onDelete: Cascade)
-  SalaryComponent   SalaryComponent?    @relation(fields: [salaryComponentId], references: [id])
+
+  PayrollItem     PayrollItem      @relation(fields: [payrollItemId], references: [id], onDelete: Cascade)
+  SalaryComponent SalaryComponent? @relation(fields: [salaryComponentId], references: [id])
 
   @@index([payrollItemId])
 }

@@ -3,12 +3,15 @@
 import "dotenv/config";
 import { defineConfig } from "prisma/config";
 
+const rawUrl = process.env["DATABASE_URL"]?.replace(/^["']|["']$/g, "");
+const directUrl = rawUrl?.replace("-pooler", "");
+
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    url: directUrl || rawUrl,
   },
 });
