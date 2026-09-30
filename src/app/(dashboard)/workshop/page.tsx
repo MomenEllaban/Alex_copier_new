@@ -317,7 +317,7 @@ export default function WorkshopPage() {
 
   const openAddForm = () => {
     setEditingMovement(null);
-    setForm(emptyMovementForm);
+    setForm({ ...emptyMovementForm, date: getCurrentDateTimeLocal() });
     setShowForm(true);
   };
 
@@ -372,7 +372,7 @@ export default function WorkshopPage() {
 
       toastSuccess(editingMovement ? t("common.updatedSuccessfully") : t("common.createdSuccessfully"));
       setShowForm(false);
-      setForm(emptyMovementForm);
+      setForm({ ...emptyMovementForm, date: getCurrentDateTimeLocal() });
       setEditingMovement(null);
       refresh();
       notifyDataChanged(["workshop"]);
