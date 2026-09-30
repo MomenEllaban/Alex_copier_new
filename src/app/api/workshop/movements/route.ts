@@ -112,9 +112,10 @@ export async function POST(request: Request) {
     const movement = await prisma.workshopPartMovement.create({
       data: {
         ...parsed.data,
+        date: new Date(parsed.data.date),
         performedById: parsed.data.performedById || actor.id,
         performedByName: parsed.data.performedByName || (actor as { name?: string }).name || null,
-        companyId: actor.companyId,
+        companyId: actor.companyId || null,
         createdById: actor.id,
       },
       include: {
@@ -126,7 +127,8 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(movement, { status: 201 });
-  } catch {
-    return NextResponse.json({ error: "Failed to create movement" }, { status: 500 });
+  } catch (error) {
+    console.error("Create movement error:", error);
+    return NextResponse.json({ error: "Failed to create movement", details: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
 }
