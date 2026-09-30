@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction, type ActionKey } from "@/lib/auth-helpers";
 import { deleteCopierTestImage } from "@/lib/copier-test-upload";
 import { ownEngineerId } from "@/lib/engineer-scope";
+import { parseEgyptDateTimeLocal } from "@/lib/datetime";
 
 const TEST_INCLUDE = {
   engineer: { select: { id: true, name: true } },
@@ -160,7 +161,7 @@ export async function PUT(
     }
 
     if (body.testDate !== undefined) {
-      const testDate = new Date(String(body.testDate));
+      const testDate = parseEgyptDateTimeLocal(String(body.testDate));
       if (Number.isNaN(testDate.getTime())) {
         return NextResponse.json({ error: "تاريخ الاختبار غير صالح", code: "TEST_DATE_INVALID" }, { status: 400 });
       }

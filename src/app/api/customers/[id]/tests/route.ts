@@ -8,6 +8,7 @@ import {
   validateCopierTestImage,
 } from "@/lib/copier-test-upload";
 import { ownEngineerId } from "@/lib/engineer-scope";
+import { parseEgyptDateTimeLocal } from "@/lib/datetime";
 
 const TEST_INCLUDE = {
   engineer: { select: { id: true, name: true } },
@@ -173,7 +174,7 @@ export async function POST(
 
     let testDate: Date | null = new Date();
     if (testDateRaw != null && String(testDateRaw).trim() !== "") {
-      testDate = new Date(String(testDateRaw));
+      testDate = parseEgyptDateTimeLocal(String(testDateRaw));
       if (Number.isNaN(testDate.getTime())) {
         return NextResponse.json({ error: "تاريخ الاختبار غير صالح", code: "TEST_DATE_INVALID" }, { status: 400 });
       }
