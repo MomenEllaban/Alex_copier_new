@@ -6,7 +6,8 @@ import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
 import ExportButton from "@/components/ExportButton";
-import { Eye, Package, Printer, Pencil, Plus, Save, Trash2, Wrench } from "lucide-react";
+import ImportDialog from "@/components/ImportDialog";
+import { Eye, Package, Printer, Pencil, Plus, Save, Trash2, Upload, Wrench } from "lucide-react";
 import PrinterLoader from "@/components/PrinterLoader";
 import { AddFormBoundary, useAutoAddForm } from "@/hooks/useAutoAddForm";
 import { useConfirm, useToast } from "@/components/UIProvider";
@@ -33,7 +34,10 @@ interface Product {
   company?: Company;
   sku?: string | null;
   egsCode?: string | null;
+  brand?: string | null;
   purchasePrice?: number | null;
+  wholesalePrice?: number | null;
+  retailPrice?: number | null;
   pricingTiers?: Record<string, number | null> | null;
   isActive: boolean;
 }
@@ -85,6 +89,7 @@ export default function ProductsPage() {
   const [companyFilter, setCompanyFilter] = useState("");
   const [activeFilter, setActiveFilter] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(true);
@@ -125,46 +130,67 @@ export default function ProductsPage() {
     if (autoAddOpen) setShowForm(true);
   }, [autoAddOpen]);
 
-  const filtered = products.filter(
-    (p) =>
-      (matchesQuery(p.name, search) ||
-        matchesQuery(p.sku, search) ||
-        matchesQuery(p.egsCode, search)) &&
-      (!typeFilter || p.productType === typeFilter) &&
-      (!companyFilter || p.companyId === companyFilter) &&
-      (!activeFilter || String(p.isActive) === activeFilter)
+  const filtered = useMemo(
+    () =>
+      products.filter(
+        (p) =>
+          (matchesQuery(p.name, search) ||
+            matchesQuery(p.sku, search) ||
+            matchesQuery(p.egsCode, search)) &&
+          (!typeFilter || p.productType === typeFilter) &&
+          (!companyFilter || p.companyId === companyFilter) &&
+          (!activeFilter || String(p.isActive) === activeFilter)
+      ),
+    [products, search, typeFilter, companyFilter, activeFilter]
   );
   const hasActiveFilters = typeFilter !== "" || companyFilter !== "" || activeFilter !== "" || search !== "";
 
-  const stats = useMemo(() => ({
-    total: products.length,
-    machines: products.filter((p) => p.productType === "MACHINE").length,
-    spareParts: products.filter((p) => p.productType === "SPARE_PART").length,
-    stockQty: Object.values(inventoryByProduct).reduce((sum, qty) => sum + (qty || 0), 0),
-  }), [products, inventoryByProduct]);
+  const stats = useMemo(() => {
+    // The cards sit above the table, so they describe what the table is showing.
+    // Reading the unfiltered list made every filter look like it had done nothing.
+    const inView = new Set(filtered.map((p) => p.id));
+    return {
+      total: filtered.length,
+      machines: filtered.filter((p) => p.productType === "MACHINE").length,
+      spareParts: filtered.filter((p) => p.productType === "SPARE_PART").length,
+      stockQty: Object.entries(inventoryByProduct).reduce(
+        (sum, [id, qty]) => (inView.has(id) ? sum + (qty || 0) : sum),
+        0
+      ),
+    };
+  }, [filtered, inventoryByProduct]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
+  // Column order and labels mirror PRODUCT_COLUMNS in import-schemas so that a
+  // file exported from one company can be edited and imported straight back
+  // without dropping the prices. The lifecycle status is deliberately left out:
+  // an import creates active products, and round-tripping a translated
+  // "inactive" label would silently archive rows instead of copying them.
   const exportProducts = () => ({
     headers: [
       t("products.name"),
-      t("products.type"),
       t("warehouses.company"),
+      t("products.type"),
       t("products.sku"),
+      t("products.brand"),
       t("products.purchasePrice"),
-      "الكمية المتاحة",
-      t("common.status"),
+      t("products.wholesalePrice"),
+      t("products.retailPrice"),
+      t("inventory.quantity"),
     ],
     rows: filtered.map((p) => [
       p.name,
-      p.productType === "MACHINE" ? t("products.machine") : t("products.sparePart"),
       p.company?.nameAr || p.company?.name || "",
+      p.productType === "MACHINE" ? t("products.machine") : t("products.sparePart"),
       p.sku || "",
+      p.brand || "",
       p.purchasePrice != null ? String(p.purchasePrice) : "",
+      p.wholesalePrice != null ? String(p.wholesalePrice) : "",
+      p.retailPrice != null ? String(p.retailPrice) : "",
       String(inventoryByProduct[p.id] ?? 0),
-      p.isActive ? t("common.active") : t("common.inactive"),
     ]),
   });
 
@@ -422,7 +448,11 @@ export default function ProductsPage() {
           <FilterSelect value={companyFilter} onChange={(v) => { setCompanyFilter(v); setPage(1); }} options={companies.map((c) => ({ value: c.id, label: c.nameAr || c.name }))} allLabel={`${t("warehouses.company")} — ${t("common.all")}`} className="md:w-52" />
           <FilterSelect value={activeFilter} onChange={(v) => { setActiveFilter(v); setPage(1); }} options={[{ value: "true", label: t("common.active") }, { value: "false", label: t("common.inactive") }]} allLabel={`${t("common.status")} — ${t("common.all")}`} className="md:w-36" />
           {hasActiveFilters && (<button onClick={() => { setSearch(""); setTypeFilter(""); setCompanyFilter(""); setActiveFilter(""); }} className="text-sm text-slate-500 underline transition hover:text-slate-700">{t("common.resetFilters")}</button>)}
-          <div className="flex flex-wrap gap-2 md:ms-auto mt-2 md:mt-0"><RefreshButton onRefresh={refresh} refreshing={refreshing} /><ExportButton filename="products" getExport={exportProducts} disabled={filtered.length === 0} /></div>
+          <div className="flex flex-wrap gap-2 md:ms-auto mt-2 md:mt-0"><RefreshButton onRefresh={refresh} refreshing={refreshing} /><ExportButton filename="products" getExport={exportProducts} disabled={filtered.length === 0} />
+            <button onClick={() => setShowImport(true)} className="inline-flex items-center gap-1.5 border border-gray-300 px-3 py-2 rounded-lg text-sm font-medium text-gray-700 transition hover:bg-gray-50">
+              <Upload size={14} />{t("common.import")}
+            </button>
+          </div>
         </div>
 
         <div className="overflow-x-auto">
@@ -474,6 +504,14 @@ export default function ProductsPage() {
         </div>
         <div className="border-t border-slate-200 bg-slate-50/60 p-3"><Pagination currentPage={safePage} totalPages={totalPages} onPageChange={setPage} totalItems={filtered.length} pageSize={PAGE_SIZE} /></div>
       </div>
+
+      <ImportDialog
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        entity="products"
+        title={`${t("common.import")} — ${t("products.title")}`}
+        onImported={refresh}
+      />
     </div>
   );
 }

@@ -73,14 +73,14 @@ export default function TradeInsPage() {
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const stats = useMemo(() => {
-    const totalValue = products.reduce((sum, p) => sum + (p.tradeInValue || 0), 0);
+    const totalValue = filtered.reduce((sum, p) => sum + (p.tradeInValue || 0), 0);
     return {
-      total: products.length,
+      total: filtered.length,
       totalValue,
-      active: products.filter((p) => p.isActive).length,
-      classified: products.filter((p) => Boolean(p.condition)).length,
+      active: filtered.filter((p) => p.isActive).length,
+      classified: filtered.filter((p) => Boolean(p.condition)).length,
     };
-  }, [products]);
+  }, [filtered]);
 
   const fetchData = async () => {
     setLoading(true);

@@ -149,15 +149,15 @@ export default function WarehousesPage() {
   const hasActiveFilters = companyFilter !== "" || search !== "";
 
   const stats = useMemo(() => {
-    const items = warehouses.reduce((sum, w) => sum + (w._count?.inventory || 0), 0);
-    const companiesCount = new Set(warehouses.filter((w) => w.companyId).map((w) => w.companyId)).size;
+    const items = filtered.reduce((sum, w) => sum + (w._count?.inventory || 0), 0);
+    const companiesCount = new Set(filtered.filter((w) => w.companyId).map((w) => w.companyId)).size;
     return {
-      total: warehouses.length,
-      main: warehouses.filter((w) => w.isMain).length,
+      total: filtered.length,
+      main: filtered.filter((w) => w.isMain).length,
       items,
       companiesCount,
     };
-  }, [warehouses]);
+  }, [filtered]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);

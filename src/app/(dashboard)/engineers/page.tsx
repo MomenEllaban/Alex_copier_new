@@ -231,15 +231,15 @@ export default function EngineersPage() {
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const stats = useMemo(() => {
-    const totalSalaries = engineers.reduce((sum, e) => sum + (e.baseSalary || 0), 0);
-    const openRequests = engineers.reduce((sum, e) => sum + (e.openAssignedCount || 0), 0);
+    const totalSalaries = filtered.reduce((sum, e) => sum + (e.baseSalary || 0), 0);
+    const openRequests = filtered.reduce((sum, e) => sum + (e.openAssignedCount || 0), 0);
     return {
-      total: engineers.length,
-      active: engineers.filter((e) => e.isActive).length,
+      total: filtered.length,
+      active: filtered.filter((e) => e.isActive).length,
       salaries: totalSalaries,
       openRequests,
     };
-  }, [engineers]);
+  }, [filtered]);
 
   const exportEngineers = () => ({
     headers: [

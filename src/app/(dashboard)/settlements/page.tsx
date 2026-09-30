@@ -141,20 +141,20 @@ export default function SettlementsPage() {
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const stats = useMemo(() => {
-    const netAmount = settlements.reduce(
+    const netAmount = filtered.reduce(
       (sum, s) => sum + (s.direction === "SUBTRACTION" ? -1 : 1) * (s.amount || 0),
       0
     );
-    const collected = settlements
+    const collected = filtered
       .filter((s) => s.status === "VERIFIED")
       .reduce((sum, s) => sum + (s.amount || 0), 0);
     return {
-      total: settlements.length,
+      total: filtered.length,
       netAmount,
-      pending: settlements.filter((s) => s.status === "INITIAL").length,
+      pending: filtered.filter((s) => s.status === "INITIAL").length,
       collected,
     };
-  }, [settlements]);
+  }, [filtered]);
 
   const exportSettlements = () => ({
     headers: [

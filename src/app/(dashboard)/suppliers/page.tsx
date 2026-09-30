@@ -101,10 +101,10 @@ export default function SuppliersPage() {
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const stats = useMemo(() => {
-    const active = suppliers.filter((s) => s.isActive).length;
-    const companiesCount = new Set(suppliers.filter((s) => s.companyId).map((s) => s.companyId)).size;
-    return { total: suppliers.length, active, companiesCount };
-  }, [suppliers]);
+    const active = filtered.filter((s) => s.isActive).length;
+    const companiesCount = new Set(filtered.filter((s) => s.companyId).map((s) => s.companyId)).size;
+    return { total: filtered.length, active, companiesCount };
+  }, [filtered]);
 
   const exportSuppliers = () => ({
     headers: [

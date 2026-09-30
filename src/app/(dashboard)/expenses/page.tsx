@@ -111,15 +111,15 @@ export default function FinancePage() {
   const stats = useMemo(() => {
     const today = new Date().toISOString().slice(0, 10);
     const currentMonth = today.slice(0, 7);
-    const total = expenses.reduce((sum, e) => sum + (e.amount || 0), 0);
-    const todayTotal = expenses
+    const total = filtered.reduce((sum, e) => sum + (e.amount || 0), 0);
+    const todayTotal = filtered
       .filter((e) => (e.date || e.createdAt).slice(0, 10) === today)
       .reduce((sum, e) => sum + (e.amount || 0), 0);
-    const monthTotal = expenses
+    const monthTotal = filtered
       .filter((e) => (e.date || e.createdAt).slice(0, 7) === currentMonth)
       .reduce((sum, e) => sum + (e.amount || 0), 0);
-    return { count: expenses.length, total, today: todayTotal, month: monthTotal };
-  }, [expenses]);
+    return { count: filtered.length, total, today: todayTotal, month: monthTotal };
+  }, [filtered]);
 
   // Deduplicated category options for table filter:
   const filterCategories = companyFilter

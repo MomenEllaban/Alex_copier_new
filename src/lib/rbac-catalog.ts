@@ -183,6 +183,7 @@ export const VIRTUAL_PAGE_ACTIONS: Partial<Record<Page, { actions: ActionKey[]; 
  */
 const ROUTE_ALLOWED_PAGES: Record<string, Page[]> = {
   products: ["products", "inventory"],
+  "products/import": ["products", "inventory"],
   warehouses: ["warehouses", "inventory"],
   "warehouses/[id]": ["warehouses", "inventory"],
   "warehouses/[id]/inventory": ["warehouses", "inventory"],

@@ -249,12 +249,12 @@ export default function ServiceRequestsPage() {
     const openStatuses = ["NEW", "ASSIGNED", "VISITED", "REASSIGNED", "NOT_RESOLVED"];
     const urgentPriorities = ["URGENT", "EMERGENCY"];
     return {
-      total: requests.length,
-      open: requests.filter((r) => openStatuses.includes(r.status)).length,
-      urgent: requests.filter((r) => urgentPriorities.includes(r.priority) && openStatuses.includes(r.status)).length,
-      resolved: requests.filter((r) => r.status === "RESOLVED").length,
+      total: filtered.length,
+      open: filtered.filter((r) => openStatuses.includes(r.status)).length,
+      urgent: filtered.filter((r) => urgentPriorities.includes(r.priority) && openStatuses.includes(r.status)).length,
+      resolved: filtered.filter((r) => r.status === "RESOLVED").length,
     };
-  }, [requests]);
+  }, [filtered]);
 
   const exportRequests = () => ({
     headers: [

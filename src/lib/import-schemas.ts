@@ -19,7 +19,7 @@ export interface ImportError {
   message: string;
 }
 
-export type EntityKey = "customers" | "machines" | "suppliers";
+export type EntityKey = "customers" | "machines" | "suppliers" | "products";
 
 export const CUSTOMER_COLUMNS: ImportColumn[] = [
   { key: "name", labelAr: "الاسم", labelEn: "Name", aliases: ["الاسم", "اسم العميل", "name"], required: true, type: "text", sample: "محمد أحمد علي" },
@@ -90,10 +90,47 @@ export const SUPPLIER_COLUMNS: ImportColumn[] = [
   { key: "taxNumber", labelAr: "الرقم الضريبي", labelEn: "Tax number", aliases: ["الرقم الضريبي", "taxnumber"], type: "text", sample: "987-654-321" },
 ];
 
+/**
+ * Products are owned by a company, so `companyName` is required and resolves to
+ * a companyId exactly as it does for suppliers. The columns deliberately mirror
+ * what the products export writes, so a file exported from one company can be
+ * edited and imported straight back without losing the prices.
+ */
+export const PRODUCT_COLUMNS: ImportColumn[] = [
+  { key: "name", labelAr: "اسم المنتج", labelEn: "Product name", aliases: ["اسم المنتج", "المنتج", "الاسم", "name", "product name", "product"], required: true, type: "text", sample: "كيوسيرا 406" },
+  { key: "companyName", labelAr: "الشركة التابعة", labelEn: "Belongs to company", aliases: ["الشركة التابعة", "الشركة", "companyname", "company", "belongs to company"], required: true, type: "text", sample: "شركة جملة آلات" },
+  {
+    key: "productType",
+    labelAr: "النوع",
+    labelEn: "Type",
+    aliases: ["النوع", "نوع المنتج", "producttype", "type"],
+    type: "enum",
+    enumMap: {
+      "آلة": "MACHINE",
+      "ماكين": "MACHINE",
+      "ماكينة": "MACHINE",
+      "قطع غيار": "SPARE_PART",
+      "قطعة غيار": "SPARE_PART",
+      "قطع": "SPARE_PART",
+      machine: "MACHINE",
+      spare_part: "SPARE_PART",
+    },
+    sample: "آلة",
+  },
+  { key: "sku", labelAr: "كود المنتج", labelEn: "SKU", aliases: ["كود المنتج", "الكود", "sku", "code"], type: "text", sample: "KYC-406" },
+  { key: "brand", labelAr: "الماركة", labelEn: "Brand", aliases: ["الماركة", "المصنع", "brand", "manufacturer"], type: "text", sample: "Kyocera" },
+  { key: "purchasePrice", labelAr: "سعر الشراء", labelEn: "Purchase price", aliases: ["سعر الشراء", "purchaseprice"], type: "number", sample: "0" },
+  { key: "wholesalePrice", labelAr: "سعر الجملة", labelEn: "Wholesale price", aliases: ["سعر الجملة", "الجملة", "wholesaleprice"], type: "number", sample: "0" },
+  { key: "retailPrice", labelAr: "سعر التجزئة", labelEn: "Retail price", aliases: ["سعر التجزئة", "سعر البيع", "التجزئة", "retailprice"], type: "number", sample: "0" },
+  { key: "description", labelAr: "الوصف", labelEn: "Description", aliases: ["الوصف", "description", "notes"], type: "text", sample: "" },
+  { key: "stock", labelAr: "الكمية", labelEn: "Quantity", aliases: ["الكمية", "الكمية المتاحة", "الرصيد", "quantity", "stock", "qty"], type: "number", sample: "0" },
+];
+
 const ENTITY_COLUMNS: Record<EntityKey, ImportColumn[]> = {
   customers: CUSTOMER_COLUMNS,
   machines: MACHINE_COLUMNS,
   suppliers: SUPPLIER_COLUMNS,
+  products: PRODUCT_COLUMNS,
 };
 
 function normalizeHeader(h: string): string {
@@ -234,6 +271,11 @@ function duplicateKey(entity: EntityKey, rec: Record<string, string>): string | 
       return rec.serialNumber ? rec.serialNumber.trim().toLowerCase() : null;
     case "suppliers":
       return rec.name ? rec.name.trim().toLowerCase() : null;
+    case "products":
+      // Two companies may legitimately stock the same product name, so the
+      // company is part of the identity — without it, importing company B's
+      // file would be rejected as a duplicate of company A's.
+      return rec.name ? `${(rec.companyId || "").trim()}|${rec.name.trim().toLowerCase()}` : null;
   }
 }
 
@@ -333,6 +375,15 @@ export function validateRecords(
       data.currentStatus = data.currentStatus ?? "IN_WAREHOUSE";
       data.isColor = data.isColor ?? false;
     }
+    if (entity === "products") {
+      // A bare list of model names is the common case, so default to a machine
+      // and leave the prices and stock at zero rather than rejecting the row.
+      data.productType = data.productType ?? "MACHINE";
+      data.purchasePrice = data.purchasePrice ?? 0;
+      data.wholesalePrice = data.wholesalePrice ?? 0;
+      data.retailPrice = data.retailPrice ?? 0;
+      data.stock = data.stock ?? 0;
+    }
 
     const dupKey = duplicateKey(entity, record);
     if (dupKey) {
@@ -361,6 +412,8 @@ function duplicateField(entity: EntityKey): string {
     case "machines":
       return "serialNumber";
     case "suppliers":
+      return "name";
+    case "products":
       return "name";
   }
 }

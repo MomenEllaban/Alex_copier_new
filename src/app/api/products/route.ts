@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
 
 const PRODUCT_TYPES = ["MACHINE", "SPARE_PART"];
-const PRICE_FIELDS = ["purchasePrice"] as const;
+const PRICE_FIELDS = ["purchasePrice", "wholesalePrice", "retailPrice"] as const;
 const PRICE_TIER_KEYS = ["legacyCustomer", "newCustomer", "jumlaMachines", "jumlaParts", "sectori", "engineer"] as const;
 
 function extractPrices(body: Record<string, unknown>): { values: Record<string, number | null> } | { error: NextResponse } {

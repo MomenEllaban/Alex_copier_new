@@ -1050,6 +1050,7 @@
     "product": "Product",
     "quantity": "Quantity",
     "sku": "SKU",
+    "brand": "Brand",
     "movements": "Stock Movements",
     "noInventory": "No inventory in this warehouse",
     "movementType": "Movement Type",

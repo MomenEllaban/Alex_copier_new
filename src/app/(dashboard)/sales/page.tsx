@@ -209,11 +209,11 @@ export default function SalesPage() {
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const stats = useMemo(() => {
-    const totalValue = orders.reduce((sum, o) => sum + (o.total || 0), 0);
-    const paid = orders.filter((o) => o.paymentStatus === "PAID").length;
-    const unpaid = orders.filter((o) => o.paymentStatus !== "PAID").length;
-    return { totalOrders: orders.length, totalValue, paid, unpaid };
-  }, [orders]);
+    const totalValue = filtered.reduce((sum, o) => sum + (o.total || 0), 0);
+    const paid = filtered.filter((o) => o.paymentStatus === "PAID").length;
+    const unpaid = filtered.filter((o) => o.paymentStatus !== "PAID").length;
+    return { totalOrders: filtered.length, totalValue, paid, unpaid };
+  }, [filtered]);
 
   const companyStock = (companyId: string) => inventoryByProductPerCompany[companyId] ?? {};
   const companyProducts = (companyId: string) => {

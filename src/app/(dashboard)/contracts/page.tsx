@@ -266,14 +266,14 @@ export default function ContractsPage() {
     const today = new Date();
     const soon = new Date();
     soon.setDate(soon.getDate() + 30);
-    const active = contracts.filter((c) => c.status === "ACTIVE");
+    const active = filtered.filter((c) => c.status === "ACTIVE");
     const activeValue = active.reduce((sum, c) => sum + (c.value || 0), 0);
     const expiringSoon = active.filter((c) => {
       const end = new Date(c.endDate);
       return end >= today && end <= soon;
     }).length;
-    return { total: contracts.length, active: active.length, expiringSoon, activeValue };
-  }, [contracts]);
+    return { total: filtered.length, active: active.length, expiringSoon, activeValue };
+  }, [filtered]);
 
   const exportContracts = () => ({
     headers: [

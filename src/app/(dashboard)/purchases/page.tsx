@@ -197,17 +197,17 @@ export default function PurchasesPage() {
   const icPaged = icFiltered.slice((icSafePage - 1) * IC_PAGE_SIZE, icSafePage * IC_PAGE_SIZE);
 
   const stats = useMemo(() => {
-    const totalValue = orders.reduce((sum, o) => sum + (o.total || 0), 0);
-    const received = orders.filter((o) => o.status === "RECEIVED").length;
-    const pending = orders.filter((o) => o.status !== "RECEIVED" && o.status !== "CANCELLED").length;
+    const totalValue = filtered.reduce((sum, o) => sum + (o.total || 0), 0);
+    const received = filtered.filter((o) => o.status === "RECEIVED").length;
+    const pending = filtered.filter((o) => o.status !== "RECEIVED" && o.status !== "CANCELLED").length;
     return {
-      totalOrders: orders.length,
+      totalOrders: filtered.length,
       totalValue,
       received,
       pending,
       icTotal: intercompanyInvoices.length,
     };
-  }, [orders, intercompanyInvoices]);
+  }, [filtered, intercompanyInvoices]);
 
   const exportPurchases = () => ({
     headers: [

@@ -76,15 +76,15 @@ export default function WorkshopPage() {
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const stats = useMemo(() => {
-    const maintaining = machines.filter((m) => m.status === "UNDER_MAINTENANCE").length;
-    const inspecting = machines.filter((m) => m.status === "UNDER_INSPECTION").length;
+    const maintaining = filtered.filter((m) => m.status === "UNDER_MAINTENANCE").length;
+    const inspecting = filtered.filter((m) => m.status === "UNDER_INSPECTION").length;
     return {
-      total: machines.length,
+      total: filtered.length,
       inspecting,
       maintaining,
-      ready: machines.length - inspecting - maintaining,
+      ready: filtered.length - inspecting - maintaining,
     };
-  }, [machines]);
+  }, [filtered]);
 
   const exportWorkshop = () => ({
     headers: [

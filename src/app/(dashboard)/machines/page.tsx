@@ -146,12 +146,12 @@ const { success: toastSuccess } = useToast();
 
   const stats = useMemo(
     () => ({
-      total: machines.length,
-      sold: machines.filter((m) => m.currentStatus === "SOLD").length,
-      inWarehouse: machines.filter((m) => m.currentStatus === "IN_WAREHOUSE").length,
-      underMaintenance: machines.filter((m) => m.currentStatus === "UNDER_MAINTENANCE").length,
+      total: filtered.length,
+      sold: filtered.filter((m) => m.currentStatus === "SOLD").length,
+      inWarehouse: filtered.filter((m) => m.currentStatus === "IN_WAREHOUSE").length,
+      underMaintenance: filtered.filter((m) => m.currentStatus === "UNDER_MAINTENANCE").length,
     }),
-    [machines]
+    [filtered]
   );
 
   const exportMachines = () => ({

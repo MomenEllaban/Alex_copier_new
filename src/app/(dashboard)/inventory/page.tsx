@@ -106,10 +106,11 @@ export default function InventoryPage() {
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const stats = useMemo(() => {
-    const totalQty = inventory.reduce((sum, item) => sum + (item.quantity || 0), 0);
-    const outOfStock = inventory.filter((item) => (item.quantity || 0) <= 0).length;
-    return { items: inventory.length, totalQty, warehouses: warehouses.length, outOfStock };
-  }, [inventory, warehouses]);
+    // Follows the filters above, so the cards describe the rows on screen.
+    const totalQty = filtered.reduce((sum, item) => sum + (item.quantity || 0), 0);
+    const outOfStock = filtered.filter((item) => (item.quantity || 0) <= 0).length;
+    return { items: filtered.length, totalQty, warehouses: warehouses.length, outOfStock };
+  }, [filtered, warehouses]);
 
   const exportInventory = () => ({
     headers: [
