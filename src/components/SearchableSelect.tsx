@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, Search, X } from "lucide-react";
+import { useI18n } from "@/i18n/context";
 
 export interface SearchableOption {
   value: string;
@@ -50,11 +51,21 @@ export default function SearchableSelect({
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(0);
   const [openUp, setOpenUp] = useState(false);
+  /** How far the popup may grow before it has to clip, in px. */
+  const [roomToEnd, setRoomToEnd] = useState<number | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const reactId = useId();
   const inputId = id || `ss-${reactId.replace(/:/g, "")}`;
+  const { dir } = useI18n();
+
+  /**
+   * Reading cap for the popup: wide enough for a long Arabic label, narrow
+   * enough that one very long name cannot swallow the page. A single
+   * line-item still has a long option, and the row truncates at this point.
+   */
+  const MAX_POPUP_WIDTH = 448;
 
   // Cap rendered rows so huge catalogs stay fast with a consistent scroll.
   const MAX_RENDER = 100;
@@ -107,14 +118,26 @@ export default function SearchableSelect({
   // Smart direction: open upward when there is no room below
   // (typical for the last rows inside a scrolled modal).
   // Measured in the event handler (not an effect) per repo lint rules.
+  //
+  // The same pass measures how far the popup may grow sideways. The popup is
+  // pinned to the trigger's *start* edge and grows towards the *end* edge, so
+  // the usable room is what sits between that start edge and the viewport
+  // edge — mirrored in RTL, where the start edge is on the right.
   const measureDirection = () => {
     const rect = rootRef.current?.getBoundingClientRect();
     if (!rect) {
       setOpenUp(false);
+      setRoomToEnd(null);
       return;
     }
     const spaceBelow = window.innerHeight - rect.bottom;
     setOpenUp(spaceBelow < 300 && rect.top > spaceBelow);
+
+    // 12px keeps the popup off the scrollbar and the viewport edge.
+    const MARGIN = 12;
+    const startEdge = dir === "rtl" ? rect.right : rect.left;
+    const endEdge = dir === "rtl" ? 0 : window.innerWidth;
+    setRoomToEnd(Math.max(0, Math.abs(endEdge - startEdge) - MARGIN));
   };
 
   const handleToggle = () => {
@@ -214,7 +237,12 @@ export default function SearchableSelect({
 
       {open && !disabled && (
         <div
-          className={`absolute z-[60] w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl ${openUp ? "bottom-full mb-1.5" : "top-full mt-1.5"} ${dropdownClassName}`}
+          style={
+            roomToEnd === null
+              ? undefined
+              : { maxWidth: `min(${MAX_POPUP_WIDTH}px, ${roomToEnd}px, 92vw)` }
+          }
+          className={`absolute z-[60] w-max min-w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl ${openUp ? "bottom-full mb-1.5" : "top-full mt-1.5"} ${dropdownClassName}`}
         >
           {/* search is always visible while typing */}
           <div className="border-b border-gray-100 p-2">

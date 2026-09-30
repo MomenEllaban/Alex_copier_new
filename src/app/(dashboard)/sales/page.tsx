@@ -628,7 +628,7 @@ export default function SalesPage() {
               <div className="grid gap-2 sm:grid-cols-5">
                 <input type="text" placeholder="اسم المنتج القديم *" value={tradeInProduct.name} onChange={(e) => setTradeInProduct({ ...tradeInProduct, name: e.target.value })} className="rounded-lg border border-amber-300 bg-white px-3 py-2.5 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500" required />
                 <input type="text" placeholder="الماركة" value={tradeInProduct.brand} onChange={(e) => setTradeInProduct({ ...tradeInProduct, brand: e.target.value })} className="rounded-lg border border-amber-300 bg-white px-3 py-2.5 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500" />
-                <select value={tradeInProduct.condition} onChange={(e) => setTradeInProduct({ ...tradeInProduct, condition: e.target.value })} className="rounded-lg border border-amber-300 bg-white px-3 py-2.5 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                <select value={tradeInProduct.condition} onChange={(e) => setTradeInProduct({ ...tradeInProduct, condition: e.target.value })} className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2.5 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500">
                   <option value="">الحالة</option>
                   <option value="excellent">ممتاز</option>
                   <option value="good">جيد</option>
@@ -688,7 +688,7 @@ export default function SalesPage() {
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">{t("sales.discount")}</label><div className="flex gap-2"><input type="number" placeholder={t("sales.discount")} value={form.discount} onChange={(e) => setForm({ ...form, discount: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" /><select value={form.discountType} onChange={(e) => setForm({ ...form, discountType: e.target.value })} className="rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="FIXED">{t("sales.discountTypeFixed")}</option><option value="PERCENTAGE">{t("sales.discountTypePercent")}</option></select></div></div>
+            <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">{t("sales.discount")}</label><div className="flex gap-2"><input type="number" placeholder={t("sales.discount")} value={form.discount} onChange={(e) => setForm({ ...form, discount: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" /><select value={form.discountType} onChange={(e) => setForm({ ...form, discountType: e.target.value })} className="min-w-[7rem] rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="FIXED">{t("sales.discountTypeFixed")}</option><option value="PERCENTAGE">{t("sales.discountTypePercent")}</option></select></div></div>
           </div>
 
           {(formMode === "tradeIn" || itemRows.some(row => row.tradeIn && row.tradeIn.value)) && (
@@ -790,7 +790,7 @@ export default function SalesPage() {
                       <div className="grid gap-2 sm:grid-cols-5">
                         <input type="text" placeholder="اسم المنتج القديم" value={row.tradeIn.name} onChange={(e) => updateItemRow(index, { tradeIn: { ...row.tradeIn!, name: e.target.value } })} className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500" />
                         <input type="text" placeholder="الماركة" value={row.tradeIn.brand} onChange={(e) => updateItemRow(index, { tradeIn: { ...row.tradeIn!, brand: e.target.value } })} className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500" />
-                        <select value={row.tradeIn.condition} onChange={(e) => updateItemRow(index, { tradeIn: { ...row.tradeIn!, condition: e.target.value } })} className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500">
+                        <select value={row.tradeIn.condition} onChange={(e) => updateItemRow(index, { tradeIn: { ...row.tradeIn!, condition: e.target.value } })} className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm focus:border-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500">
                           <option value="">الحالة</option>
                           <option value="excellent">ممتاز</option>
                           <option value="good">جيد</option>

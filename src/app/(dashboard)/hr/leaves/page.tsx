@@ -278,7 +278,7 @@ export default function LeavesPage() {
         <select
           value={statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500"
+            className="min-w-[10rem] border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 focus:ring-2 focus:ring-blue-500"
         >
           <option value="">{t("hr.leaves.allStatuses")}</option>
           <option value="PENDING">{t("hr.leaves.filterPending")}</option>

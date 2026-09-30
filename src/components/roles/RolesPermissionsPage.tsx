@@ -252,7 +252,7 @@ export default function RolesPermissionsPage() {
               id="roles-role-picker"
               value={selectedId ?? ""}
               onChange={(event) => setSelectedId(event.target.value)}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium
+              className="min-w-[12rem] rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium
                 text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100
                 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:ring-blue-950"
             >
