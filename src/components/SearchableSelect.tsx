@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useFloating, offset, flip, shift, size, autoUpdate } from "@floating-ui/react";
 import { Check, ChevronDown, Search, X } from "lucide-react";
 import { useI18n } from "@/i18n/context";
 
@@ -33,6 +35,8 @@ function normalize(s: string) {
     .trim();
 }
 
+const MAX_RENDER = 100;
+
 export default function SearchableSelect({
   value,
   onChange,
@@ -50,25 +54,36 @@ export default function SearchableSelect({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [highlight, setHighlight] = useState(0);
-  const [openUp, setOpenUp] = useState(false);
-  /** How far the popup may grow before it has to clip, in px. */
-  const [roomToEnd, setRoomToEnd] = useState<number | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+  const floatingRef = useRef<HTMLElement | null>(null);
   const reactId = useId();
   const inputId = id || `ss-${reactId.replace(/:/g, "")}`;
   const { dir } = useI18n();
 
-  /**
-   * Reading cap for the popup: wide enough for a long Arabic label, narrow
-   * enough that one very long name cannot swallow the page. A single
-   * line-item still has a long option, and the row truncates at this point.
-   */
-  const MAX_POPUP_WIDTH = 600;
-
-  // Cap rendered rows so huge catalogs stay fast with a consistent scroll.
-  const MAX_RENDER = 100;
+  const { refs, floatingStyles } = useFloating({
+    open,
+    placement: dir === "rtl" ? "bottom-end" : "bottom-start",
+    strategy: "fixed",
+    middleware: [
+      offset(4),
+      flip({ padding: 8 }),
+      shift({ padding: 8 }),
+      size({
+        padding: 8,
+        apply({ availableWidth, availableHeight, elements }) {
+          const refEl = elements.reference;
+          const refWidth = "clientWidth" in refEl ? refEl.clientWidth : 0;
+          Object.assign(elements.floating.style, {
+            width: `${Math.max(refWidth, Math.min(availableWidth, 448))}px`,
+            maxHeight: `${Math.min(availableHeight, 320)}px`,
+          });
+        },
+      }),
+    ],
+    whileElementsMounted: autoUpdate,
+  });
 
   const selected = useMemo(
     () => options.find((o) => o.value === value),
@@ -86,7 +101,8 @@ export default function SearchableSelect({
   useEffect(() => {
     if (!open) return;
     const onDocClick = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (rootRef.current && !rootRef.current.contains(target) && floatingRef.current && !floatingRef.current.contains(target)) {
         setOpen(false);
         setQuery("");
       }
@@ -103,59 +119,19 @@ export default function SearchableSelect({
       document.removeEventListener("mousedown", onDocClick);
       document.removeEventListener("keydown", onKey);
     };
-  }, [open ]);
+  }, [open]);
 
   useEffect(() => {
     if (open) {
-      setHighlight(0);
-      // focus search every time dropdown opens so typing filters immediately
-      requestAnimationFrame(() => searchRef.current?.focus());
+      requestAnimationFrame(() => {
+        setHighlight(0);
+        searchRef.current?.focus();
+      });
     } else {
-      setQuery("");
+      requestAnimationFrame(() => setQuery(""));
     }
-  }, [open ]);
+  }, [open]);
 
-  // Smart direction: open upward when there is no room below
-  // (typical for the last rows inside a scrolled modal).
-  // Measured in the event handler (not an effect) per repo lint rules.
-  //
-  // The same pass measures how far the popup may grow sideways. The popup is
-  // pinned to the trigger's *start* edge and grows towards the *end* edge, so
-  // the usable room is what sits between that start edge and the viewport
-  // edge — mirrored in RTL, where the start edge is on the right.
-  const measureDirection = () => {
-    const rect = rootRef.current?.getBoundingClientRect();
-    if (!rect) {
-      setOpenUp(false);
-      setRoomToEnd(null);
-      return;
-    }
-    const spaceBelow = window.innerHeight - rect.bottom;
-    setOpenUp(spaceBelow < 300 && rect.top > spaceBelow);
-
-    // 12px keeps the popup off the scrollbar and the viewport edge.
-    const MARGIN = 12;
-    const startEdge = dir === "rtl" ? rect.right : rect.left;
-    const endEdge = dir === "rtl" ? 0 : window.innerWidth;
-    setRoomToEnd(Math.max(0, Math.abs(endEdge - startEdge) - MARGIN));
-  };
-
-  const handleToggle = () => {
-    if (disabled) return;
-    if (!open) measureDirection();
-    setOpen((o) => !o);
-  };
-
-  const handleOpen = () => {
-    if (disabled || open) return;
-    measureDirection();
-    setOpen(true);
-  };
-
-  // Keep the highlighted option in view WITHOUT moving the page or the
-  // modal: plain scrollIntoView() would scroll every scrollable ancestor.
-  // (offsetTop is relative to the positioned dropdown wrapper, so subtract
-  // the list's own offset to get the row position inside the scroll area.)
   useEffect(() => {
     const list = listRef.current;
     if (!list) return;
@@ -175,9 +151,133 @@ export default function SearchableSelect({
     setQuery("");
   };
 
+  const handleToggle = () => {
+    if (disabled) return;
+    setOpen((o) => !o);
+  };
+
+  const handleOpen = () => {
+    if (disabled || open) return;
+    setOpen(true);
+  };
+
+  const dropdown = open && !disabled && createPortal(
+    <div
+      ref={(el) => {
+        floatingRef.current = el;
+        refs.setFloating(el);
+      }}
+      style={{ ...floatingStyles, zIndex: 60 }}
+      className={`overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl ${dropdownClassName}`}
+    >
+      <div className="border-b border-gray-100 p-2">
+        <div className="relative">
+          <Search
+            size={15}
+            className="pointer-events-none absolute start-2.5 top-1/2 -translate-y-1/2 text-gray-400"
+          />
+          <input
+            ref={searchRef}
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setHighlight(0);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowDown") {
+                e.preventDefault();
+                setHighlight((h) => Math.min(h + 1, visible.length - 1));
+              } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                setHighlight((h) => Math.max(h - 1, 0));
+              } else if (e.key === "Enter") {
+                e.preventDefault();
+                const target = visible[highlight];
+                if (target && !disabledValues?.includes(target.value)) pick(target.value);
+              }
+            }}
+            placeholder={searchPlaceholder}
+            className="w-full rounded-lg border border-gray-200 bg-slate-50 py-2 pe-3 ps-8 text-sm focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              className="absolute end-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-gray-400 hover:text-gray-600"
+              aria-label="مسح البحث"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div
+        ref={listRef}
+        id={`${inputId}-listbox`}
+        role="listbox"
+        aria-labelledby={inputId}
+        className="max-h-56 overflow-y-auto overscroll-contain p-1.5 sidebar-scroll"
+      >
+        <div
+          role="option"
+          aria-selected={!value}
+          data-index={-1}
+          onClick={() => pick("")}
+          className={`flex cursor-pointer items-center justify-between rounded-lg px-2.5 py-2 text-sm transition hover:bg-blue-50 ${
+            !value ? "bg-blue-50 font-medium text-blue-700" : "text-slate-500"
+          }`}
+        >
+          <span>{placeholder}</span>
+          {!value && <Check size={15} className="text-blue-600" />}
+        </div>
+
+        {visible.map((opt, i) => {
+          const active = opt.value === value;
+          const isDisabled = disabledValues?.includes(opt.value);
+          return (
+            <div
+              key={opt.value}
+              role="option"
+              aria-selected={active}
+              aria-disabled={isDisabled}
+              data-index={i}
+              onClick={() => !isDisabled && pick(opt.value)}
+              onMouseEnter={() => !isDisabled && setHighlight(i)}
+              className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-sm transition ${
+                i === highlight && !isDisabled ? "bg-blue-50" : ""
+              } ${active ? "font-medium text-blue-700" : "text-slate-800"} ${
+                isDisabled ? "cursor-not-allowed opacity-40" : ""
+              }`}
+              title={opt.label}
+            >
+              <span className="flex-1 truncate">{opt.label}</span>
+              {active && <Check size={15} className="shrink-0 text-blue-600" />}
+            </div>
+          );
+        })}
+
+        {filtered.length === 0 && (
+          <div className="px-3 py-6 text-center text-sm text-gray-400">{emptyText}</div>
+        )}
+        {filtered.length > visible.length && (
+          <div className="px-3 py-2 text-center text-xs text-gray-400">
+            عرض {visible.length} من {filtered.length} — اكتب حرفين على الأقل لتضييق البحث
+          </div>
+        )}
+      </div>
+
+      {filtered.length > 0 && (
+        <div className="border-t border-gray-100 bg-slate-50 px-3 py-1.5 text-xs text-gray-400">
+          {filtered.length} نتيجة
+        </div>
+      )}
+    </div>,
+    document.body
+  );
+
   return (
     <div ref={rootRef} className={`relative ${className}`}>
-      {/* native hidden input keeps `required` form validation working */}
       {required && (
         <input
           id={`${inputId}-req`}
@@ -191,6 +291,10 @@ export default function SearchableSelect({
       )}
       <div
         id={inputId}
+        ref={(el) => {
+          rootRef.current = el;
+          refs.setReference(el);
+        }}
         role="combobox"
         tabIndex={disabled ? -1 : 0}
         aria-haspopup="listbox"
@@ -235,122 +339,7 @@ export default function SearchableSelect({
           />
         </span>
       </div>
-
-      {open && !disabled && (
-        <div
-          style={
-            roomToEnd === null
-              ? undefined
-              : { width: `min(${MAX_POPUP_WIDTH}px, ${roomToEnd}px, 92vw)` }
-          }
-          className={`absolute z-[60] min-w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl ${openUp ? "bottom-full mb-1.5" : "top-full mt-1.5"} ${dropdownClassName}`}
-        >
-          {/* search is always visible while typing */}
-          <div className="border-b border-gray-100 p-2">
-            <div className="relative">
-              <Search
-                size={15}
-                className="pointer-events-none absolute start-2.5 top-1/2 -translate-y-1/2 text-gray-400"
-              />
-              <input
-                ref={searchRef}
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setHighlight(0);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "ArrowDown") {
-                    e.preventDefault();
-                    setHighlight((h) => Math.min(h + 1, visible.length - 1));
-                  } else if (e.key === "ArrowUp") {
-                    e.preventDefault();
-                    setHighlight((h) => Math.max(h - 1, 0));
-                  } else if (e.key === "Enter") {
-                    e.preventDefault();
-                    const target = visible[highlight];
-                    if (target && !disabledValues?.includes(target.value)) pick(target.value);
-                  }
-                }}
-                placeholder={searchPlaceholder}
-                className="w-full rounded-lg border border-gray-200 bg-slate-50 py-2 pe-3 ps-8 text-sm focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              {query && (
-                <button
-                  type="button"
-                  onClick={() => setQuery("")}
-                  className="absolute end-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-gray-400 hover:text-gray-600"
-                  aria-label="مسح البحث"
-                >
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div
-            ref={listRef}
-            id={`${inputId}-listbox`}
-            role="listbox"
-            aria-labelledby={inputId}
-            className="max-h-56 overflow-y-auto overscroll-contain p-1.5 sidebar-scroll"
-          >
-            {/* clear / all option */}
-            <div
-              role="option"
-              aria-selected={!value}
-              data-index={-1}
-              onClick={() => pick("")}
-              className={`flex cursor-pointer items-center justify-between rounded-lg px-2.5 py-2 text-sm transition hover:bg-blue-50 ${
-                !value ? "bg-blue-50 font-medium text-blue-700" : "text-slate-500"
-              }`}
-            >
-              <span>{placeholder}</span>
-              {!value && <Check size={15} className="text-blue-600" />}
-            </div>
-
-            {visible.map((opt, i) => {
-              const active = opt.value === value;
-              const isDisabled = disabledValues?.includes(opt.value);
-              return (
-                <div
-                  key={opt.value}
-                  role="option"
-                  aria-selected={active}
-                  aria-disabled={isDisabled}
-                  data-index={i}
-                  onClick={() => !isDisabled && pick(opt.value)}
-                  onMouseEnter={() => !isDisabled && setHighlight(i)}
-                  className={`flex cursor-pointer items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-sm transition ${
-                    i === highlight && !isDisabled ? "bg-blue-50" : ""
-                  } ${active ? "font-medium text-blue-700" : "text-slate-800"} ${
-                    isDisabled ? "cursor-not-allowed opacity-40" : ""
-                  }`}
-                  title={opt.label}
-                >
-                  <span className="flex-1 truncate">{opt.label}</span>
-                  {active && <Check size={15} className="shrink-0 text-blue-600" />}
-                </div>
-              );
-            })}
-
-            {filtered.length === 0 && (
-              <div className="px-3 py-6 text-center text-sm text-gray-400">{emptyText}</div>
-            )}
-            {filtered.length > visible.length && (
-              <div className="px-3 py-2 text-center text-xs text-gray-400">
-                عرض {visible.length} من {filtered.length} — اكتب حرفين على الأقل لتضييق البحث
-              </div>
-            )}
-          </div>
-
-          {filtered.length > 0 && (
-            <div className="border-t border-gray-100 bg-slate-50 px-3 py-1.5 text-xs text-gray-400">
-              {filtered.length} نتيجة
-            </div>
-          )}
-        </div>
-      )}
+      {dropdown}
     </div>
   );
 }

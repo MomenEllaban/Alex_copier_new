@@ -23,6 +23,7 @@
     "db:push:demo": "node scripts/push-demo-schema.mjs"
   },
   "dependencies": {
+    "@floating-ui/react": "^0.27.20",
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
     "@prisma/pg-worker": "^6.9.0",

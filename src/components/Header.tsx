@@ -243,7 +243,7 @@ export default function Header({ title }: { title: string }) {
             <div
               className="fixed inset-x-2 top-16 z-50 rounded-xl border border-gray-200 bg-white py-2
                 shadow-xl dark:border-slate-700 dark:bg-slate-900 sm:absolute sm:inset-x-auto
-                sm:left-0 sm:top-full sm:mt-2 sm:w-96"
+                sm:end-0 sm:top-full sm:mt-2 sm:w-96"
             >
               <div
                 className="flex items-center justify-between px-4 py-3 border-b border-gray-100
@@ -381,7 +381,7 @@ export default function Header({ title }: { title: string }) {
 
           {dropdownOpen && (
             <div
-              className="absolute left-0 top-full z-50 mt-2 w-[min(14rem,calc(100vw-1rem))] rounded-xl
+              className="absolute end-0 top-full z-50 mt-2 w-[min(14rem,calc(100vw-1rem))] rounded-xl
                 border border-gray-200 bg-white py-2 shadow-lg dark:border-slate-700 dark:bg-slate-900"
             >
               <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-800">

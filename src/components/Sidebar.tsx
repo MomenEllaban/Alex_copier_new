@@ -355,7 +355,7 @@ export default function Sidebar() {
         onClick={() => setMobileOpen(true)}
         aria-label="Open navigation menu"
         aria-expanded={mobileOpen}
-        className={`fixed right-3 top-3 z-50 flex min-h-11 min-w-11 items-center justify-center rounded-xl bg-gray-900 p-2 text-white shadow-lg transition-opacity lg:hidden ${mobileOpen ? "pointer-events-none opacity-0" : "opacity-100"}`}
+        className={`fixed end-3 top-3 z-50 flex min-h-11 min-w-11 items-center justify-center rounded-xl bg-gray-900 p-2 text-white shadow-lg transition-opacity lg:hidden ${mobileOpen ? "pointer-events-none opacity-0" : "opacity-100"}`}
       >
         <Menu size={24} />
       </button>
@@ -370,7 +370,7 @@ export default function Sidebar() {
 
       <aside
         id="dashboard-sidebar"
-        className={`fixed top-0 right-0 z-50 h-screen w-[min(20rem,86vw)] bg-gray-900 shadow-2xl transition-transform duration-300 ease-out will-change-transform lg:sticky lg:z-40 lg:top-0 lg:h-screen lg:shadow-none lg:transition-all ${
+        className={`fixed top-0 end-0 z-50 h-screen w-[min(20rem,86vw)] bg-gray-900 shadow-2xl transition-transform duration-300 ease-out will-change-transform lg:sticky lg:z-40 lg:top-0 lg:h-screen lg:shadow-none lg:transition-all ${
           collapsed ? "lg:w-16" : "lg:w-64"
         } ${mobileOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"}`}
       >
