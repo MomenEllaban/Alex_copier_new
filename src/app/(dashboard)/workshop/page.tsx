@@ -68,8 +68,18 @@ interface MovementForm {
   performedByName: string;
 }
 
+function getCurrentDateTimeLocal(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  const hours = String(now.getHours()).padStart(2, "0");
+  const minutes = String(now.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
 const emptyMovementForm: MovementForm = {
-  date: new Date().toISOString().slice(0, 10),
+  date: getCurrentDateTimeLocal(),
   engineerId: "",
   engineerName: "",
   customerId: "",
@@ -313,8 +323,14 @@ export default function WorkshopPage() {
 
   const openEditForm = (m: Movement) => {
     setEditingMovement(m);
+    const dateObj = m.date ? new Date(m.date) : new Date();
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, "0");
+    const day = String(dateObj.getDate()).padStart(2, "0");
+    const hours = String(dateObj.getHours()).padStart(2, "0");
+    const minutes = String(dateObj.getMinutes()).padStart(2, "0");
     setForm({
-      date: m.date ? new Date(m.date).toISOString().slice(0, 10) : "",
+      date: `${year}-${month}-${day}T${hours}:${minutes}`,
       engineerId: m.engineerId || "",
       engineerName: m.engineerName || "",
       customerId: m.customerId || "",
@@ -607,9 +623,12 @@ export default function WorkshopPage() {
                         <td className="px-3 py-2.5 text-sm whitespace-nowrap">{m.performedByName || m.performedBy?.name || "—"}</td>
                         <td className="px-3 py-2.5 text-sm">
                           {m.receivedAt ? (
-                            <div className="flex flex-col gap-0.5">
-                              <span className="text-green-600 font-medium text-xs">{m.receivedByName || m.receivedBy?.name || "—"}</span>
-                              <DateTimeCell value={m.receivedAt} className="text-xs text-gray-400" />
+                            <div className="flex flex-col gap-0.5 min-w-0">
+                              <span className="text-green-600 font-medium text-xs truncate">{m.receivedByName || m.receivedBy?.name || "—"}</span>
+                              <span className="text-xs text-gray-400 whitespace-nowrap" dir="ltr">
+                                {new Date(m.receivedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })}{" "}
+                                {new Date(m.receivedAt).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}
+                              </span>
                             </div>
                           ) : (
                             <button
@@ -657,7 +676,7 @@ export default function WorkshopPage() {
               <div className="space-y-1.5">
                 <label className="block text-sm font-medium text-slate-700">{t("workshop.movements.date")} *</label>
                 <input
-                  type="date"
+                  type="datetime-local"
                   value={form.date}
                   onChange={(e) => setField("date", e.target.value)}
                   className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
