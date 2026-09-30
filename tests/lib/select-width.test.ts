@@ -86,3 +86,31 @@ describe("SearchableSelect popup width", () => {
     expect(offenders, "native selects need an explicit width or min-width").toEqual([]);
   });
 });
+
+/**
+ * A `role="combobox"` that is not linked to its listbox is announced by a screen
+ * reader as an input with no popup attached, so the user never hears the options.
+ * The association is aria-controls on the combobox pointing at the listbox id,
+ * which is why both sides have to be checked together.
+ */
+describe("SearchableSelect accessibility", () => {
+  const combobox = SRC.match(/<div\s+id=\{inputId\}\s+role="combobox"[\s\S]*?>/)?.[0] ?? "";
+  const listbox = SRC.match(/<div\s+ref=\{listRef\}[\s\S]*?role="listbox"[\s\S]*?>/)?.[0] ?? "";
+
+  it("has a combobox and a listbox to link", () => {
+    expect(combobox, "could not find the combobox").toBeTruthy();
+    expect(listbox, "could not find the listbox").toBeTruthy();
+  });
+
+  it("points the combobox at the listbox", () => {
+    // aria-expanded alone does not associate the two; without aria-controls the
+    // popup is orphaned from the control that opens it.
+    expect(combobox).toMatch(/aria-expanded=\{open\}/);
+    expect(combobox).toContain("aria-controls={`${inputId}-listbox`}");
+    expect(listbox).toContain('id={`${inputId}-listbox`}');
+  });
+
+  it("labels the listbox from the control that opens it", () => {
+    expect(listbox).toContain("aria-labelledby={inputId}");
+  });
+});

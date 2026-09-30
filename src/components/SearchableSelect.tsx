@@ -195,6 +195,7 @@ export default function SearchableSelect({
         tabIndex={disabled ? -1 : 0}
         aria-haspopup="listbox"
         aria-expanded={open}
+        aria-controls={`${inputId}-listbox`}
         aria-disabled={disabled}
         onClick={handleToggle}
         onKeyDown={(e) => {
@@ -287,7 +288,13 @@ export default function SearchableSelect({
             </div>
           </div>
 
-          <div ref={listRef} role="listbox" className="max-h-56 overflow-y-auto overscroll-contain p-1.5 sidebar-scroll">
+          <div
+            ref={listRef}
+            id={`${inputId}-listbox`}
+            role="listbox"
+            aria-labelledby={inputId}
+            className="max-h-56 overflow-y-auto overscroll-contain p-1.5 sidebar-scroll"
+          >
             {/* clear / all option */}
             <div
               role="option"
