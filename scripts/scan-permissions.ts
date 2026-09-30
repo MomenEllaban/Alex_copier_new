@@ -199,9 +199,16 @@ export function scan(): ScanResult {
     }
   }
 
-  const navByPage = new Map(nav.map((n) => [n.page, n]));
+  // Several nav items can share one page key: the eight report routes all map
+  // to `reports`. The first (the group hub) is the one that names the page, so
+  // the catalogue must keep the first entry per key — otherwise the stored
+  // icon becomes whichever report happens to be listed last.
+  const navByPage = new Map<string, NavEntry>();
+  for (const entry of nav) {
+    if (!navByPage.has(entry.page)) navByPage.set(entry.page, entry);
+  }
   const ordered: Page[] = [
-    ...nav.map((n) => n.page),
+    ...[...navByPage.values()].map((n) => n.page),
     ...declared.filter((p) => !navByPage.has(p)),
   ];
 

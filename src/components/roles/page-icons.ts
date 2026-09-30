@@ -68,16 +68,18 @@ export const PAGE_ICONS: Record<string, LucideIcon> = {
 
 export const PAGE_ICON_NAMES = Object.keys(PAGE_ICONS);
 
-/** Sidebar section order, matching navigation.group.* in the i18n files. */
-export const GROUP_LABELS: Record<string, { ar: string; en: string }> = {
-  "navigation.group.general": { ar: "عام", en: "General" },
-  "navigation.group.salesCustomers": { ar: "المبيعات والعملاء", en: "Sales & Customers" },
-  "navigation.group.purchasing": { ar: "المشتريات والمخزون", en: "Purchases & Stock" },
-  "navigation.group.maintenance": { ar: "الصيانة", en: "Maintenance & Workshop" },
-  "navigation.group.hr": { ar: "الموارد البشرية", en: "Human Resources" },
-  "navigation.group.finance": { ar: "المالية", en: "Finance" },
-  "navigation.group.admin": { ar: "التقارير والإدارة", en: "Administration" },
-  "": { ar: "أخرى", en: "Other" },
+/**
+ * Sidebar section label.
+ *
+ * The group key stored on Page.group *is* the i18n key (`navigation.group.*`),
+ * so the label is read through `t()` like page names are. A hardcoded copy of
+ * these strings used to live here and drifted: the new Reports section was
+ * missing entirely, and Admin still read "التقارير والإدارة" long after the
+ * sidebar renamed it. Only the catch-all for pages with no group stays literal.
+ */
+export const OTHER_GROUP_LABEL: Record<"ar" | "en", string> = {
+  ar: "أخرى",
+  en: "Other",
 };
 
 /**

@@ -11,7 +11,7 @@ import {
   X,
 } from "lucide-react";
 import { useI18n } from "@/i18n/context";
-import { GROUP_LABELS, pageIcon, pageLabelKey } from "@/components/roles/page-icons";
+import { OTHER_GROUP_LABEL, pageIcon, pageLabelKey } from "@/components/roles/page-icons";
 import { ACTION_LABELS, type ActionKey } from "@/lib/rbac-catalog";
 
 export interface MatrixAction {
@@ -327,14 +327,16 @@ export default function PermissionsMatrix({
       ) : (
         <div className="space-y-5">
           {grouped.map(([group, groupPages]) => {
-            const label = GROUP_LABELS[group] ?? GROUP_LABELS[""];
+            // Page.group holds the sidebar's own i18n key, so the section
+            // heading follows the sidebar wording in either language.
+            const label = group ? t(group) : OTHER_GROUP_LABEL[locale];
             return (
               <section key={group || "other"}>
                 <h3
                   className="mb-2 px-1 text-xs font-semibold uppercase tracking-wide text-slate-500
                     dark:text-slate-400"
                 >
-                  {label[locale] ?? label.ar}
+                  {label}
                 </h3>
                 <ul className="space-y-2">
                   {groupPages.map((page) => {

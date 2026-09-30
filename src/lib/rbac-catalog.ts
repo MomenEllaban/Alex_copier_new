@@ -136,11 +136,25 @@ export const ROUTE_PREFIX_PAGE: Array<[string, Page]> = [
 export const IGNORED_ROUTE_PREFIXES = ["auth", "public", "health-check", "dev"];
 
 /**
- * Routes that gate on a page but must not contribute actions to it.
+ * Routes that grant no page capability.
+ *
  * `/api/notifications` is checked against the `dashboard` page, so without this
  * the dashboard would grow "add" and "edit" it does not actually have.
+ *
+ * The roles and permission-cache routes are gated on the super-admin role, not
+ * on a page at all: they administer the matrix itself rather than operating
+ * any screen, so they must not widen the `settings` page they happen to sit
+ * next to in the sidebar.
  */
-export const NO_ACTION_ROUTES = ["notifications", "notifications/[id]"];
+export const NO_ACTION_ROUTES = [
+  "notifications",
+  "notifications/[id]",
+  "permissions/me",
+  "permissions/stamp",
+  "roles",
+  "roles/[id]",
+  "roles/[id]/permissions",
+];
 
 /**
  * Pages with no route of their own: they are a view over other pages' data.

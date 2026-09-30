@@ -36,10 +36,15 @@ export async function GET(_request: Request, { params }: Params) {
       return NextResponse.json({ error: "Role not found", code: "ROLE_NOT_FOUND" }, { status: 404 });
     }
 
+    // Sidebar order, not alphabetical-by-group. The scanner walks Sidebar.tsx
+    // and assigns sortOrder = index * 10 in that order, so sorting on it alone
+    // reproduces the sidebar sequence; the client groups by first appearance.
+    // Sorting by `group` first used to put "admin" above "general" and reorder
+    // every section relative to the nav the user actually clicks through.
     const pages = await prisma.page.findMany({
       where: { isActive: true },
       include: { actions: { where: { isActive: true }, orderBy: { sortOrder: "asc" } } },
-      orderBy: [{ group: "asc" }, { sortOrder: "asc" }],
+      orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
     });
 
     const pageView = new Map(role.pages.map((p) => [p.pageId, p.canView]));
