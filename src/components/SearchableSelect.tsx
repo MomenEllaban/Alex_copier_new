@@ -72,7 +72,7 @@ export default function SearchableSelect({
       shift({ padding: 8 }),
       size({
         padding: 8,
-        apply({ availableWidth, availableHeight, elements }) {
+        apply({ availableWidth, availableHeight, elements }: any) {
           const refEl = elements.reference;
           const refWidth = "clientWidth" in refEl ? refEl.clientWidth : 0;
           Object.assign(elements.floating.style, {

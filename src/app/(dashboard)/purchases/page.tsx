@@ -106,7 +106,7 @@ export default function PurchasesPage() {
   const [supplierFilter, setSupplierFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [form, setForm] = useState({ companyId: "", supplierId: "", notes: "", status: "CONFIRMED", orderDate: new Date().toISOString().slice(0, 10) });
+  const [form, setForm] = useState({ companyId: "", supplierId: "", notes: "", status: "RECEIVED", orderDate: new Date().toISOString().slice(0, 10) });
   const [itemRows, setItemRows] = useState<ItemRow[]>([{ productId: "", quantity: "", unitPrice: "" }]);
   const [priceHistory, setPriceHistory] = useState<Record<string, PriceHistory>>({});
   const [priceHistoryLoading, setPriceHistoryLoading] = useState<Record<string, boolean>>({});
@@ -158,7 +158,7 @@ export default function PurchasesPage() {
 
   const openCreateOrder = () => {
     setEditingId(null);
-    setForm({ companyId: "", supplierId: "", notes: "", status: "CONFIRMED", orderDate: new Date().toISOString().slice(0, 10) });
+    setForm({ companyId: "", supplierId: "", notes: "", status: "RECEIVED", orderDate: new Date().toISOString().slice(0, 10) });
     setItemRows([{ productId: "", quantity: "", unitPrice: "" }]);
     setPriceHistory({});
     setPriceHistoryLoading({});
@@ -300,7 +300,7 @@ export default function PurchasesPage() {
   };
 
   const resetOrderForm = () => {
-    setForm({ companyId: "", supplierId: "", notes: "", status: "CONFIRMED", orderDate: new Date().toISOString().slice(0, 10) });
+    setForm({ companyId: "", supplierId: "", notes: "", status: "RECEIVED", orderDate: new Date().toISOString().slice(0, 10) });
     setItemRows([{ productId: "", quantity: "", unitPrice: "" }]);
     setEditingId(null);
     setShowForm(false);
@@ -504,11 +504,13 @@ export default function PurchasesPage() {
             </div>
             <div className="space-y-1.5">
               <label className="block text-sm font-medium text-slate-700">{t("purchases.orderStatus")}</label>
-              <select value={form.status || "CONFIRMED"} onChange={(e) => setForm({ ...form, status: e.target.value })} className={inputClass}>
+              <select value={form.status || "RECEIVED"} onChange={(e) => setForm({ ...form, status: e.target.value })} className={inputClass}>
                 {Object.entries(STATUS_LABELS).map(([value, label]) => (<option key={value} value={value}>{label}</option>))}
               </select>
-              {form.status === "RECEIVED" && (
+              {form.status === "RECEIVED" ? (
                 <p className="text-xs text-green-700">{t("purchases.receivedStockHint")}</p>
+              ) : (
+                <p className="text-xs text-amber-700">{t("purchases.notReceivedStockHint")}</p>
               )}
             </div>
           </div>

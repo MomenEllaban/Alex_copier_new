@@ -21,6 +21,7 @@ export async function findOrCreateMainWarehouse(tx: InventoryTx, companyId: stri
 export interface PurchaseStockItem {
   productId: string;
   quantity: number;
+  unitPrice?: number;
 }
 
 /**
@@ -61,6 +62,12 @@ export async function receivePurchaseIntoStock(
         notes: args.notes ?? `استلام أمر شراء ${args.purchaseOrderId}`,
       },
     });
+    if (typeof item.unitPrice === "number" && item.unitPrice > 0) {
+      await tx.product.update({
+        where: { id: item.productId },
+        data: { purchasePrice: item.unitPrice },
+      });
+    }
   }
 }
 

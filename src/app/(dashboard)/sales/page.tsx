@@ -54,7 +54,7 @@ interface Customer { id: string; name: string; remainingDebt?: number; }
 interface Company { id: string; name: string; }
 interface Engineer { id: string; name: string; email?: string | null; }
 interface SalesCategory { id: string; name: string; companyId: string; }
-interface Product { id: string; name: string; retailPrice?: number | null; wholesalePrice?: number | null; purchasePrice?: number | null; pricingTiers?: Record<string, number | null> | null; }
+interface Product { id: string; name: string; companyId?: string; retailPrice?: number | null; wholesalePrice?: number | null; purchasePrice?: number | null; pricingTiers?: Record<string, number | null> | null; }
 interface SalesItem { id: string; productId: string; quantity: number; unitPrice: number; discount: number; product: Product; }
 interface SalesOrder {
   id: string; companyId: string; customerId: string; engineerId?: string | null; orderType: string; status: string; total: number; discount: number;
@@ -166,7 +166,6 @@ export default function SalesPage() {
   const [engineers, setEngineers] = useState<Engineer[]>([]);
   const [salesCategories, setSalesCategories] = useState<SalesCategory[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [inventoryByProduct, setInventoryByProduct] = useState<Record<string, number>>({});
   const [inventoryByProductPerCompany, setInventoryByProductPerCompany] = useState<Record<string, Record<string, number>>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -218,9 +217,9 @@ export default function SalesPage() {
   const companyStock = (companyId: string) => inventoryByProductPerCompany[companyId] ?? {};
   const companyProducts = (companyId: string) => {
     const stock = companyStock(companyId);
-    const hasData = Object.keys(stock).length > 0;
-    if (companyId && hasData) return products.filter((p) => (stock[p.id] ?? 0) > 0);
-    return products;
+    if (!companyId) return products;
+    const matching = products.filter((p) => p.companyId === companyId || (stock[p.id] ?? 0) > 0);
+    return matching.length > 0 ? matching : products;
   };
 
   const exportSales = () => ({
@@ -273,16 +272,14 @@ export default function SalesPage() {
       setSalesCategories(Array.isArray(catsData) ? catsData : []);
       const catalogProducts = Array.isArray(inventoryData.products) ? inventoryData.products : [];
       setProducts(catalogProducts);
-      const stockMap: Record<string, number> = {};
       const perCompanyStock: Record<string, Record<string, number>> = {};
       for (const entry of Array.isArray(inventoryData.inventory) ? inventoryData.inventory : []) {
-        stockMap[entry.productId] = (stockMap[entry.productId] ?? 0) + Number(entry.quantity || 0);
+        if (entry.warehouse && entry.warehouse.isMain === false) continue;
         const companyId = entry.warehouse?.companyId;
         if (!companyId) continue;
         perCompanyStock[companyId] = perCompanyStock[companyId] ?? {};
         perCompanyStock[companyId][entry.productId] = (perCompanyStock[companyId][entry.productId] ?? 0) + Number(entry.quantity || 0);
       }
-      setInventoryByProduct(stockMap);
       setInventoryByProductPerCompany(perCompanyStock);
     } finally {
       setLoading(false);
@@ -720,7 +717,10 @@ export default function SalesPage() {
             <div className="mb-4 flex items-center justify-between"><h3 className="text-sm font-semibold text-slate-700">{t("sales.items")}</h3><button type="button" onClick={() => setItemRows([...itemRows, { productId: "", quantity: "", unitPrice: "", discount: "", priceTier: "newCustomer" }])} className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800"><Plus size={16} />{t("purchases.addRow")}</button></div>
             <div className="space-y-3">{itemRows.map((row, index) => {
               const selectedProduct = products.find((product) => product.id === row.productId);
-              const availableQty = row.productId ? inventoryByProduct[row.productId] ?? 0 : 0;
+              // The API deducts from the SELECTED company's main warehouse, so the
+              // number shown here must be that company's stock — not the global
+              // total, which would let the user enter a qty the sale then rejects.
+              const availableQty = row.productId ? companyStock(form.companyId)[row.productId] ?? 0 : 0;
               const rowPrice = selectedProduct
                 ? row.priceTier === "custom"
                   ? Number(row.unitPrice) || 0
@@ -738,7 +738,7 @@ export default function SalesPage() {
                         <SearchableSelect value={row.productId} onChange={(v) => updateItemRow(index, { productId: v, priceTier: row.priceTier || "newCustomer" })} options={companyProducts(form.companyId).map((product) => ({ value: product.id, label: product.name }))} placeholder={t("purchases.selectProduct")} required />
                         {selectedProduct && (
                           <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-slate-500">
-                            <span>المتاح: <span className="font-semibold text-slate-700">{availableQty}</span></span>
+                            <span>المتاح: <span className={`font-semibold ${!form.companyId ? "text-amber-600" : availableQty > 0 ? "text-emerald-700" : "text-rose-600"}`}>{!form.companyId ? "اختر الشركة أولاً" : availableQty}</span></span>
                             {ph?.lastSalePrice != null && lastSaleTierLabel && (
                               <span>آخر بيع: <span className="font-semibold text-slate-700">{ph.lastSalePrice.toLocaleString()}</span> · <span className="font-medium text-blue-600">{lastSaleTierLabel}</span></span>
                             )}
@@ -925,13 +925,17 @@ export default function SalesPage() {
             <div className="space-y-3">
               {interRows.map((row, index) => {
                 const selectedProduct = products.find((p) => p.id === row.productId);
-                const availableQty = row.productId ? inventoryByProduct[row.productId] ?? 0 : 0;
+                const availableQty = row.productId ? companyStock(interForm.fromCompanyId)[row.productId] ?? 0 : 0;
                 return (
                   <div key={index} className="grid gap-2 rounded-lg border border-gray-200 bg-white p-3 sm:grid-cols-[1.2fr_90px_130px_130px_110px_auto]">
                     <div>
                       <label className="mb-1 block text-[11px] font-medium text-gray-500">{t("sales.product")}</label>
                       <SearchableSelect value={row.productId} onChange={(v) => updateInterRow(index, { productId: v })} options={companyProducts(interForm.fromCompanyId).map((product) => ({ value: product.id, label: product.name }))} placeholder={t("purchases.selectProduct")} required />
-                      {selectedProduct && (<div className="mt-1 text-[11px] text-slate-500">المتاح في الشركة المختارة: {availableQty}</div>)}
+                      {selectedProduct && (
+                        <div className="mt-1 text-[11px] text-slate-500">
+                          المتاح في الشركة المختارة: <span className={`font-semibold ${!interForm.fromCompanyId ? "text-amber-600" : availableQty > 0 ? "text-emerald-700" : "text-rose-600"}`}>{!interForm.fromCompanyId ? "اختر الشركة أولاً" : availableQty}</span>
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label className="mb-1 block text-[11px] font-medium text-gray-500">{t("sales.qty")}</label>

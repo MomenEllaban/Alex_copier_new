@@ -145,9 +145,10 @@ export async function POST(request: Request) {
         await receivePurchaseIntoStock(tx, {
           purchaseOrderId: created.id,
           warehouseId: warehouse.id,
-          items: (created.items as unknown as { productId: string; quantity: number }[]).map((it) => ({
+          items: (created.items as unknown as { productId: string; quantity: number; unitPrice: number }[]).map((it) => ({
             productId: it.productId,
             quantity: it.quantity,
+            unitPrice: it.unitPrice,
           })),
         });
       }

@@ -82,8 +82,8 @@ export async function PUT(
       return NextResponse.json({ error: "الشركة مطلوبة عند استلام أمر الشراء", code: "COMPANY_REQUIRED_FOR_RECEIVE" }, { status: 400 });
     }
 
-    // بمجرد الاستلام (أو أثناء تحويله للاستلام) تكون البنود مثبّتة — يُمنع تعديلها.
-    if ((nextStatus === "RECEIVED" || existing.status === "RECEIVED") && itemsProvided) {
+    // بمجرد الاستلام تكون البنود مثبّتة — يُمنع تعديلها.
+    if (existing.status === "RECEIVED" && itemsProvided) {
       return NextResponse.json(
         { error: "لا يمكن تعديل بنود أمر شراء تم استلامه — احذف الأمر أو عكس الاستلام أولاً", code: "ITEMS_LOCKED_AFTER_RECEIVE" },
         { status: 400 }
@@ -135,7 +135,7 @@ export async function PUT(
         const warehouse = await findOrCreateMainWarehouse(tx, companyId);
         const withItems = await tx.purchaseOrder.findUnique({
           where: { id },
-          select: { items: { select: { productId: true, quantity: true } } },
+          select: { items: { select: { productId: true, quantity: true, unitPrice: true } } },
         });
         await receivePurchaseIntoStock(tx, {
           purchaseOrderId: id,
@@ -170,9 +170,14 @@ export async function DELETE(
       return NextResponse.json({ error: authed ? "Forbidden" : "Unauthorized" }, { status: authed ? 403 : 401 });
     }
     const { id } = await params;
-    const existing = await prisma.purchaseOrder.findUnique({ where: { id }, select: { id: true } });
+    const existing = await prisma.purchaseOrder.findUnique({ where: { id }, select: { id: true, status: true } });
     if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    await prisma.purchaseOrder.delete({ where: { id } });
+    await prisma.$transaction(async (tx) => {
+      if (existing.status === "RECEIVED") {
+        await reversePurchaseFromStock(tx, id);
+      }
+      await tx.purchaseOrder.delete({ where: { id } });
+    });
     return NextResponse.json({ message: "Deleted" });
   } catch (error: unknown) {
     if (error && typeof error === "object" && "code" in error && error.code === "P2025") {
