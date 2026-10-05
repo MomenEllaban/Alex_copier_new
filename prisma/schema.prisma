@@ -288,6 +288,7 @@ model Company {
   employeePenalties     EmployeePenalty[]
   machineReplacements   MachineReplacement[]
   hrSetting             HrSetting?
+  inventorySetting      InventorySetting?
   workshopPartMovements WorkshopPartMovement[]
 }
 
@@ -1986,6 +1987,35 @@ model HrSetting {
   updatedAt                  DateTime @updatedAt
 
   Company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+/// Per-company stock policy. One row per company, created on first read.
+///
+/// The policy governs SALES only (SalesOrder and InterCompanyInvoice). Manual
+/// outbound movements typed on the inventory page — ADJUSTMENT, CONSUMED,
+/// SCRAP, ENGINEER_CUSTODY_OUT — stay blocked at zero whatever this says, and
+/// so do every reversal flow (deleting a sale, un-receiving a purchase,
+/// a return): reversing a movement is how the ledger is repaired, and letting
+/// it go negative would hide the real shortage instead of recording it.
+model InventorySetting {
+  id        String @id @default(cuid())
+  companyId String @unique
+
+  /// false (the default, and the pre-existing behaviour): a sale is refused
+  /// with 409 INSUFFICIENT_STOCK. true: the sale is allowed to go through and
+  /// the balance is allowed to end below zero, after the client has confirmed.
+  allowNegativeStock Boolean @default(false)
+
+  /// When negative stock is allowed, still answer a short-selling sale with 409
+  /// NEGATIVE_STOCK_CONFIRM_REQUIRED plus the per-item shortfall, so the user
+  /// sees what the balance will become before committing. Turning this off lets
+  /// the sale through silently.
+  warnOnNegativeStock Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 }
 
 model PayrollPeriod {

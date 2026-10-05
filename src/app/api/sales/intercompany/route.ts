@@ -4,6 +4,14 @@ import { requireAuth, requireAction } from "@/lib/auth-helpers";
 import { recalculatePaymentStatus } from "@/lib/payment-status";
 import { computeCreditSplit, creditUsedNote } from "@/lib/customer-credit";
 import { traceError } from "@/lib/prisma-errors";
+import {
+  STOCK_BLOCKED,
+  STOCK_CONFIRM_REQUIRED,
+  StockShortfall,
+  StockShortfallError,
+  deductStockForSale,
+} from "@/lib/stock-movement-helper";
+import { getInventoryPolicy } from "@/lib/services/inventory/inventory-settings-service";
 
 type PrismaTx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 
@@ -144,6 +152,10 @@ export async function POST(request: Request) {
     // لا يمكن أن يتجاوز المبلغ المدفوع الإجمالي؛ ويُخصم رصيد تحت الحساب أولاً
     const split = computeCreditSplit(total, customer?.remainingDebt ?? 0, paid, paymentMethod);
 
+    // Hoisted out of the transaction so the response can tell the client which
+    // items went below zero in the source warehouse.
+    let acceptedShortfalls: StockShortfall[] = [];
+
     const result = await prisma.$transaction(async (tx: PrismaTx) => {
       const warehouses = await tx.warehouse.findMany({
         where: { companyId: { in: [fromCompanyId, toCompanyId] }, isMain: true },
@@ -194,18 +206,15 @@ export async function POST(request: Request) {
       });
 
       // بداية: سحب المخزون من مستودع شركة المصدر
+      // The policy comes from the SOURCE company: it is the source warehouse
+      // that goes into deficit, whatever the destination's setting says.
+      acceptedShortfalls = await deductStockForSale(tx, {
+        warehouseId: sourceWarehouse.id,
+        lines: items as InterItem[],
+        policy: await getInventoryPolicy(fromCompanyId, tx),
+        confirmed: body.allowNegativeStock === true,
+      });
       for (const item of items as InterItem[]) {
-        const src = await tx.warehouseInventory.findUnique({
-          where: { warehouseId_productId: { warehouseId: sourceWarehouse.id, productId: item.productId } },
-        });
-        const available = src?.quantity ?? 0;
-        if (available < item.quantity || !src) {
-          throw new Error(`INSUFFICIENT_STOCK:${item.productId}`);
-        }
-        await tx.warehouseInventory.update({
-          where: { warehouseId_productId: { warehouseId: sourceWarehouse.id, productId: item.productId } },
-          data: { quantity: available - item.quantity },
-        });
         await tx.stockMovement.create({
           data: {
             warehouseId: sourceWarehouse.id,
@@ -244,8 +253,9 @@ export async function POST(request: Request) {
       }
 
       // تصريف المخزون من مستودع شركة الوجهة (نفس الوحدات المُستلمة داخليًا)
-      // ملاحظة: الرصيد الهدف زاد للتو بحركة INTER_COMPANY_IN، لكن الحارس صارم:
-      // لا يُسمح بالمرور الصامت أو خصم جزئي — أي نقص يعيد العملية كاملة (rollback).
+      // ملاحظة: الرصيد الهدف زاد للتو بحركة INTER_COMPANY_IN، لذلك هذا الحارس
+      // تحقّق سلامة وليس فحص توفر — نقص هنا يعني خللاً في الحركات لا عجز مخزون.
+      // ولهذا لا تُطبَّق عليه سياسة الرصيد السالب إطلاقًا.
       for (const item of items as InterItem[]) {
         const tgt = await tx.warehouseInventory.findUnique({
           where: { warehouseId_productId: { warehouseId: targetWarehouse.id, productId: item.productId } },
@@ -389,10 +399,28 @@ export async function POST(request: Request) {
       return { interInvoice, order: finalOrder, internalTotal, costTotal, total };
     }, { timeout: 120000 });
 
-    return NextResponse.json(result, { status: 201 });
+    // The invoice plus the deficits it was allowed to create in the source
+    // warehouse, so the UI can state the resulting balance.
+    return NextResponse.json({ ...result, negativeStockShortfalls: acceptedShortfalls }, { status: 201 });
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("INSUFFICIENT_STOCK")) {
-      return NextResponse.json({ error: "الكمية المتاحة في المخزون لا تكفي لهذه الحركة", code: "INSUFFICIENT_STOCK" }, { status: 409 });
+    if (error instanceof StockShortfallError) {
+      if (error.code === STOCK_CONFIRM_REQUIRED) {
+        return NextResponse.json(
+          {
+            error: "الكمية المطلوبة أكبر من المتاح — التحويل سيُنفَّذ وسيصبح رصيد الصنف سالبًا",
+            code: STOCK_CONFIRM_REQUIRED,
+            shortfalls: error.shortfalls,
+          },
+          { status: 409 },
+        );
+      }
+      return NextResponse.json(
+        { error: "الكمية المتاحة في المخزون لا تكفي لهذه الحركة", code: STOCK_BLOCKED },
+        { status: 409 },
+      );
+    }
+    if (error instanceof Error && error.message.startsWith(STOCK_BLOCKED)) {
+      return NextResponse.json({ error: "الكمية المتاحة في المخزون لا تكفي لهذه الحركة", code: STOCK_BLOCKED }, { status: 409 });
     }
     if (error instanceof Error && error.message === "ACCOUNT_CHART_MISSING") {
       return NextResponse.json({ error: "شجرة الحسابات غير مكتملة لإحدى الشركتين", code: "ACCOUNT_CHART_MISSING" }, { status: 400 });

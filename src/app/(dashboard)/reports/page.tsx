@@ -35,6 +35,7 @@ const REPORTS = [
   { href: "/reports/satisfaction", labelKey: "reports.customerSatisfaction", descKey: "reports.averageRatings", icon: "⭐" },
   { href: "/reports/investors", labelKey: "reports.investorDistribution", descKey: "reports.distributionHistory", icon: "📊" },
   { href: "/reports/spare-parts", labelKey: "reports.sparePartsMatrix", descKey: "reports.compatibilityMatrix", icon: "🔧" },
+  { href: "/reports/negative-stock", labelKey: "reports.negativeStockReport", descKey: "reports.negativeStockSubtitle", icon: "📉" },
 ] as const;
 
 /**

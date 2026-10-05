@@ -86,6 +86,10 @@ const navGroups: NavGroup[] = [
       { key: "navigation.purchases", href: "/purchases", icon: ShoppingCart, page: "purchases", canAdd: true },
       { key: "navigation.suppliers", href: "/suppliers", icon: Truck, page: "suppliers", canAdd: true },
       { key: "navigation.inventory", href: "/inventory", icon: Package, page: "inventory" },
+      // Separate page from the stock list on purpose: the negative-stock policy
+      // can only ever loosen a guard, so it must not travel with `inventory`
+      // (which warehouse clerks and workshop managers hold).
+      { key: "navigation.inventorySettings", href: "/inventory/settings", icon: Cog, page: "inventorySettings" },
       { key: "navigation.warehouses", href: "/warehouses", icon: Warehouse, page: "warehouses", canAdd: true },
       { key: "navigation.products", href: "/products", icon: Boxes, page: "products", canAdd: true },
       { key: "navigation.tradeIns", href: "/trade-ins", icon: RotateCcw, page: "tradeIns" },
@@ -138,6 +142,9 @@ const navGroups: NavGroup[] = [
       { key: "navigation.reportSatisfaction", href: "/reports/satisfaction", icon: Star, page: "reports" },
       { key: "navigation.reportInvestors", href: "/reports/investors", icon: PieChart, page: "reports" },
       { key: "navigation.reportSpareParts", href: "/reports/spare-parts", icon: Package, page: "reports" },
+      // Reached from the dashboard's negative-stock alert as well, so it needs
+      // its own entry rather than living only behind that alert.
+      { key: "navigation.reportNegativeStock", href: "/reports/negative-stock", icon: AlertTriangle, page: "reports" },
     ],
   },
   {

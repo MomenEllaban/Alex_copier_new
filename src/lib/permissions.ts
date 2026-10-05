@@ -19,6 +19,7 @@ export type Page =
   | "purchases"
   | "sales"
   | "inventory"
+  | "inventorySettings"
   | "warehouses"
   | "products"
   | "workshop"
@@ -49,7 +50,7 @@ export const ROLE_PERMISSIONS: Record<Role, Page[]> = {
   GENERAL_MANAGER: [
     "dashboard", "machines", "customers", "engineers",
     "serviceRequests", "contracts", "purchases", "sales",
-    "inventory", "warehouses", "products", "workshop", "finance", "companies",
+    "inventory", "inventorySettings", "warehouses", "products", "workshop", "finance", "companies",
     "settlements", "reports", "settings", "suppliers", "investors", "returns", "tradeIns", "workshopDaily",
     "copierTests",
     "hrDashboard", "hrEmployees", "hrAttendance", "hrLeaves", "hrPayroll", "hrSettings", "hrReports", "hrSelfService",
@@ -59,7 +60,7 @@ export const ROLE_PERMISSIONS: Record<Role, Page[]> = {
   COMPANY_MANAGER: [
     "dashboard", "machines", "customers", "engineers",
     "serviceRequests", "contracts", "purchases", "sales",
-    "inventory", "warehouses", "products", "workshop", "finance", "settlements",
+    "inventory", "inventorySettings", "warehouses", "products", "workshop", "finance", "settlements",
     "reports", "suppliers", "returns", "tradeIns", "workshopDaily",
     "copierTests",
     // 1.7: These two were unreachable for a company manager even though the

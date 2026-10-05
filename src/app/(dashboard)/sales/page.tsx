@@ -13,7 +13,7 @@ import ExportButton from "@/components/ExportButton";
 import StatsCards from "@/components/StatsCards";
 import PrinterLoader from "@/components/PrinterLoader";
 import { useConfirm, useToast } from "@/components/UIProvider";
-import { apiErrorMessage } from "@/lib/api-client";
+import { apiErrorMessage, fill } from "@/lib/api-client";
 import FormModal from "@/components/FormModal";
 import SelectWithAdd from "@/components/SelectWithAdd";
 import SearchableSelect from "@/components/SearchableSelect";
@@ -96,6 +96,24 @@ interface PriceHistory {
   lastPurchaseAt: string | null;
 }
 
+// ── Negative stock on sales ────────────────────────────────────────────────
+// The server owns the stock numbers. When the company has allowed it, a
+// short-selling invoice is answered with 409 NEGATIVE_STOCK_CONFIRM_REQUIRED
+// and the per-item shortfall — not a refusal. We show what the balance will
+// become and replay the SAME payload once with allowNegativeStock, so the sale
+// is recorded exactly as the user entered it. Quantities are never adjusted
+// here: the balance the server writes is the real one.
+interface StockShortfallView {
+  productId: string;
+  productName: string;
+  requested: number;
+  available: number;
+  resultingBalance: number;
+  shortage: number;
+}
+
+const STOCK_CONFIRM_REQUIRED = "NEGATIVE_STOCK_CONFIRM_REQUIRED";
+
 const PRICE_TIER_LABELS: Record<string, string> = {
   legacyCustomer: "عميل قديم",
   newCustomer: "عميل جديد",
@@ -158,7 +176,7 @@ const ORDER_KIND_LABEL: Record<OrderKind, string> = {
 export default function SalesPage() {
   const { t, dir } = useI18n();
 
-  const { success: toastSuccess, error: toastError } = useToast();
+  const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
   const confirmAction = useConfirm();
   const [orders, setOrders] = useState<SalesOrder[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -438,6 +456,46 @@ export default function SalesPage() {
     setShowForm(true);
   };
 
+  /**
+   * Ask the user to accept a negative balance before the sale is written.
+   *
+   * Returns true when they confirm. The wording states the three numbers that
+   * matter — requested, available, and the balance that results — so the
+   * decision is informed rather than a bare OK.
+   */
+  const confirmNegativeStock = async (data: unknown) => {
+    const shortfalls = (data as { shortfalls?: StockShortfallView[] } | null)?.shortfalls;
+    if (!Array.isArray(shortfalls) || shortfalls.length === 0) return false;
+    const lines = shortfalls
+      .map((s) =>
+        fill(t("sales.negativeStockLine"), {
+          product: s.productName,
+          requested: s.requested,
+          available: s.available,
+          resulting: s.resultingBalance,
+        })
+      )
+      .join("\n");
+    return confirmAction({
+      title: t("sales.negativeStockTitle"),
+      message: lines,
+      confirmLabel: t("sales.negativeStockContinue"),
+    });
+  };
+
+  /** Toast when the server reports the sale left items below zero. */
+  const reportAcceptedDeficit = (data: unknown) => {
+    const accepted = (data as { negativeStockShortfalls?: StockShortfallView[] } | null)?.negativeStockShortfalls;
+    if (Array.isArray(accepted) && accepted.length > 0) {
+      toastInfo(
+        fill(t("sales.negativeStockCommitted"), {
+          count: accepted.length,
+          products: accepted.map((s) => `${s.productName} (${s.resultingBalance})`).join("، "),
+        })
+      );
+    }
+  };
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     const items = itemRows
@@ -478,13 +536,33 @@ export default function SalesPage() {
       items,
     };
     setSaving(true);
+    await submitSale(payload, false);
+  };
+
+  /**
+   * POST/PUT a sales invoice, replaying it once if the server asks the user to
+   * accept a negative stock balance.
+   *
+   * `confirmed` guards against a loop: the replay carries allowNegativeStock, so
+   * if the server still asks (the policy changed mid-flight, say) the second
+   * answer is shown as an error instead of asking again.
+   */
+  const submitSale = async (payload: Record<string, unknown>, confirmed: boolean) => {
     const response = await fetch(editingId ? `/api/sales/${editingId}` : "/api/sales", {
       method: editingId ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) { toastError(apiErrorMessage(data, t)); setSaving(false); return; }
+    if (!response.ok) {
+      if (!confirmed && data?.code === STOCK_CONFIRM_REQUIRED && (await confirmNegativeStock(data))) {
+        await submitSale({ ...payload, allowNegativeStock: true }, true);
+        return;
+      }
+      toastError(apiErrorMessage(data, t));
+      setSaving(false);
+      return;
+    }
     setForm({ companyId: "", customerId: "", engineerId: "", categoryId: "", orderType: "MACHINE_SALE", paymentMethod: "CASH", isTaxInvoice: false, discount: "", discountType: "FIXED", taxRate: "0", notes: "", paidAmount: "" });
     setItemRows([{ productId: "", quantity: "", unitPrice: "", discount: "", priceTier: "newCustomer" }]);
     setTradeInProduct({ name: "", brand: "", condition: "", value: "", serialNumber: "" });
@@ -497,6 +575,7 @@ export default function SalesPage() {
     refresh();
     notifyDataChanged(["sales", "products", "inventory", "customers", "companies", "trade-ins", "notifications"]);
     toastSuccess(t("common.savedSuccessfully"));
+    reportAcceptedDeficit(data);
   };
 
   const handleDelete = async (id: string) => {
@@ -550,20 +629,33 @@ export default function SalesPage() {
     }
     const safeTaxRate = interForm.isTaxInvoice ? 14 : (parseFloat(interForm.taxRate) || 0);
     setSavingInter(true);
+    await submitInterSale({
+      ...interForm,
+      discount: parseFloat(interForm.discount) || 0,
+      paidAmount: parseFloat(interForm.paidAmount) || 0,
+      internalPaidAmount: parseFloat(interForm.internalPaidAmount) || 0,
+      taxRate: safeTaxRate,
+      items,
+    }, false);
+  };
+
+  /** Same replay-once contract as submitSale, for the inter-company invoice. */
+  const submitInterSale = async (payload: Record<string, unknown>, confirmed: boolean) => {
     const response = await fetch(editingId ? `/api/sales/intercompany/${editingId}` : "/api/sales/intercompany", {
       method: editingId ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...interForm,
-        discount: parseFloat(interForm.discount) || 0,
-        paidAmount: parseFloat(interForm.paidAmount) || 0,
-        internalPaidAmount: parseFloat(interForm.internalPaidAmount) || 0,
-        taxRate: safeTaxRate,
-        items,
-      }),
+      body: JSON.stringify(payload),
     });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) { toastError(apiErrorMessage(data, t)); setSavingInter(false); return; }
+    if (!response.ok) {
+      if (!confirmed && data?.code === STOCK_CONFIRM_REQUIRED && (await confirmNegativeStock(data))) {
+        await submitInterSale({ ...payload, allowNegativeStock: true }, true);
+        return;
+      }
+      toastError(apiErrorMessage(data, t));
+      setSavingInter(false);
+      return;
+    }
     setInterForm({ fromCompanyId: "", toCompanyId: "", customerId: "", engineerId: "", categoryId: "", orderType: "SPARE_PART_SALE", paymentMethod: "CREDIT", internalPaymentMethod: "CREDIT", paidAmount: "", internalPaidAmount: "", isTaxInvoice: false, taxRate: "0", discount: "", notes: "" });
     setInterRows([{ productId: "", quantity: "", internalPrice: "", customerPrice: "", costPrice: "" }]);
     setEditingId(null);
@@ -574,6 +666,7 @@ export default function SalesPage() {
     refresh();
     notifyDataChanged(["sales", "products", "inventory", "customers", "companies", "notifications"]);
     toastSuccess(t("common.savedSuccessfully"));
+    reportAcceptedDeficit(data);
   };
 
   return (
@@ -739,6 +832,11 @@ export default function SalesPage() {
                         {selectedProduct && (
                           <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-slate-500">
                             <span>المتاح: <span className={`font-semibold ${!form.companyId ? "text-amber-600" : availableQty > 0 ? "text-emerald-700" : "text-rose-600"}`}>{!form.companyId ? "اختر الشركة أولاً" : availableQty}</span></span>
+                            {/* The balance is shown as it really stands: a deficit
+                                stays negative until a purchase covers it. */}
+                            {form.companyId && availableQty < 0 && (
+                              <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-700">{t("inventory.negativeBadge")}</span>
+                            )}
                             {ph?.lastSalePrice != null && lastSaleTierLabel && (
                               <span>آخر بيع: <span className="font-semibold text-slate-700">{ph.lastSalePrice.toLocaleString()}</span> · <span className="font-medium text-blue-600">{lastSaleTierLabel}</span></span>
                             )}
@@ -934,6 +1032,9 @@ export default function SalesPage() {
                       {selectedProduct && (
                         <div className="mt-1 text-[11px] text-slate-500">
                           المتاح في الشركة المختارة: <span className={`font-semibold ${!interForm.fromCompanyId ? "text-amber-600" : availableQty > 0 ? "text-emerald-700" : "text-rose-600"}`}>{!interForm.fromCompanyId ? "اختر الشركة أولاً" : availableQty}</span>
+                          {interForm.fromCompanyId && availableQty < 0 && (
+                            <span className="ms-1 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700">{t("inventory.negativeBadge")}</span>
+                          )}
                         </div>
                       )}
                     </div>

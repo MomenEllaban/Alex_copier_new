@@ -184,6 +184,9 @@ describe("GET /api/dashboard", () => {
 
     expect(body.alerts.map((alert: { kind: string }) => alert.kind)).toEqual([
       "URGENT_REQUESTS",
+      // Deficit stock, reported alongside low stock: an allowed sale can leave a
+      // balance below zero and that has to be visible without opening a report.
+      "NEGATIVE_STOCK",
       "OVERDUE_INSTALLMENTS",
       "UNASSIGNED_REQUESTS",
       "CONTRACTS_EXPIRING",

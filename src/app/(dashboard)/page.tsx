@@ -80,6 +80,10 @@ const ALERT_META: Record<AlertKind, { labelKey: string; className: string }> = {
     labelKey: "dashboard.alerts.LOW_STOCK",
     className: "border-orange-200 bg-orange-50 text-orange-800",
   },
+  NEGATIVE_STOCK: {
+    labelKey: "dashboard.alerts.NEGATIVE_STOCK",
+    className: "border-red-200 bg-red-50 text-red-800",
+  },
 };
 
 const getQuickActions = (role?: string) => {

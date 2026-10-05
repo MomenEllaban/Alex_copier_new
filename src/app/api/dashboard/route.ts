@@ -113,6 +113,7 @@ export async function GET() {
       overdueInstallmentAggregate,
       expiringContracts,
       lowStockItems,
+      negativeStockItems,
     ] = await Promise.all([
       prisma.company.findMany({ orderBy: { name: "asc" } }),
       prisma.machine.groupBy({ by: ["currentStatus"], _count: { _all: true } }),
@@ -157,6 +158,9 @@ export async function GET() {
       prisma.warehouseInventory.count({
         where: { quantity: { lte: LOW_STOCK_THRESHOLD }, product: { isActive: true, productType: "SPARE_PART" } },
       }),
+      // No product filter: a machine in deficit matters just as much as a toner,
+      // and the alert is about the balance, not the item type.
+      prisma.warehouseInventory.count({ where: { quantity: { lt: 0 } } }),
     ]);
 
     const machineStatuses: MachineStatusCounts = Object.fromEntries(
@@ -209,6 +213,7 @@ export async function GET() {
         },
         expiringContracts: buildExpiringContracts(expiringContracts, now),
         lowStockItems,
+        negativeStockItems,
       }),
       recentRequests: toRecentRequestViews(recentRequests),
       engineerWorkload: buildEngineerWorkload(

@@ -5,6 +5,14 @@ import { recalculatePaymentStatus } from "@/lib/payment-status";
 import { computeCreditSplit, creditUsedNote } from "@/lib/customer-credit";
 import { sanitizePaymentMethod } from "@/lib/payment-method";
 import { traceError } from "@/lib/prisma-errors";
+import {
+  STOCK_BLOCKED,
+  STOCK_CONFIRM_REQUIRED,
+  StockShortfall,
+  StockShortfallError,
+  deductStockForSale,
+} from "@/lib/stock-movement-helper";
+import { getInventoryPolicy } from "@/lib/services/inventory/inventory-settings-service";
 
 export async function GET(
   request: Request,
@@ -168,6 +176,10 @@ export async function PUT(
       );
     }
 
+    // Hoisted out of the transaction so the response can tell the client which
+    // items this edit left below zero.
+    let acceptedShortfalls: StockShortfall[] = [];
+
     const updated = await prisma.$transaction(async (tx) => {
       // 1) Reverse stock from the ORIGINAL order using recorded movements
       const stockMovements = await tx.stockMovement.findMany({ where: { referenceId: id } });
@@ -232,21 +244,22 @@ export async function PUT(
       });
 
       // 5) Deduct new stock
-      if (warehouse) {
-        for (const item of items as { productId: string; quantity: number }[]) {
-          const iv = await tx.warehouseInventory.findUnique({
-            where: { warehouseId_productId: { warehouseId: warehouse.id, productId: item.productId } },
-          });
-          const available = iv?.quantity ?? 0;
-          if (available < item.quantity || !iv) {
-            throw new Error(`INSUFFICIENT_STOCK:${item.productId}`);
-          }
-          await tx.warehouseInventory.update({
-            where: { warehouseId_productId: { warehouseId: warehouse.id, productId: item.productId } },
-            data: { quantity: available - item.quantity },
-          });
-        }
-      }
+      // This runs AFTER the original order's stock was returned in step 1, so the
+      // shortfall the user is warned about is measured against the balance the
+      // item will actually end on — not against one that still has this order's
+      // units missing.
+      const policy = await getInventoryPolicy(companyId, tx);
+      const shortfalls = await deductStockForSale(tx, {
+        warehouseId: warehouse.id,
+        lines: items as { productId: string; quantity: number }[],
+        policy,
+        confirmed: raw.allowNegativeStock === true,
+      });
+      acceptedShortfalls = shortfalls;
+      const shortfallNote =
+        shortfalls.length > 0
+          ? ` — عجز مخزون: ${shortfalls.map((s) => `${s.productName} (${s.resultingBalance})`).join("، ")}`
+          : "";
 
       const installmentData = Array.isArray(installments) && installments.length > 0
         ? {
@@ -396,7 +409,7 @@ export async function PUT(
               quantity: item.quantity,
               movementType: "SALE_OUT",
               referenceId: id,
-              notes: `بيع — ${orderType} — ${id}`,
+              notes: `بيع — ${orderType} — ${id}${shortfallNote}`,
             },
           });
         }
@@ -420,10 +433,28 @@ export async function PUT(
       });
     }, { timeout: 120000 });
 
-    return NextResponse.json(updated);
+    // The order plus the deficits this edit was allowed to leave, so the UI can
+    // state the resulting balance instead of implying the stock was there.
+    return NextResponse.json({ ...updated, negativeStockShortfalls: acceptedShortfalls });
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("INSUFFICIENT_STOCK")) {
-      return NextResponse.json({ error: "الكمية المتاحة في المخزون لا تكفي لهذه الحركة", code: "INSUFFICIENT_STOCK" }, { status: 409 });
+    if (error instanceof StockShortfallError) {
+      if (error.code === STOCK_CONFIRM_REQUIRED) {
+        return NextResponse.json(
+          {
+            error: "الكمية المطلوبة أكبر من المتاح — البيع سيُنفَّذ وسيصبح رصيد الصنف سالبًا",
+            code: STOCK_CONFIRM_REQUIRED,
+            shortfalls: error.shortfalls,
+          },
+          { status: 409 },
+        );
+      }
+      return NextResponse.json(
+        { error: "الكمية المتاحة في المخزون لا تكفي لهذه الحركة", code: STOCK_BLOCKED },
+        { status: 409 },
+      );
+    }
+    if (error instanceof Error && error.message.startsWith(STOCK_BLOCKED)) {
+      return NextResponse.json({ error: "الكمية المتاحة في المخزون لا تكفي لهذه الحركة", code: STOCK_BLOCKED }, { status: 409 });
     }
     return NextResponse.json({ error: "Failed to update sales order", detail: error instanceof Error ? error.message : undefined }, { status: traceError("[sales:PUT] update failed", error) });
   }
@@ -528,7 +559,10 @@ export async function DELETE(
             create: { warehouseId: movement.warehouseId, productId: movement.productId, quantity: movement.quantity },
           });
         } else if (movement.movementType === "PURCHASE_IN") {
-          // Reverse trade-in: decrement warehouse inventory (guarded: never negative)
+          // Reverse trade-in: decrement warehouse inventory.
+          // Deliberately NOT covered by the negative-stock policy. The units of
+          // a trade-in product have usually been consumed by now, and letting
+          // this reversal go below zero would invent stock that never existed.
           const inv = await tx.warehouseInventory.findUnique({
             where: { warehouseId_productId: { warehouseId: movement.warehouseId, productId: movement.productId } },
           });
@@ -552,8 +586,8 @@ export async function DELETE(
 
     return NextResponse.json({ message: "Sales order deleted" });
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("INSUFFICIENT_STOCK")) {
-      return NextResponse.json({ error: "الكمية المتاحة في المخزون لا تكفي للعكس — لا يُسمح برصيد سالب", code: "INSUFFICIENT_STOCK" }, { status: 409 });
+    if (error instanceof Error && error.message.startsWith(STOCK_BLOCKED)) {
+      return NextResponse.json({ error: "الكمية المتاحة في المخزون لا تكفي لعكس الفاتورة — لا يمكن إرجاع كمية تم صرفها", code: STOCK_BLOCKED }, { status: 409 });
     }
     console.error("Failed to delete sales order:", error);
     return NextResponse.json({ error: "Failed to delete sales order" }, { status: 500 });

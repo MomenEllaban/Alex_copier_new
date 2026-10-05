@@ -135,7 +135,7 @@ export default function UIProvider({ children }: { children: ReactNode }) {
                     <h2 className="text-lg font-semibold text-slate-900">
                       {confirmState.title || t("common.confirmTitle")}
                     </h2>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">{confirmState.message}</p>
+                    <p className="mt-2 text-sm leading-6 whitespace-pre-line text-slate-600">{confirmState.message}</p>
                   </div>
                 </div>
               </div>

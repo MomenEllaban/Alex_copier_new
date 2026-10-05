@@ -12,6 +12,7 @@
     "sales": "المبيعات",
     "returns": "المرتجعات",
     "inventory": "المخزون",
+    "inventorySettings": "إعدادات المخزون",
     "workshop": "الورشة",
     "workshopDaily": "يومية الورشة",
     "finance": "المالية",
@@ -56,7 +57,8 @@
     "reportWarranties": "ضمانات تنتهي قريباً",
     "reportSatisfaction": "رضا العملاء",
     "reportInvestors": "توزيع الأرباح",
-    "reportSpareParts": "مصفوفة قطع الغيار"
+    "reportSpareParts": "مصفوفة قطع الغيار",
+    "reportNegativeStock": "أرصدة مخزون سالبة"
   },
   "dashboard": {
     "title": "لوحة التحكم",
@@ -97,7 +99,8 @@
       "UNASSIGNED_REQUESTS": "طلبات لم يُسند لها فني",
       "OVERDUE_INSTALLMENTS": "أقساط متأخرة عن السداد",
       "CONTRACTS_EXPIRING": "عقود تنتهي خلال 30 يومًا",
-      "LOW_STOCK": "مخزون منخفض"
+      "LOW_STOCK": "مخزون منخفض",
+      "NEGATIVE_STOCK": "أرصدة مخزون سالبة"
     }
   },
   "notifications": {
@@ -682,6 +685,10 @@
     "categoryName": "اسم الفئة",
     "searchCategoryPlaceholder": "ابحث باسم الفئة...",
     "deleteCategoryConfirm": "هل أنت متأكد من حذف هذه الفئة؟",
+    "negativeStockTitle": "تحذير: الكمية أكبر من المتاح",
+    "negativeStockLine": "{product}: المطلوب {requested} — المتاح {available} — سيصبح الرصيد {resulting}",
+    "negativeStockContinue": "متابعة البيع",
+    "negativeStockCommitted": "تم تسجيل البيع برصيد سالب: {products} — سيُعوَّض مع أول وارد",
     "stats": {
       "totalOrders": "إجمالي الفواتير",
       "totalValue": "إجمالي المبيعات",
@@ -712,8 +719,25 @@
       "items": "أصناف بالمخزون",
       "totalQty": "إجمالي الكمية",
       "warehouses": "مستودعات",
-      "outOfStock": "نفد المخزون"
-    }
+      "outOfStock": "نفد المخزون",
+      "negativeStock": "أرصدة سالبة"
+    },
+    "negative": "رصيد سالب",
+    "negativeShort": "سالب",
+    "negativeBadge": "عجز",
+    "showNegativeOnly": "الأرصدة السالبة فقط",
+    "negativeEmpty": "لا توجد أصناف برصيد سالب — كل الأرصدة موجبة",
+    "negativeHint": "الأصناف التي بيعت بكمية أكبر من المتاح تظهر هنا برصيد سالب، وتعود موجبة مع أول وارد يعوضها",
+    "settingsTitle": "إعدادات المخزون",
+    "settingsSubtitle": "سياسة التعامل مع الأرصدة السالبة",
+    "allowNegativeStock": "السماح بالبيع برصيد مخزون غير كافٍ",
+    "allowNegativeStockHint": "عند التفعيل: تُنفَّذ فاتورة البيع حتى لو كانت الكمية أكبر من المتاح، ويُسجَّل الرصيد الناتج سالبًا ويُتابع حتى تعوّضه عملية شراء لاحقة. عند الإيقاف: تُرفض الفاتورة كما كان سلوكها السابق.",
+    "warnOnNegativeStock": "إظهار تحذير قبل إتمام البيع",
+    "warnOnNegativeStockHint": "عند التفعيل: تظهر رسالة توضح الكمية المتوفرة والرصيد الناتج قبل التنفيذ، ويمكن للمستخدم الإلغاء. عند الإيقاف: يُنفَّذ البيع مباشرة.",
+    "policyScopeNote": "الإعداد يؤثر على فواتير البيع فقط. حركات المخزون اليدوية (تسوية/مستهلك/مهمل) وعمليات الإرجاع تبقى مقيّدة بمنع الرصيد السالب.",
+    "policyCurrent": "الوضع الحالي",
+    "policyAllowed": "مسموح بالبيع مع رصيد سالب",
+    "policyBlocked": "البيع يُرفض عند نقص الرصيد"
   },
   "workshopDaily": {
     "title": "يومية الورشة",
@@ -971,6 +995,13 @@
     "totalEngineers": "المهندسون",
     "totalContracts": "العقود",
     "openServiceRequests": "طلبات خدمة مفتوحة",
+    "negativeStockReport": "الأرصدة السالبة للمخزون",
+    "negativeStockSubtitle": "أصناف بيعت بكمية أكبر من المتاح — يظهر العجز حتى يعوّضه وارد شراء",
+    "negativeStockBalance": "الرصيد الحالي",
+    "negativeStockShortage": "ناقص",
+    "negativeStockValue": "قيمة التعويض",
+    "negativeStockEmpty": "لا توجد أرصدة سالبة — كل الأصناف متاحة بكميتها",
+    "negativeStockEmptyHint": "تظهر هذه القائمة فقط عند تفعيل «السماح بالبيع برصيد غير كافٍ» من إعدادات المخزون.",
     "allReports": "كل التقارير",
     "browseReports": "اختر تقريراً لعرض تفاصيله الكاملة وتصديره.",
     "reportsOverview": "نظرة عامة"
@@ -1205,6 +1236,7 @@
     "INVALID_PRICE": "الأسعار يجب أن تكون أرقامًا موجبة",
     "INVALID_MOVEMENT_DATA": "بيانات حركة المخزون غير صالحة",
     "INSUFFICIENT_STOCK": "الكمية المتاحة لا تكفي لهذه الحركة",
+    "NEGATIVE_STOCK_CONFIRM_REQUIRED": "الكمية المطلوبة أكبر من المتاح — سيصبح رصيد الصنف سالبًا",
     "WAREHOUSE_IN_USE": "لا يمكن حذف مستودع به مخزون أو حركات سابقة",
     "COMPANY_IN_USE": "لا يمكن حذف شركة مرتبطة ببيانات أخرى",
     "CUSTOMER_IN_USE": "لا يمكن حذف عميل مرتبط بماكينات أو عقود أو طلبات صيانة",

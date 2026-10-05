@@ -5,11 +5,11 @@ const mocks = vi.hoisted(() => {
     company: { findUnique: vi.fn() },
     customer: { findUnique: vi.fn(), update: vi.fn() },
     engineer: { findUnique: vi.fn() },
-    product: { count: vi.fn() },
+    product: { count: vi.fn(), findMany: vi.fn() },
     warehouse: { findMany: vi.fn() },
     salesOrder: { create: vi.fn(), update: vi.fn(), findUnique: vi.fn(), findUniqueOrThrow: vi.fn() },
     interCompanyInvoice: { create: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
-    warehouseInventory: { findUnique: vi.fn(), update: vi.fn(), create: vi.fn() },
+    warehouseInventory: { findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn(), upsert: vi.fn(), create: vi.fn() },
     stockMovement: { create: vi.fn(), findMany: vi.fn(), deleteMany: vi.fn() },
     salesOrderItem: { create: vi.fn(), deleteMany: vi.fn() },
     customerLedger: { upsert: vi.fn() },
@@ -18,6 +18,12 @@ const mocks = vi.hoisted(() => {
     journalEntry: { create: vi.fn(), deleteMany: vi.fn() },
     installment: { deleteMany: vi.fn() },
     account: { findFirst: vi.fn() },
+    // Source company's negative-stock policy, read inside the transaction.
+    inventorySetting: {
+      findUnique: vi.fn(),
+      create: vi.fn().mockResolvedValue({ allowNegativeStock: false, warnOnNegativeStock: true }),
+      update: vi.fn(),
+    },
     $transaction: vi.fn(),
   };
   return { db, requireAuth: vi.fn(), requirePageAccess: vi.fn() };
@@ -66,6 +72,15 @@ describe("intercompany target-side stock guard (Phase 1)", () => {
     });
     mocks.db.returnTransaction.findMany.mockResolvedValue([]);
     mocks.db.account.findFirst.mockResolvedValue({ id: "acc" });
+    // The source-side deduction reads balances in bulk; this file's guard being
+    // tested is the TARGET side, so the source is stocked by default.
+    mocks.db.product.findMany.mockResolvedValue([{ id: "p1", name: "صنف 1" }]);
+    mocks.db.warehouseInventory.findMany.mockResolvedValue([{ productId: "p1", quantity: 10 }]);
+    // Reset (not just cleared) so a per-test "once" queue from an earlier test
+    // cannot leak into the next one and shift which read gets which value.
+    mocks.db.warehouseInventory.findUnique.mockReset().mockResolvedValue({ quantity: 10 });
+    mocks.db.warehouseInventory.update.mockResolvedValue({});
+    mocks.db.warehouseInventory.create.mockResolvedValue({});
     mocks.db.$transaction.mockImplementation(async (cb: (tx: typeof mocks.db) => Promise<unknown>) => cb(mocks.db));
   });
 
@@ -100,8 +115,9 @@ describe("intercompany target-side stock guard (Phase 1)", () => {
     ]);
     mocks.db.salesOrder.create.mockResolvedValue({ id: "o1" });
     mocks.db.interCompanyInvoice.create.mockResolvedValue({ id: "ic1", invoiceNumber: "IC-1" });
+    // Source is read in bulk (findMany) by the policy-aware deduction, so these
+    // queued reads are all on the target side.
     mocks.db.warehouseInventory.findUnique
-      .mockResolvedValueOnce({ quantity: 10 }) // source
       .mockResolvedValueOnce(null) // target: create row
       .mockResolvedValueOnce({ quantity: 2 }); // target drain: enough
     mocks.db.warehouseInventory.update.mockResolvedValue({});
@@ -133,10 +149,11 @@ describe("intercompany target-side stock guard (Phase 1)", () => {
       { id: "tgt", companyId: "t2", isMain: true },
     ]);
     mocks.db.stockMovement.findMany.mockResolvedValue([]);
+    // No prior movements to reverse, so the only reads left are the target's
+    // receipt and then its drain.
     mocks.db.warehouseInventory.findUnique
-      .mockResolvedValueOnce({ quantity: 10 }) // source check
-      .mockResolvedValueOnce({ quantity: 0 }) // target drain check
-      .mockResolvedValueOnce({ quantity: 2 }); // target drain decrement path
+      .mockResolvedValueOnce({ quantity: 0 }) // target read for the receipt
+      .mockResolvedValueOnce({ quantity: 2 }); // target drain: enough
     mocks.db.warehouseInventory.update.mockResolvedValue({});
     mocks.db.warehouseInventory.create.mockResolvedValue({});
     mocks.db.stockMovement.create.mockResolvedValue({});

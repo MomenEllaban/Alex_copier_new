@@ -105,6 +105,7 @@ export const PAGE_NAV_KEYS: Record<Page, string> = {
   purchases: "navigation.purchases",
   sales: "navigation.sales",
   inventory: "navigation.inventory",
+  inventorySettings: "navigation.inventorySettings",
   warehouses: "navigation.warehouses",
   products: "navigation.products",
   workshop: "navigation.workshop",

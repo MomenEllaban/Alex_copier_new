@@ -5,16 +5,23 @@ const mocks = vi.hoisted(() => {
     company: { findUnique: vi.fn() },
     customer: { findUnique: vi.fn(), update: vi.fn() },
     engineer: { findUnique: vi.fn() },
-    product: { count: vi.fn() },
+    product: { count: vi.fn(), findMany: vi.fn() },
     warehouse: { findFirst: vi.fn() },
     salesOrder: { findUnique: vi.fn(), findUniqueOrThrow: vi.fn(), update: vi.fn(), create: vi.fn(), delete: vi.fn() },
-    warehouseInventory: { findUnique: vi.fn(), update: vi.fn(), create: vi.fn() },
+    warehouseInventory: { findUnique: vi.fn(), findMany: vi.fn(), update: vi.fn(), upsert: vi.fn(), create: vi.fn() },
     stockMovement: { create: vi.fn(), deleteMany: vi.fn(), findMany: vi.fn() },
     salesOrderItem: { create: vi.fn(), deleteMany: vi.fn() },
     customerLedger: { upsert: vi.fn() },
     customerPayment: { create: vi.fn(), deleteMany: vi.fn() },
     installment: { deleteMany: vi.fn() },
     productArchive: {},
+    // Read inside the sale's transaction; null row means "use the blocking
+    // defaults", which is what these tests were written against.
+    inventorySetting: {
+      findUnique: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockResolvedValue({ allowNegativeStock: false, warnOnNegativeStock: true }),
+      update: vi.fn(),
+    },
     returnTransaction: { findMany: vi.fn().mockResolvedValue([]) },
     $transaction: vi.fn(),
   };
@@ -54,6 +61,8 @@ describe("sales stock is scoped to the selling company's main warehouse", () => 
     mocks.db.company.findUnique.mockResolvedValue({ id: "co1" });
     mocks.db.customer.findUnique.mockResolvedValue({ id: "c1", remainingDebt: 0 });
     mocks.db.product.count.mockResolvedValue(1);
+    // Names ride along in the shortfall warning, never in the balance.
+    mocks.db.product.findMany.mockResolvedValue([{ id: "p1", name: "صنف 1" }]);
     mocks.db.warehouse.findFirst.mockResolvedValue({ id: "w_main_co1" });
     mocks.db.salesOrder.create.mockResolvedValue({ id: "o1" });
     mocks.db.salesOrder.findUniqueOrThrow.mockResolvedValue({ id: "o1", total: 200, paidAmount: 200, tradeInTotal: 0, paymentMethod: "CASH", installments: [] });
@@ -63,15 +72,15 @@ describe("sales stock is scoped to the selling company's main warehouse", () => 
   });
 
   it("reads availability from the company's OWN main warehouse row", async () => {
-    mocks.db.warehouseInventory.findUnique.mockResolvedValue({ quantity: 4 });
+    mocks.db.warehouseInventory.findMany.mockResolvedValue([{ productId: "p1", quantity: 4 }]);
 
     const res = await POST(jsonReq("http://localhost/api/sales", "POST", order(2)));
 
     expect(res.status).toBe(201);
     // The lookup must be keyed by the main warehouse returned above — reading
     // any other row is how "available" and "deducted" drift apart.
-    const lookup = mocks.db.warehouseInventory.findUnique.mock.calls[0][0];
-    expect(lookup.where.warehouseId_productId.warehouseId).toBe("w_main_co1");
+    const lookup = mocks.db.warehouseInventory.findMany.mock.calls[0][0];
+    expect(lookup.where.warehouseId).toBe("w_main_co1");
     const update = mocks.db.warehouseInventory.update.mock.calls[0][0];
     expect(update.where.warehouseId_productId.warehouseId).toBe("w_main_co1");
     expect(update.data.quantity).toBe(2);
@@ -80,7 +89,7 @@ describe("sales stock is scoped to the selling company's main warehouse", () => 
   it("rejects with 409 INSUFFICIENT_STOCK when the company alone lacks the qty", async () => {
     // Company A has 1 left while other companies hold plenty. Selling must
     // still fail — a cross-company total would let this through and oversell.
-    mocks.db.warehouseInventory.findUnique.mockResolvedValue({ quantity: 1 });
+    mocks.db.warehouseInventory.findMany.mockResolvedValue([{ productId: "p1", quantity: 1 }]);
 
     const res = await POST(jsonReq("http://localhost/api/sales", "POST", order(5)));
 
@@ -91,7 +100,7 @@ describe("sales stock is scoped to the selling company's main warehouse", () => 
   });
 
   it("rejects with 409 when the company has no row for the product at all", async () => {
-    mocks.db.warehouseInventory.findUnique.mockResolvedValue(null);
+    mocks.db.warehouseInventory.findMany.mockResolvedValue([]);
 
     const res = await POST(jsonReq("http://localhost/api/sales", "POST", order(1)));
 

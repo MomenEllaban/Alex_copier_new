@@ -10,7 +10,7 @@
 type ApiErrorData = { error?: unknown; code?: unknown; message?: unknown } | null | undefined;
 
 /** Substitutes `{name}`-style placeholders left in a translated string. */
-function fill(template: string, values?: Record<string, string | number>): string {
+export function fill(template: string, values?: Record<string, string | number>): string {
   if (!values) return template;
   return template.replace(/\{(\w+)\}/g, (whole, key: string) =>
     key in values ? String(values[key]) : whole

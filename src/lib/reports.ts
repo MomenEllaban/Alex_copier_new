@@ -393,3 +393,63 @@ export async function loadCustomerSatisfaction(): Promise<CustomerSatisfaction> 
     openRequests: open,
   };
 }
+
+export interface NegativeStockRow {
+  id: string;
+  productId: string;
+  productName: string;
+  sku: string | null;
+  warehouseId: string;
+  warehouseName: string;
+  companyId: string;
+  companyName: string;
+  /** The balance on hand: negative while the item is in deficit. */
+  available: number;
+  /** How many units are missing: the absolute value of the deficit. */
+  shortage: number;
+  /** What the deficit is costing at the product's own cost price, when known. */
+  shortageValue: number;
+}
+
+/**
+ * Items whose balance is below zero, worst deficit first.
+ *
+ * Only reachable once a company has allowed negative stock on sales (see
+ * InventorySetting); with the default policy nothing can land below zero, so
+ * this report is simply empty — which is itself the answer.
+ *
+ * `shortageValue` uses the product's cost price rather than any sales price:
+ * a deficit is a purchasing problem, so the useful number is what it will cost
+ * to cover, not what it would have been sold for.
+ */
+export async function loadNegativeStock(): Promise<NegativeStockRow[]> {
+  const rows = await prisma.warehouseInventory.findMany({
+    where: { quantity: { lt: 0 } },
+    select: {
+      id: true,
+      productId: true,
+      warehouseId: true,
+      quantity: true,
+      product: { select: { name: true, sku: true, purchasePrice: true } },
+      warehouse: { select: { name: true, company: { select: { id: true, name: true, nameAr: true } } } },
+    },
+    orderBy: { quantity: "asc" },
+  });
+
+  return rows.map((row) => {
+    const shortage = Math.abs(row.quantity);
+    return {
+      id: row.id,
+      productId: row.productId,
+      productName: row.product?.name ?? row.productId,
+      sku: row.product?.sku ?? null,
+      warehouseId: row.warehouseId,
+      warehouseName: row.warehouse?.name ?? row.warehouseId,
+      companyId: row.warehouse?.company.id ?? "",
+      companyName: row.warehouse?.company.nameAr || row.warehouse?.company.name || "—",
+      available: row.quantity,
+      shortage,
+      shortageValue: Math.round(shortage * (row.product?.purchasePrice ?? 0) * 100) / 100,
+    };
+  });
+}

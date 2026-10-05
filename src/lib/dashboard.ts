@@ -113,7 +113,8 @@ export type AlertKind =
   | "UNASSIGNED_REQUESTS"
   | "OVERDUE_INSTALLMENTS"
   | "CONTRACTS_EXPIRING"
-  | "LOW_STOCK";
+  | "LOW_STOCK"
+  | "NEGATIVE_STOCK";
 
 export type AlertSeverity = "HIGH" | "MEDIUM";
 
@@ -168,11 +169,22 @@ export function buildAlerts(input: {
   overdueInstallments: { count: number; totalAmount: number };
   expiringContracts: ExpiringContract[];
   lowStockItems?: number;
+  negativeStockItems?: number;
 }): DashboardAlert[] {
   const alerts: DashboardAlert[] = [];
 
   if (input.urgentRequests > 0) {
     alerts.push({ kind: "URGENT_REQUESTS", severity: "HIGH", href: "/service-requests", count: input.urgentRequests });
+  }
+  // HIGH, and above low stock: a negative balance means stock was sold that was
+  // never there. It is an accounting hole to close, not a reorder reminder.
+  if ((input.negativeStockItems ?? 0) > 0) {
+    alerts.push({
+      kind: "NEGATIVE_STOCK",
+      severity: "HIGH",
+      href: "/reports/negative-stock",
+      count: input.negativeStockItems ?? 0,
+    });
   }
   if (input.overdueInstallments.count > 0) {
     alerts.push({

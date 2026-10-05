@@ -12,6 +12,7 @@
     "sales": "Sales",
     "returns": "Returns",
     "inventory": "Inventory",
+    "inventorySettings": "Inventory Settings",
     "workshop": "Workshop",
     "workshopDaily": "Workshop daily book",
     "finance": "Finance",
@@ -56,7 +57,8 @@
     "reportWarranties": "Expiring Warranties",
     "reportSatisfaction": "Customer Satisfaction",
     "reportInvestors": "Investor Distribution",
-    "reportSpareParts": "Spare Parts Matrix"
+    "reportSpareParts": "Spare Parts Matrix",
+    "reportNegativeStock": "Negative Stock Balances"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -97,7 +99,8 @@
       "UNASSIGNED_REQUESTS": "Requests not assigned to a technician",
       "OVERDUE_INSTALLMENTS": "Overdue installments",
       "CONTRACTS_EXPIRING": "Contracts expiring within 30 days",
-      "LOW_STOCK": "Low stock"
+      "LOW_STOCK": "Low stock",
+      "NEGATIVE_STOCK": "Negative stock balances"
     }
   },
   "notifications": {
@@ -689,6 +692,10 @@
     "categoryName": "Category Name",
     "searchCategoryPlaceholder": "Search category name...",
     "deleteCategoryConfirm": "Are you sure you want to delete this category?",
+    "negativeStockTitle": "Warning: quantity exceeds available stock",
+    "negativeStockLine": "{product}: requested {requested} — available {available} — balance becomes {resulting}",
+    "negativeStockContinue": "Continue the sale",
+    "negativeStockCommitted": "Sale recorded with a negative balance: {products} — a purchase will cover it",
     "stats": {
       "totalOrders": "Total Invoices",
       "totalValue": "Total Sales",
@@ -719,8 +726,25 @@
       "items": "Stock Items",
       "totalQty": "Total Quantity",
       "warehouses": "Warehouses",
-      "outOfStock": "Out of Stock"
-    }
+      "outOfStock": "Out of Stock",
+      "negativeStock": "Negative Balances"
+    },
+    "negative": "Negative balance",
+    "negativeShort": "Negative",
+    "negativeBadge": "Deficit",
+    "showNegativeOnly": "Negative balances only",
+    "negativeEmpty": "No items below zero — every balance is positive",
+    "negativeHint": "Items sold beyond what was available appear here with a negative balance, and go back positive with the first purchase that covers them",
+    "settingsTitle": "Inventory Settings",
+    "settingsSubtitle": "Negative stock policy",
+    "allowNegativeStock": "Allow sales with insufficient stock",
+    "allowNegativeStockHint": "When on: a sales invoice is completed even when the quantity exceeds what is available, and the resulting negative balance is recorded until a later purchase covers it. When off: the invoice is refused, as before.",
+    "warnOnNegativeStock": "Warn before completing the sale",
+    "warnOnNegativeStockHint": "When on: a message shows the available quantity and the balance that will result, and the user can cancel. When off: the sale goes through silently.",
+    "policyScopeNote": "This setting affects sales invoices only. Manual stock movements (adjustment / consumed / scrap) and every reversal stay blocked at zero.",
+    "policyCurrent": "Current mode",
+    "policyAllowed": "Selling below zero is allowed",
+    "policyBlocked": "Sales are refused when stock is short"
   },
   "workshopDaily": {
     "title": "Workshop daily book",
@@ -978,6 +1002,13 @@
     "totalEngineers": "Engineers",
     "totalContracts": "Contracts",
     "openServiceRequests": "Open requests",
+    "negativeStockReport": "Negative Stock Balances",
+    "negativeStockSubtitle": "Items sold beyond what was available — the deficit stays visible until a purchase covers it",
+    "negativeStockBalance": "Current balance",
+    "negativeStockShortage": "Shortage",
+    "negativeStockValue": "Cost to cover",
+    "negativeStockEmpty": "No negative balances — every item is fully covered",
+    "negativeStockEmptyHint": "This list can only fill up once “Allow sales with insufficient stock” is on in the inventory settings.",
     "allReports": "All reports",
     "browseReports": "Pick a report to see its full detail and export it.",
     "reportsOverview": "Overview"
@@ -1205,6 +1236,7 @@
     "INVALID_PRICE": "Prices must be positive numbers",
     "INVALID_MOVEMENT_DATA": "Invalid stock movement data",
     "INSUFFICIENT_STOCK": "Insufficient stock for this movement",
+    "NEGATIVE_STOCK_CONFIRM_REQUIRED": "Requested quantity is greater than available — the item balance will go negative",
     "WAREHOUSE_IN_USE": "Cannot delete a warehouse with stock or past movements",
     "COMPANY_IN_USE": "Cannot delete a company linked to other records",
     "CUSTOMER_IN_USE": "Cannot delete a customer linked to machines, contracts, or service requests",

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
@@ -10,7 +11,7 @@ import PrinterLoader from "@/components/PrinterLoader";
 import { useToast } from "@/components/UIProvider";
 import { useUrlParams, useSearchWithDefault } from "@/hooks/useUrlParams";
 import { apiErrorMessage } from "@/lib/api-client";
-import { AlertTriangle, Boxes, Package, Save, Warehouse } from "lucide-react";
+import { AlertTriangle, Boxes, Package, Save, TrendingDown, Warehouse } from "lucide-react";
 import SubmitButton from "@/components/SubmitButton";
 import SearchableSelect from "@/components/SearchableSelect";
 import RefreshButton from "@/components/RefreshButton";
@@ -62,6 +63,7 @@ export default function InventoryPage() {
   const [search, setSearchInput] = useSearchWithDefault(urlParams.q ?? "");
   const [warehouseFilter, setWarehouseFilter] = useState("");
   const [companyFilter, setCompanyFilter] = useState("");
+  const [negativeOnly, setNegativeOnly] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<StockMovementForm>({
     warehouseId: "",
@@ -96,6 +98,9 @@ export default function InventoryPage() {
     return (
       matchesCompany &&
       (!warehouseFilter || item.warehouseId === warehouseFilter) &&
+      // A deficit is a real balance, so it is filtered on like any other
+      // quantity rather than being hidden behind "out of stock".
+      (!negativeOnly || (item.quantity || 0) < 0) &&
       (matchesQuery(item.product?.name, search) ||
         matchesQuery(item.product?.sku, search) ||
         matchesQuery(item.warehouse?.name, search))
@@ -108,9 +113,12 @@ export default function InventoryPage() {
   const stats = useMemo(() => {
     // Follows the filters above, so the cards describe the rows on screen.
     const totalQty = filtered.reduce((sum, item) => sum + (item.quantity || 0), 0);
-    const outOfStock = filtered.filter((item) => (item.quantity || 0) <= 0).length;
-    return { items: filtered.length, totalQty, warehouses: warehouses.length, outOfStock };
-  }, [filtered, warehouses]);
+    const outOfStock = filtered.filter((item) => (item.quantity || 0) === 0).length;
+    // Counted from the whole list, not `filtered`: switching the filter on
+    // would otherwise report "1 deficit" and hide the other seven.
+    const negative = inventory.filter((item) => (item.quantity || 0) < 0).length;
+    return { items: filtered.length, totalQty, warehouses: warehouses.length, outOfStock, negative };
+  }, [filtered, inventory, warehouses]);
 
   const exportInventory = () => ({
     headers: [
@@ -186,14 +194,37 @@ export default function InventoryPage() {
       </div>
 
       <StatsCards
-        columns={4}
+        columns={5}
         stats={[
           { label: t("inventory.stats.items"), value: stats.items.toLocaleString("ar-EG"), icon: <Package size={18} />, tone: "sky" },
           { label: t("inventory.stats.totalQty"), value: stats.totalQty.toLocaleString("ar-EG"), icon: <Boxes size={18} />, tone: "green" },
           { label: t("inventory.stats.warehouses"), value: stats.warehouses.toLocaleString("ar-EG"), icon: <Warehouse size={18} />, tone: "purple" },
           { label: t("inventory.stats.outOfStock"), value: stats.outOfStock.toLocaleString("ar-EG"), icon: <AlertTriangle size={18} />, tone: "amber" },
+          // Kept apart from "out of stock": zero is a shortage, below zero is a
+          // deficit the books still carry until a purchase covers it.
+          { label: t("inventory.stats.negativeStock"), value: stats.negative.toLocaleString("ar-EG"), icon: <TrendingDown size={18} />, tone: "rose" },
         ]}
       />
+
+      {stats.negative > 0 && !negativeOnly && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm leading-6 text-rose-800">{t("inventory.negativeHint")}</p>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => { setNegativeOnly(true); setPage(1); }}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-rose-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-rose-700"
+            >
+              <TrendingDown size={14} />{t("inventory.showNegativeOnly")}
+            </button>
+            <Link
+              href="/reports/negative-stock"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-300 bg-white px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+            >
+              {t("reports.negativeStockReport")}
+            </Link>
+          </div>
+        </div>
+      )}
 
       {showForm && (
         <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
@@ -275,8 +306,15 @@ export default function InventoryPage() {
             { value: "jumla-both", label: "جملة الآلات + جملة قطع غيار" },
           ]} allLabel={`الشركة — ${t("common.all")}`} className="md:w-52" />
           <FilterSelect value={warehouseFilter} onChange={(v) => { setWarehouseFilter(v); setPage(1); }} options={warehouses.map((w) => ({ value: w.id, label: w.name }))} allLabel={`${t("inventory.warehouse")} — ${t("common.all")}`} className="md:w-44" />
-          {(search !== "" || warehouseFilter !== "" || companyFilter !== "") && (
-            <button onClick={() => { setSearchInput(null); setWarehouseFilter(""); setCompanyFilter(""); }} className="text-sm text-slate-500 underline transition hover:text-slate-700">
+          <button
+            onClick={() => { setNegativeOnly(!negativeOnly); setPage(1); }}
+            aria-pressed={negativeOnly}
+            className={`inline-flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2 text-sm font-medium transition ${negativeOnly ? "border-rose-300 bg-rose-100 text-rose-800" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"}`}
+          >
+            <TrendingDown size={15} />{t("inventory.showNegativeOnly")}
+          </button>
+          {(search !== "" || warehouseFilter !== "" || companyFilter !== "" || negativeOnly) && (
+            <button onClick={() => { setSearchInput(null); setWarehouseFilter(""); setCompanyFilter(""); setNegativeOnly(false); }} className="text-sm text-slate-500 underline transition hover:text-slate-700">
               {t("common.resetFilters")}
             </button>
           )}
@@ -305,15 +343,20 @@ export default function InventoryPage() {
                     <td className="px-4 py-3 text-sm font-medium text-slate-800">{item.product?.name || item.productId}</td>
                     <td className="px-4 py-3 text-sm text-slate-600">{item.warehouse?.name || item.warehouseId}</td>
                     <td className="px-4 py-3 text-sm">
-                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${item.quantity > 10 ? "bg-emerald-100 text-emerald-700" : item.quantity > 0 ? "bg-amber-100 text-amber-700" : "bg-rose-100 text-rose-700"}`}>
+                      {/* Negative is its own state, not "low": the balance is a real
+                          deficit that a purchase has to cover. */}
+                      <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${item.quantity < 0 ? "bg-rose-100 text-rose-800 ring-1 ring-rose-300" : item.quantity > 10 ? "bg-emerald-100 text-emerald-700" : item.quantity > 0 ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"}`}>
                         {item.quantity}
+                        {item.quantity < 0 && <span className="text-[10px] font-bold uppercase">({t("inventory.negativeShort")})</span>}
                       </span>
                     </td>
                   </tr>
                 ))}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={3} className="px-4 py-8 text-center text-sm text-slate-400">{t("common.noData")}</td>
+                    <td colSpan={3} className="px-4 py-8 text-center text-sm text-slate-400">
+                      {negativeOnly ? t("inventory.negativeEmpty") : t("common.noData")}
+                    </td>
                   </tr>
                 )}
               </tbody>

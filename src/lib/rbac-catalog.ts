@@ -109,6 +109,10 @@ export const EXACT_ROUTE_PAGE: Record<string, Page> = {
   "hr/loans": "hrPayroll",
   "hr/bonuses": "hrPayroll",
   "hr/penalties": "hrPayroll",
+  // The negative-stock policy is a separate page from the stock list on
+  // purpose: it can only ever loosen a guard, so it must not travel with the
+  // inventory page that clerks and workshop managers already hold.
+  "inventory/settings": "inventorySettings",
   // The الاستبدال page reads its own route (it needs the warehouse position,
   // which the products route does not return); the replacement history is part
   // of what that page shows.
@@ -223,6 +227,7 @@ const ROUTE_ALLOWED_PAGES: Record<string, Page[]> = {
   "hr/loans": ["hrPayroll"],
   "hr/bonuses": ["hrPayroll"],
   "hr/penalties": ["hrPayroll"],
+  "inventory/settings": ["inventorySettings"],
   notifications: ["dashboard"],
   "notifications/[id]": ["dashboard"],
   "trade-ins": ["tradeIns"],

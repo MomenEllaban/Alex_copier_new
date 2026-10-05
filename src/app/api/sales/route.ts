@@ -5,6 +5,14 @@ import { recalculatePaymentStatus } from "@/lib/payment-status";
 import { computeCreditSplit, creditUsedNote } from "@/lib/customer-credit";
 import { sanitizePaymentMethod } from "@/lib/payment-method";
 import { traceError } from "@/lib/prisma-errors";
+import {
+  STOCK_BLOCKED,
+  STOCK_CONFIRM_REQUIRED,
+  StockShortfall,
+  StockShortfallError,
+  deductStockForSale,
+} from "@/lib/stock-movement-helper";
+import { getInventoryPolicy } from "@/lib/services/inventory/inventory-settings-service";
 
 export async function GET() {
   try {
@@ -148,22 +156,27 @@ export async function POST(request: Request) {
       );
     }
 
+    // Hoisted out of the transaction so the response can tell the client which
+    // items were recorded below zero (the UI acknowledges the deficit).
+    let acceptedShortfalls: StockShortfall[] = [];
+
     const salesOrder = await prisma.$transaction(async (tx) => {
-      if (warehouse) {
-        for (const item of items as { productId: string; quantity: number }[]) {
-          const existing = await tx.warehouseInventory.findUnique({
-            where: { warehouseId_productId: { warehouseId: warehouse.id, productId: item.productId } },
-          });
-          const available = existing?.quantity ?? 0;
-          if (available < item.quantity || !existing) {
-            throw new Error(`INSUFFICIENT_STOCK:${item.productId}`);
-          }
-          await tx.warehouseInventory.update({
-            where: { warehouseId_productId: { warehouseId: warehouse.id, productId: item.productId } },
-            data: { quantity: available - item.quantity },
-          });
-        }
-      }
+      // The negative-stock policy is read here, inside the transaction that
+      // moves the stock, and the client's confirmation flag is honoured only
+      // against it — a browser cannot opt the company in on its own.
+      const policy = await getInventoryPolicy(companyId, tx);
+      const confirmed = raw.allowNegativeStock === true;
+      const shortfalls = await deductStockForSale(tx, {
+        warehouseId: warehouse.id,
+        lines: items as { productId: string; quantity: number }[],
+        policy,
+        confirmed,
+      });
+      acceptedShortfalls = shortfalls;
+      const shortfallNote =
+        shortfalls.length > 0
+          ? ` — عجز مخزون: ${shortfalls.map((s) => `${s.productName} (${s.resultingBalance})`).join("، ")}`
+          : "";
 
       const installmentData = Array.isArray(installments) && installments.length > 0
         ? {
@@ -296,7 +309,7 @@ export async function POST(request: Request) {
               quantity: item.quantity,
               movementType: "SALE_OUT",
               referenceId: order.id,
-              notes: `بيع — ${orderType} — ${order.id}`,
+              notes: `بيع — ${orderType} — ${order.id}${shortfallNote}`,
             },
           });
         }
@@ -352,10 +365,36 @@ export async function POST(request: Request) {
       return finalOrder;
     });
 
-    return NextResponse.json(salesOrder, { status: 201 });
+    // The order plus the deficits it was allowed to create, so the UI can say
+    // "recorded at -3" rather than implying the stock was there.
+    return NextResponse.json(
+      { ...salesOrder, negativeStockShortfalls: acceptedShortfalls },
+      { status: 201 },
+    );
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("INSUFFICIENT_STOCK")) {
-      return NextResponse.json({ error: "الكمية المتاحة في المخزون لا تكفي لهذه الحركة", code: "INSUFFICIENT_STOCK" }, { status: 409 });
+    if (error instanceof StockShortfallError) {
+      // The two answers are deliberately distinct. BLOCKED means the company
+      // has not opted in and the numbers must not change. CONFIRM_REQUIRED
+      // means the sale is allowed but the user has not yet seen what the
+      // balance will become — so the shortfalls travel with the response and
+      // the client resubmits with allowNegativeStock.
+      if (error.code === STOCK_CONFIRM_REQUIRED) {
+        return NextResponse.json(
+          {
+            error: "الكمية المطلوبة أكبر من المتاح — البيع سيُنفَّذ وسيصبح رصيد الصنف سالبًا",
+            code: STOCK_CONFIRM_REQUIRED,
+            shortfalls: error.shortfalls,
+          },
+          { status: 409 },
+        );
+      }
+      return NextResponse.json(
+        { error: "الكمية المتاحة في المخزون لا تكفي لهذه الحركة", code: STOCK_BLOCKED },
+        { status: 409 },
+      );
+    }
+    if (error instanceof Error && error.message.startsWith(STOCK_BLOCKED)) {
+      return NextResponse.json({ error: "الكمية المتاحة في المخزون لا تكفي لهذه الحركة", code: STOCK_BLOCKED }, { status: 409 });
     }
     const msg = error instanceof Error ? (error.message || error.name || String(error)) : "Failed to create sales order";
     return NextResponse.json({ error: msg, detail: error instanceof Error ? error.stack : undefined }, { status: traceError("[sales:POST] create failed", error) });

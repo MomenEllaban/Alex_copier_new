@@ -15,6 +15,16 @@ const eslintConfig = defineConfig([
     // One-off maintenance/codemod scripts run directly with node:
     "scripts/**",
   ]),
+  {
+    // Route tests stand in for Prisma by hand, and a fake has to read whatever
+    // shape the route passed (`where.warehouseId_productId.productId`, nested
+    // `create`, ...). Spelling those out would be noise, not safety — the test
+    // still asserts on real values.
+    files: ["tests/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

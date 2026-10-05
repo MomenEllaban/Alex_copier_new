@@ -4,6 +4,14 @@ import { requireAuth, requireAction } from "@/lib/auth-helpers";
 import { recalculatePaymentStatus } from "@/lib/payment-status";
 import { computeCreditSplit, creditUsedNote } from "@/lib/customer-credit";
 import { traceError } from "@/lib/prisma-errors";
+import {
+  STOCK_BLOCKED,
+  STOCK_CONFIRM_REQUIRED,
+  StockShortfall,
+  StockShortfallError,
+  deductStockForSale,
+} from "@/lib/stock-movement-helper";
+import { getInventoryPolicy } from "@/lib/services/inventory/inventory-settings-service";
 
 type PrismaTx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 
@@ -127,6 +135,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     const total = totalNoTax + taxVal;
     const internalTotal = (items as InterItem[]).reduce((s, it) => s + it.internalPrice * it.quantity, 0);
     const costTotal = (items as InterItem[]).reduce((s, it) => s + (it.costPrice || 0) * it.quantity, 0);
+
+    // Hoisted out of the transaction so the response can tell the client which
+    // items this edit left below zero in the source warehouse.
+    let acceptedShortfalls: StockShortfall[] = [];
 
     const result = await prisma.$transaction(async (tx: PrismaTx) => {
       const existing = await tx.salesOrder.findUnique({
@@ -291,18 +303,15 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       }
 
       // سحب المخزون من شركة المصدر
+      // Runs AFTER the old movements were reversed above, so the shortfall the
+      // user is warned about is the balance the item really ends on.
+      acceptedShortfalls = await deductStockForSale(tx, {
+        warehouseId: sourceWarehouse.id,
+        lines: items as InterItem[],
+        policy: await getInventoryPolicy(fromCompanyId, tx),
+        confirmed: body.allowNegativeStock === true,
+      });
       for (const item of items as InterItem[]) {
-        const src = await tx.warehouseInventory.findUnique({
-          where: { warehouseId_productId: { warehouseId: sourceWarehouse.id, productId: item.productId } },
-        });
-        const available = src?.quantity ?? 0;
-        if (available < item.quantity || !src) {
-          throw new Error(`INSUFFICIENT_STOCK:${item.productId}`);
-        }
-        await tx.warehouseInventory.update({
-          where: { warehouseId_productId: { warehouseId: sourceWarehouse.id, productId: item.productId } },
-          data: { quantity: available - item.quantity },
-        });
         await tx.stockMovement.create({
           data: {
             warehouseId: sourceWarehouse.id,
@@ -340,8 +349,8 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       }
 
       // تصريف المخزون من شركة الوجهة للعميل
-      // ملاحظة: الرصيد الهدف زاد للتو بحركة INTER_COMPANY_IN، لكن الحارس صارم:
-      // لا يُسمح بالمرور الصامت أو خصم جزئي — أي نقص يعيد العملية كاملة (rollback).
+      // الرصيد الهدف زاد للتو بحركة INTER_COMPANY_IN، فهذا تحقق سلامة لا فحص
+      // توفر، ولا تُطبَّق عليه سياسة الرصيد السالب إطلاقًا.
       for (const item of items as InterItem[]) {
         const tgt = await tx.warehouseInventory.findUnique({
           where: { warehouseId_productId: { warehouseId: targetWarehouse.id, productId: item.productId } },
@@ -485,7 +494,9 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       return { interInvoice: invoice, order: finalOrder, internalTotal, costTotal, total };
     }, { timeout: 120000 });
 
-    return NextResponse.json(result);
+    // The invoice plus the deficits this edit was allowed to leave in the source
+    // warehouse, so the UI can state the resulting balance.
+    return NextResponse.json({ ...result, negativeStockShortfalls: acceptedShortfalls });
   } catch (error) {
     if (error instanceof Error && error.message === "ACCOUNT_CHART_MISSING") {
       return NextResponse.json({ error: "شجرة الحسابات غير مكتملة لإحدى الشركتين", code: "ACCOUNT_CHART_MISSING" }, { status: 400 });
@@ -499,8 +510,24 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     if (error instanceof Error && error.message === "WAREHOUSE_NOT_FOUND") {
       return NextResponse.json({ error: "المستودع الرئيسي غير موجود لإحدى الشركتين", code: "WAREHOUSE_NOT_FOUND" }, { status: 400 });
     }
-    if (error instanceof Error && error.message.startsWith("INSUFFICIENT_STOCK")) {
-      return NextResponse.json({ error: "الكمية المتاحة في المخزون لا تكفي لهذه الحركة", code: "INSUFFICIENT_STOCK" }, { status: 409 });
+    if (error instanceof StockShortfallError) {
+      if (error.code === STOCK_CONFIRM_REQUIRED) {
+        return NextResponse.json(
+          {
+            error: "الكمية المطلوبة أكبر من المتاح — التحويل سيُنفَّذ وسيصبح رصيد الصنف سالبًا",
+            code: STOCK_CONFIRM_REQUIRED,
+            shortfalls: error.shortfalls,
+          },
+          { status: 409 },
+        );
+      }
+      return NextResponse.json(
+        { error: "الكمية المتاحة في المخزون لا تكفي لهذه الحركة", code: STOCK_BLOCKED },
+        { status: 409 },
+      );
+    }
+    if (error instanceof Error && error.message.startsWith(STOCK_BLOCKED)) {
+      return NextResponse.json({ error: "الكمية المتاحة في المخزون لا تكفي لهذه الحركة", code: STOCK_BLOCKED }, { status: 409 });
     }
     const msg = error instanceof Error ? (error.message || error.name || String(error)) : "Failed to update intercompany sale";
     return NextResponse.json({ error: msg, detail: error instanceof Error ? error.stack : undefined }, { status: traceError("[sales/intercompany:PUT] update failed", error) });
