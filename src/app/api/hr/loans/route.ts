@@ -11,6 +11,10 @@ import {
   earlyPayoffLoan,
   getEmployeeLoanSummary,
 } from "@/lib/services/hr/loan-advance-service";
+import { errorMessage } from "@/lib/prisma-errors";
+import { Prisma } from "@/generated/prisma/client";
+import { enumFilter } from "@/lib/enum-filter";
+import { ADVANCE_STATUSES } from "@/lib/hr/hr-statuses";
 
 export async function GET(request: Request) {
   try {
@@ -25,7 +29,7 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const employeeId = searchParams.get("employeeId");
-    const status = searchParams.get("status");
+    const status = enumFilter(searchParams.get("status"), ADVANCE_STATUSES);
     const summaryOnly = searchParams.get("summaryOnly");
 
     if (employeeId && summaryOnly === "true") {
@@ -33,7 +37,7 @@ export async function GET(request: Request) {
       return NextResponse.json(summary);
     }
 
-    const where: any = {};
+    const where: Prisma.EmployeeLoanWhereInput = {};
     if (actor.companyId) where.companyId = actor.companyId;
     if (employeeId) where.employeeId = employeeId;
     if (status) where.status = status;
@@ -59,9 +63,9 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json(loans);
-  } catch (error: any) {
+  } catch (error) {
     console.error("GET /api/hr/loans error:", error);
-    return NextResponse.json({ error: error.message || "Failed to fetch loans" }, { status: 500 });
+    return NextResponse.json({ error: errorMessage(error, "Failed to fetch loans") }, { status: 500 });
   }
 }
 
@@ -91,14 +95,13 @@ export async function POST(request: Request) {
         installmentCount: parseInt(body.installmentCount),
         startDate: new Date(body.startDate),
         reason: body.reason || "طلب قرض موظف",
-      },
-      actor.id
+      }
     );
 
     return NextResponse.json(loan, { status: 201 });
-  } catch (error: any) {
+  } catch (error) {
     console.error("POST /api/hr/loans error:", error);
-    return NextResponse.json({ error: error.message || "Failed to create loan" }, { status: 400 });
+    return NextResponse.json({ error: errorMessage(error, "Failed to create loan") }, { status: 400 });
   }
 }
 
@@ -141,8 +144,8 @@ export async function PATCH(request: Request) {
     }
 
     return NextResponse.json(result);
-  } catch (error: any) {
+  } catch (error) {
     console.error("PATCH /api/hr/loans error:", error);
-    return NextResponse.json({ error: error.message || "Failed to update loan" }, { status: 400 });
+    return NextResponse.json({ error: errorMessage(error, "Failed to update loan") }, { status: 400 });
   }
 }

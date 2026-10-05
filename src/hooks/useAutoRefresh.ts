@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { subscribeDataChanged, type DataEntity } from "@/lib/data-events";
 
 interface UseAutoRefreshOptions {
@@ -35,7 +35,11 @@ export function useAutoRefresh(
     fnRef.current = refreshFn;
   }, [refreshFn]);
 
-  const run = async () => {
+  // `run` and `refresh` are referentially stable, so a page can safely list
+  // `refresh` in a `useEffect` dependency list: the mount fetch runs once
+  // instead of on every render. The queued re-run goes through `runRef`
+  // because `run` cannot reference itself inside its own `useCallback`.
+  const run = useCallback(async () => {
     if (state.current.running) {
       state.current.pending = true;
       return;
@@ -50,30 +54,37 @@ export function useAutoRefresh(
       setRefreshing(false);
       if (state.current.pending) {
         state.current.pending = false;
-        void run();
+        void runRef.current();
       }
     }
-  };
+  }, []);
 
-  const refresh = () => {
-    void run();
-  };
+  const runRef = useRef(run);
+  useEffect(() => {
+    runRef.current = run;
+  }, [run]);
 
-  const mayRefresh = () => Date.now() - state.current.lastDoneAt >= skipAfterMs;
+  const refresh = useCallback(() => {
+    void runRef.current();
+  }, []);
 
   const entitiesKey = entities.join(",");
+  const mayRefresh = useCallback(
+    () => Date.now() - state.current.lastDoneAt >= skipAfterMs,
+    [skipAfterMs]
+  );
 
   useEffect(() => {
     const timers: number[] = [];
 
     const onVisible = () => {
-      if (document.visibilityState === "visible" && mayRefresh()) void run();
+      if (document.visibilityState === "visible" && mayRefresh()) void runRef.current();
     };
 
     const unsubscribe = subscribeDataChanged((evEntities) => {
       if (!evEntities.some((e) => entitiesKey.split(",").includes(e))) return;
       if (!mayRefresh()) return;
-      const timer = window.setTimeout(() => run(), debounceMs);
+      const timer = window.setTimeout(() => void runRef.current(), debounceMs);
       timers.push(timer);
     });
 
@@ -90,8 +101,7 @@ export function useAutoRefresh(
         window.removeEventListener("focus", onVisible);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entitiesKey, debounceMs, focus]);
+  }, [entitiesKey, debounceMs, focus, mayRefresh]);
 
   return { refresh, refreshing };
 }

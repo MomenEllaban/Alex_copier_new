@@ -176,7 +176,7 @@ export function calculateInstallments(
   return installmentData;
 }
 
-export async function createLoan(input: CreateLoanInput, actorId?: string) {
+export async function createLoan(input: CreateLoanInput) {
   const employee = await prisma.employee.findUnique({
     where: { id: input.employeeId },
   });

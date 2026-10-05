@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useTransition, useMemo } from "react";
+import { useCallback, useEffect, useState, useTransition, useMemo } from "react";
 import { useI18n } from "@/i18n/context";
+import { errorMessage } from "@/lib/prisma-errors";
 import PrinterLoader from "@/components/PrinterLoader";
 import SearchInput from "@/components/SearchInput";
 import Pagination from "@/components/Pagination";
@@ -63,27 +64,38 @@ export default function LeavesPage() {
     reason: "",
   });
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [lRes, eRes] = await Promise.all([
-        fetch("/api/hr/leaves"),
-        fetch("/api/hr/employees"),
-      ]);
+  // A promise chain rather than `async`/`await`: the mount effect calls this, and
+  // a direct async call from an effect body is a second synchronous render pass
+  // (the `setState`-in-effect rule). Here every state change lands in a
+  // callback, so the first paint happens once.
+  //
+  // `loading` already starts true, so only the reload path flips it on; doing it
+  // here instead would set state synchronously inside the mount effect.
+  const fetchData = useCallback(() => {
+    Promise.all([fetch("/api/hr/leaves"), fetch("/api/hr/employees")])
+      .then(async ([lRes, eRes]) => {
+        if (lRes.ok) setLeaves(await lRes.json());
+        if (eRes.ok) setEmployees(await eRes.json());
+      })
+      .catch((err: unknown) => {
+        console.error("Error loading leaves:", err);
+        toastError(t("hr.leaves.toastLoadFailed"));
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [t, toastError]);
 
-      if (lRes.ok) setLeaves(await lRes.json());
-      if (eRes.ok) setEmployees(await eRes.json());
-    } catch (err) {
-      console.error("Error loading leaves:", err);
-      toastError(t("hr.leaves.toastLoadFailed"));
-    } finally {
-      setLoading(false);
-    }
+  // Refetches after a save or a review decision, where the list should show its
+  // spinner again.
+  const reload = () => {
+    setLoading(true);
+    fetchData();
   };
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   const handleOpenAddModal = () => {
     setFormError("");
@@ -119,9 +131,9 @@ export default function LeavesPage() {
 
         toastSuccess(t("hr.leaves.toastAdded"));
         setShowAddModal(false);
-        fetchData();
-      } catch (err: any) {
-        setFormError(err.message || t("hr.leaves.toastAddError"));
+        reload();
+      } catch (err) {
+        setFormError(errorMessage(err, t("hr.leaves.toastAddError")));
       }
     });
   };
@@ -146,9 +158,9 @@ export default function LeavesPage() {
       }
 
       toastSuccess(t("hr.leaves.toastApproved"));
-      fetchData();
-    } catch (err: any) {
-      toastError(err.message || t("hr.leaves.toastApproveError"));
+      reload();
+    } catch (err) {
+      toastError(errorMessage(err, t("hr.leaves.toastApproveError")));
     }
   };
 
@@ -176,9 +188,9 @@ export default function LeavesPage() {
         toastSuccess(t("hr.leaves.toastRejected"));
         setShowRejectModal(null);
         setRejectReasonInput("");
-        fetchData();
-      } catch (err: any) {
-        toastError(err.message || t("hr.leaves.toastRejectError"));
+        reload();
+      } catch (err) {
+        toastError(errorMessage(err, t("hr.leaves.toastRejectError")));
       }
     });
   };

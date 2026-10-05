@@ -117,10 +117,7 @@ export default function WarehousesPage() {
   }, []);
   const { refresh, refreshing } = useAutoRefresh(fetchData, ["warehouses", "inventory", "products", "purchases"]);
 
-  const autoAddOpen = useAutoAddForm();
-  useEffect(() => {
-    if (autoAddOpen) setShowForm(true);
-  }, [autoAddOpen]);
+  useAutoAddForm(() => setShowForm(true));
 
   const openDetail = async (warehouse: Warehouse) => {
     setDetailWarehouse(warehouse);

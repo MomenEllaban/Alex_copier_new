@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => {
     purchaseOrder: { create: vi.fn(), update: vi.fn(), findUnique: vi.fn() },
     company: { findUnique: vi.fn() },
     supplier: { findUnique: vi.fn() },
-    product: { count: vi.fn() },
+    product: { count: vi.fn(), update: vi.fn() },
     warehouse: { findFirst: vi.fn(), create: vi.fn() },
     warehouseInventory: { findUnique: vi.fn(), upsert: vi.fn(), update: vi.fn(), create: vi.fn() },
     stockMovement: { create: vi.fn(), findMany: vi.fn(), deleteMany: vi.fn() },
@@ -164,11 +164,53 @@ describe("purchases stock receive (Phase 1)", () => {
     expect(res.status).toBe(409);
   });
 
-  it("PUT blocks editing items once the order is received (or being received)", async () => {
+  it("PUT allows items on the receive call itself, since received quantities can differ", async () => {
+    // Receiving is where the order meets reality: the supplier may deliver 3 of
+    // the 2 ordered, so the receive request is allowed to carry the actual
+    // quantities. Stock is posted for what was actually received.
+    mocks.db.purchaseOrder.findUnique
+      // the guard's "what is the order now" read
+      .mockResolvedValueOnce({
+        id: "po1",
+        companyId: "c1",
+        status: "CONFIRMED",
+        items: [{ productId: "p1", quantity: 2 }],
+      })
+      // the post-write re-read the receive path uses to decide what to stock in
+      .mockResolvedValue({
+        id: "po1",
+        companyId: "c1",
+        status: "RECEIVED",
+        items: [{ productId: "p1", quantity: 3, unitPrice: 50 }],
+      });
+    mocks.db.purchaseOrder.update.mockResolvedValue({
+      id: "po1",
+      status: "RECEIVED",
+      companyId: "c1",
+      items: [{ productId: "p1", quantity: 3 }],
+    });
+
+    const res = await PUT(
+      jsonReq("http://localhost/api/purchases/po1", "PUT", {
+        status: "RECEIVED",
+        items: [{ productId: "p1", quantity: 3, unitPrice: 50 }],
+      }),
+      { params: Promise.resolve({ id: "po1" }) },
+    );
+
+    expect(res.status).toBe(200);
+    const created = mocks.db.stockMovement.create.mock.calls[0][0];
+    expect(created.data.quantity).toBe(3);
+    expect(created.data.movementType).toBe("PURCHASE_IN");
+  });
+
+  it("PUT blocks editing items once the order is already received", async () => {
+    // Once stock has moved, editing the lines would leave inventory and the
+    // document disagreeing, so the items are frozen until the receipt is reversed.
     mocks.db.purchaseOrder.findUnique.mockResolvedValue({
       id: "po1",
       companyId: "c1",
-      status: "CONFIRMED",
+      status: "RECEIVED",
       items: [{ productId: "p1", quantity: 2 }],
     });
 
@@ -183,5 +225,8 @@ describe("purchases stock receive (Phase 1)", () => {
     expect(res.status).toBe(400);
     const body = await res.json();
     expect(body.code).toBe("ITEMS_LOCKED_AFTER_RECEIVE");
+    // The guard must run before anything is written.
+    expect(mocks.db.purchaseOrder.update).not.toHaveBeenCalled();
+    expect(mocks.db.stockMovement.create).not.toHaveBeenCalled();
   });
 });

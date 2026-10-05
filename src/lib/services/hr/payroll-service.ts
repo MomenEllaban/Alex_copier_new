@@ -90,7 +90,7 @@ export async function calculatePayrollRun(options: CalculatePayrollOptions) {
 
   // 3. Load HR policy settings (Zero hardcoding)
   const settings = await getCompanyHrSettings(companyId);
-  const taxBrackets = (settings.taxBrackets as any) || DEFAULT_TAX_BRACKETS;
+  const taxBrackets = settings.taxBrackets ?? DEFAULT_TAX_BRACKETS;
 
   // 4. Load Active Employees with recurring salary components
   const employees = await prisma.employee.findMany({

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { AddFormBoundary, useAutoAddForm } from "@/hooks/useAutoAddForm";
 import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
@@ -165,13 +165,15 @@ export default function ContractsPage() {
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
   const { refresh, refreshing } = useAutoRefresh(fetchData, ["contracts", "machines", "customers", "service-requests"]);
 
-  const autoAddOpen = useAutoAddForm();
+  // Mount goes through `refresh`, the same entry point the RefreshButton and
+  // the event bus use, so there is only one fetch path to reason about.
   useEffect(() => {
-    if (autoAddOpen) setShowForm(true);
-  }, [autoAddOpen]);
+    refresh();
+  }, [refresh]);
+
+  useAutoAddForm(() => setShowForm(true));
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -262,18 +264,21 @@ export default function ContractsPage() {
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  const stats = useMemo(() => {
-    const today = new Date();
-    const soon = new Date();
-    soon.setDate(soon.getDate() + 30);
-    const active = filtered.filter((c) => c.status === "ACTIVE");
-    const activeValue = active.reduce((sum, c) => sum + (c.value || 0), 0);
-    const expiringSoon = active.filter((c) => {
-      const end = new Date(c.endDate);
-      return end >= today && end <= soon;
-    }).length;
-    return { total: filtered.length, active: active.length, expiringSoon, activeValue };
-  }, [filtered]);
+  const activeContracts = filtered.filter((c) => c.status === "ACTIVE");
+  const activeValue = activeContracts.reduce((sum, c) => sum + (c.value || 0), 0);
+  const today = new Date();
+  const soon = new Date();
+  soon.setDate(soon.getDate() + 30);
+  const expiringSoon = activeContracts.filter((c) => {
+    const end = new Date(c.endDate);
+    return end >= today && end <= soon;
+  }).length;
+  const stats = {
+    total: filtered.length,
+    active: activeContracts.length,
+    expiringSoon,
+    activeValue,
+  };
 
   const exportContracts = () => ({
     headers: [

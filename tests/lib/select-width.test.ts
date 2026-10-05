@@ -5,6 +5,13 @@ import path from "node:path";
 const ROOT = path.join(__dirname, "..", "..");
 const SRC = fs.readFileSync(path.join(ROOT, "src", "components", "SearchableSelect.tsx"), "utf8");
 
+/** The element that actually carries the popup markup. */
+const popup = SRC.match(/const dropdown = [\s\S]*?document\.body/)?.[0] ?? "";
+/** The combobox trigger, from its id up to the end of its opening tag. */
+const combobox = SRC.match(/<div\s+id=\{inputId\}[\s\S]*?role="combobox"[\s\S]*?>/)?.[0] ?? "";
+/** The scrollable option list. */
+const listbox = SRC.match(/<div\s+ref=\{listRef\}[\s\S]*?role="listbox"[\s\S]*?>/)?.[0] ?? "";
+
 /**
  * The custom select is used by FilterSelect (every filter toolbar) and by
  * SelectWithAdd (every quick-add field), so its popup is what most dropdowns in
@@ -12,33 +19,45 @@ const SRC = fs.readFileSync(path.join(ROOT, "src", "components", "SearchableSele
  *
  * It used to be `w-full` — pinned to the trigger — while every option label was
  * `truncate`, so a popup holding long Arabic company/product names showed a
- * handful of clipped characters per row. The popup has to be allowed to grow to
- * its content instead, bounded so it cannot run off the screen.
+ * handful of clipped characters per row. Sizing is now done by Floating UI's
+ * `size()` middleware rather than by Tailwind width classes, because the popup
+ * is rendered in a portal: once it leaves the trigger's subtree, percentage
+ * widths such as `w-full` or `min-w-full` resolve against the body instead of
+ * the control and no longer mean anything useful.
  */
 describe("SearchableSelect popup width", () => {
-  it("sizes the popup to its content instead of the trigger width", () => {
-    const popup = SRC.match(/<div\s+style=\{[\s\S]*?className=\{`absolute[\s\S]*?`\}/)?.[0] ?? "";
-    expect(popup, "could not find the popup element in SearchableSelect.tsx").toBeTruthy();
-
-    // w-max lets it grow to the widest option; min-w-full keeps it at least as
-    // wide as the trigger, so it is never smaller than it used to be.
-    expect(popup).toContain("w-max");
-    expect(popup).toContain("min-w-full");
-    expect(popup).not.toMatch(/(^|\s)w-full(\s|$)/);
+  it("escapes the trigger's subtree so ancestor overflow cannot clip it", () => {
+    // The popup is portalled and positioned with `strategy: "fixed"`, which is
+    // what makes it independent of any `overflow-hidden` ancestor (table cell,
+    // modal body, filter bar) the trigger happens to sit inside.
+    expect(SRC).toMatch(/createPortal\(/);
+    expect(popup, "could not find the portalled popup").toContain("document.body");
+    expect(SRC).toContain('strategy: "fixed"');
   });
 
-  it("caps the growth and leaves room for the scrollbar", () => {
-    // An inline max-width is what keeps a very long label from spanning the
-    // page; it combines a reading cap with the space actually available.
-    expect(SRC).toMatch(/MAX_POPUP_WIDTH\s*=\s*\d+/);
-    expect(SRC).toMatch(/maxWidth/);
-    expect(SRC).toContain("92vw");
+  it("sizes the popup from the space available, not the trigger width", () => {
+    // The width is the larger of the trigger and the room on screen, capped so
+    // a single long label cannot stretch the popup across the page.
+    const sizing = SRC.match(/size\(\{[\s\S]*?\}\),/)?.[0] ?? "";
+    expect(sizing, "could not find the size() middleware").toBeTruthy();
+    expect(sizing).toMatch(/availableWidth/);
+    expect(sizing).toMatch(/Math\.max\(refWidth,\s*Math\.min\(availableWidth,\s*\d+\)\)/);
+    // Padding keeps the popup off the viewport edge when it does hit the cap.
+    expect(sizing).toMatch(/padding:\s*8/);
+  });
+
+  it("caps the height and leaves room for the scrollbar", () => {
+    // A long option list must scroll rather than run off the bottom of the
+    // viewport, so the height is bounded and the list carries its own overflow.
+    expect(SRC).toMatch(/maxHeight: `\$\{Math\.min\(availableHeight,\s*\d+\)\}px`/);
+    expect(listbox, "could not find the listbox").toContain("overflow-y-auto");
   });
 
   it("measures the room it has, in both text directions", () => {
     // The popup grows towards the end edge, which is the left in RTL, so the
     // measurement has to be direction aware or RTL dropdowns run off-screen.
     expect(SRC).toContain('dir === "rtl"');
+    expect(SRC).toMatch(/placement: dir === "rtl" \? "bottom-end" : "bottom-start"/);
     expect(SRC).toMatch(/useI18n/);
   });
 
@@ -94,9 +113,6 @@ describe("SearchableSelect popup width", () => {
  * which is why both sides have to be checked together.
  */
 describe("SearchableSelect accessibility", () => {
-  const combobox = SRC.match(/<div\s+id=\{inputId\}\s+role="combobox"[\s\S]*?>/)?.[0] ?? "";
-  const listbox = SRC.match(/<div\s+ref=\{listRef\}[\s\S]*?role="listbox"[\s\S]*?>/)?.[0] ?? "";
-
   it("has a combobox and a listbox to link", () => {
     expect(combobox, "could not find the combobox").toBeTruthy();
     expect(listbox, "could not find the listbox").toBeTruthy();
@@ -112,5 +128,12 @@ describe("SearchableSelect accessibility", () => {
 
   it("labels the listbox from the control that opens it", () => {
     expect(listbox).toContain("aria-labelledby={inputId}");
+  });
+
+  it("announces the popup as a listbox of options", () => {
+    // The portalled popup still has to expose the listbox semantics, otherwise
+    // moving it out of the trigger's subtree silently drops it from the a11y tree.
+    expect(popup).toContain('role="listbox"');
+    expect(SRC).toContain('role="option"');
   });
 });

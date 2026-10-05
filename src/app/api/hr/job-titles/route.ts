@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
+import { Prisma } from "@/generated/prisma/client";
 
 export async function GET() {
   try {
@@ -13,7 +14,7 @@ export async function GET() {
       );
     }
 
-    const where: any = {};
+    const where: Prisma.JobTitleWhereInput = {};
     if (actor.companyId) where.companyId = actor.companyId;
 
     const titles = await prisma.jobTitle.findMany({

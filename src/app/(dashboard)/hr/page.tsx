@@ -17,6 +17,16 @@ interface SummaryData {
   totalPayrollThisMonth: number;
 }
 
+/** Only the two fields the summary counts; see the fetches below. */
+interface EmployeeStatusRow {
+  status: string;
+}
+
+/** Only `status`, which is what the present/late/absent tally reads. */
+interface AttendanceStatusRow {
+  status: string;
+}
+
 export default function HRDashboardPage() {
   const { t, dir } = useI18n();
   const [stats, setStats] = useState<SummaryData>({
@@ -41,12 +51,12 @@ export default function HRDashboardPage() {
           fetch("/api/hr/leaves?status=PENDING"),
         ]);
 
-        const employees = empRes.ok ? await empRes.json() : [];
-        const attendance = attRes.ok ? await attRes.json() : [];
-        const pendingLeaves = leaveRes.ok ? await leaveRes.json() : [];
+        const employees: EmployeeStatusRow[] = empRes.ok ? await empRes.json() : [];
+        const attendance: AttendanceStatusRow[] = attRes.ok ? await attRes.json() : [];
+        const pendingLeaves: unknown[] = leaveRes.ok ? await leaveRes.json() : [];
 
         const totalEmp = Array.isArray(employees) ? employees.length : 0;
-        const activeEmp = Array.isArray(employees) ? employees.filter((e: any) => e.status === "ACTIVE").length : 0;
+        const activeEmp = Array.isArray(employees) ? employees.filter((e) => e.status === "ACTIVE").length : 0;
         
         let present = 0;
         let late = 0;
@@ -54,7 +64,7 @@ export default function HRDashboardPage() {
         let onLeave = 0;
 
         if (Array.isArray(attendance)) {
-          attendance.forEach((rec: any) => {
+          attendance.forEach((rec) => {
             if (rec.status === "PRESENT") present++;
             else if (rec.status === "LATE") { present++; late++; }
             else if (rec.status === "ABSENT") absent++;

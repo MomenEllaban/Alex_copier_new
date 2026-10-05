@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useI18n } from "@/i18n/context";
 import { FileText, Printer, Receipt } from "lucide-react";
 
 interface PrintMenuProps {
@@ -15,13 +16,12 @@ const FORMATS = [
 ] as const;
 
 export default function PrintMenu({ type, id }: PrintMenuProps) {
+  // The active locale comes from the i18n provider, so switching languages in
+  // the app updates the labels without mirroring `document.lang` into state.
+  const { locale } = useI18n();
+  const lang = locale;
   const [open, setOpen] = useState(false);
-  const [lang, setLang] = useState<"ar" | "en">("ar");
   const rootRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    setLang(document.documentElement.lang === "en" ? "en" : "ar");
-  }, []);
 
   useEffect(() => {
     if (!open) return;

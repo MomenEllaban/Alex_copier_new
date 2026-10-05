@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { signOut } from "next-auth/react";
 import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
@@ -108,18 +108,16 @@ export default function FinancePage() {
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  const stats = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    const currentMonth = today.slice(0, 7);
-    const total = filtered.reduce((sum, e) => sum + (e.amount || 0), 0);
-    const todayTotal = filtered
-      .filter((e) => (e.date || e.createdAt).slice(0, 10) === today)
-      .reduce((sum, e) => sum + (e.amount || 0), 0);
-    const monthTotal = filtered
-      .filter((e) => (e.date || e.createdAt).slice(0, 7) === currentMonth)
-      .reduce((sum, e) => sum + (e.amount || 0), 0);
-    return { count: filtered.length, total, today: todayTotal, month: monthTotal };
-  }, [filtered]);
+  const today = new Date().toISOString().slice(0, 10);
+  const currentMonth = today.slice(0, 7);
+  const total = filtered.reduce((sum, e) => sum + (e.amount || 0), 0);
+  const todayTotal = filtered
+    .filter((e) => (e.date || e.createdAt).slice(0, 10) === today)
+    .reduce((sum, e) => sum + (e.amount || 0), 0);
+  const monthTotal = filtered
+    .filter((e) => (e.date || e.createdAt).slice(0, 7) === currentMonth)
+    .reduce((sum, e) => sum + (e.amount || 0), 0);
+  const stats = { count: filtered.length, total, today: todayTotal, month: monthTotal };
 
   // Deduplicated category options for table filter:
   const filterCategories = companyFilter

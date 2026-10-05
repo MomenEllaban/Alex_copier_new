@@ -61,10 +61,7 @@ export default function InvestorsPage() {
   }, []);
   const { refresh, refreshing } = useAutoRefresh(fetchInvestors, ["investors"]);
 
-  const autoAddOpen = useAutoAddForm();
-  useEffect(() => {
-    if (autoAddOpen) setShowForm(true);
-  }, [autoAddOpen]);
+  useAutoAddForm(() => setShowForm(true));
 
   const filtered = investors.filter(
     (i) =>

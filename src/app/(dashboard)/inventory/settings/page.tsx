@@ -41,56 +41,103 @@ export default function InventorySettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const load = useCallback(async (targetCompanyId?: string) => {
-    setLoading(true);
-    try {
-      const url = targetCompanyId
-        ? `/api/inventory/settings?companyId=${encodeURIComponent(targetCompanyId)}`
-        : "/api/inventory/settings";
-      const res = await fetch(url);
-      if (!res.ok) {
-        const data = await readApiError(res);
-        // 400 with companyId is the server asking WHICH company — not a failure.
-        if (res.status === 400 && (data as { error?: string } | null)?.error === "companyId is required") {
-          setNeedsCompany(true);
-          const companiesRes = await fetch("/api/companies");
-          if (companiesRes.ok) {
-            const list: Company[] = await companiesRes.json();
-            setCompanies(list);
-            // Preselect the first company so the page is not empty on arrival.
-            if (list[0]) {
-              setCompanyId(list[0].id);
-              const first = await fetch(`/api/inventory/settings?companyId=${encodeURIComponent(list[0].id)}`);
-              if (first.ok) {
-                setSettings(await first.json());
-                setNeedsCompany(false);
-              }
-            }
-          }
-          return;
-        }
-        toastError(apiErrorMessage(data, t));
+  // `fetchSettings` is a pure request helper: it resolves with the outcome instead
+  // of writing state itself. That keeps the mount effect free of setState calls,
+  // since every state change then lands in the `.then` callback below.
+  const fetchSettings = useCallback(async (targetCompanyId?: string) => {
+    const url = targetCompanyId
+      ? `/api/inventory/settings?companyId=${encodeURIComponent(targetCompanyId)}`
+      : "/api/inventory/settings";
+    const res = await fetch(url);
+
+    if (res.ok) {
+      return { kind: "ok" as const, settings: (await res.json()) as InventorySettings };
+    }
+
+    const data = await readApiError(res);
+    // 400 with companyId is the server asking WHICH company — not a failure.
+    if (res.status === 400 && (data as { error?: string } | null)?.error === "companyId is required") {
+      const companiesRes = await fetch("/api/companies");
+      const list: Company[] = companiesRes.ok ? await companiesRes.json() : [];
+      return { kind: "pick" as const, companies: list };
+    }
+
+    return { kind: "error" as const, message: apiErrorMessage(data, t) };
+  }, [t]);
+
+  const applyResult = useCallback(
+    (result: Awaited<ReturnType<typeof fetchSettings>>) => {
+      if (result.kind === "ok") {
+        setSettings(result.settings);
+        setCompanyId(result.settings.companyId);
+        setNeedsCompany(false);
         return;
       }
-      const data: InventorySettings = await res.json();
-      setSettings(data);
-      setCompanyId(data.companyId);
-      setNeedsCompany(false);
-    } catch {
-      toastError(t("common.error"));
-    } finally {
-      setLoading(false);
-    }
-  }, [t, toastError]);
+      if (result.kind === "pick") {
+        // A 400 "companyId is required" means the user must choose a company, so
+        // the picker stays up. `applyPickedCompany` clears this again below once
+        // it has loaded the preselected company's settings.
+        setNeedsCompany(true);
+        setCompanies(result.companies);
+        return;
+      }
+      toastError(result.message);
+    },
+    [toastError]
+  );
+
+  // Preselect the first company so a general manager is not looking at an empty
+  // page on arrival. Returns true once that company's settings are on screen,
+  // so the caller can skip re-applying the `pick` result that asked for it.
+  const applyPickedCompany = useCallback(async (list: Company[]) => {
+    const first = list[0];
+    if (!first) return false;
+    setCompanyId(first.id);
+    const res = await fetch(`/api/inventory/settings?companyId=${encodeURIComponent(first.id)}`);
+    if (!res.ok) return false;
+    setSettings((await res.json()) as InventorySettings);
+    setNeedsCompany(false);
+    return true;
+  }, []);
+
+  // Runs the "pick a company, then load it" sequence in one place so the mount
+  // fetch and `reload` cannot drift apart.
+  const resolve = useCallback(
+    async (result: Awaited<ReturnType<typeof fetchSettings>>) => {
+      if (result.kind === "pick") {
+        applyResult(result);
+        await applyPickedCompany(result.companies);
+        return;
+      }
+      applyResult(result);
+    },
+    [applyResult, applyPickedCompany]
+  );
+
+  // `loading` already starts true, so only `reload` raises it — doing that here
+  // would be a synchronous setState inside the mount effect.
+  const reload = useCallback(
+    (targetCompanyId?: string) => {
+      setLoading(true);
+      void fetchSettings(targetCompanyId)
+        .then(resolve)
+        .catch(() => toastError(t("common.error")))
+        .finally(() => setLoading(false));
+    },
+    [fetchSettings, resolve, toastError, t]
+  );
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    void fetchSettings()
+      .then(resolve)
+      .catch(() => toastError(t("common.error")))
+      .finally(() => setLoading(false));
+  }, [fetchSettings, resolve, toastError, t]);
 
   const changeCompany = async (next: string) => {
     setCompanyId(next);
     setSettings(null);
-    await load(next);
+    reload(next);
   };
 
   const save = async (patch: Partial<InventorySettings>) => {
@@ -136,7 +183,7 @@ export default function InventorySettingsPage() {
           <h1 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl">{t("inventory.settingsTitle")}</h1>
           <p className="mt-1 text-sm text-slate-500">{t("inventory.settingsSubtitle")}</p>
         </div>
-        <RefreshButton onRefresh={() => void load(needsCompany ? undefined : companyId)} refreshing={loading} />
+        <RefreshButton onRefresh={() => reload(needsCompany ? undefined : companyId)} refreshing={loading} />
       </div>
 
       {needsCompany && companies.length > 0 && (

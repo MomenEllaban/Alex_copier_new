@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
+import { Prisma } from "@/generated/prisma/client";
 
 export async function GET(request: Request) {
   try {
@@ -20,10 +21,14 @@ export async function GET(request: Request) {
     const employeeId = searchParams.get("employeeId");
     const departmentId = searchParams.get("departmentId");
 
-    const where: any = {};
-    if (actor.companyId) where.Employee = { companyId: actor.companyId };
+    const where: Prisma.DailyAttendanceRecordWhereInput = {};
+    // Built up in one object: `where.Employee` is a relation filter union, so
+    // spreading it into a new literal would widen it out of the generated type.
+    const employeeFilter: Prisma.EmployeeWhereInput = {};
+    if (actor.companyId) employeeFilter.companyId = actor.companyId;
+    if (departmentId) employeeFilter.departmentId = departmentId;
+    if (employeeFilter.companyId || departmentId) where.Employee = employeeFilter;
     if (employeeId) where.employeeId = employeeId;
-    if (departmentId) where.Employee = { ...where.Employee, departmentId };
 
     if (dateStr) {
       const d = new Date(dateStr);

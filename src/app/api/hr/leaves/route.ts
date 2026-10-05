@@ -2,6 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
 import { notifyLeaveRequested, notifyLeaveReviewed } from "@/lib/hr/hr-notifications";
+import { Prisma } from "@/generated/prisma/client";
+import { enumFilter } from "@/lib/enum-filter";
+import { LEAVE_STATUSES } from "@/lib/hr/hr-statuses";
 
 export async function GET(request: Request) {
   try {
@@ -16,9 +19,9 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const employeeId = searchParams.get("employeeId");
-    const status = searchParams.get("status");
+    const status = enumFilter(searchParams.get("status"), LEAVE_STATUSES);
 
-    const where: any = {};
+    const where: Prisma.LeaveRequestWhereInput = {};
     if (actor.companyId) where.Employee = { companyId: actor.companyId };
     if (employeeId) where.employeeId = employeeId;
     if (status) where.status = status;

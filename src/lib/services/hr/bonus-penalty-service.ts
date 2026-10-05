@@ -5,6 +5,7 @@
  * disciplinary deductions, percentage/fixed calculations, and approval flows.
  */
 import { prisma } from "@/lib/prisma";
+import { AdvanceStatus, Prisma } from "@/generated/prisma/client";
 import { getCompanyHrSettings } from "./hr-settings-service";
 
 export interface CreateBonusInput {
@@ -37,7 +38,7 @@ export interface CreatePenaltyInput {
 // BONUSES (الحوافز والمكافآت)
 // ───────────────────────────────────────────────
 
-export async function createBonus(input: CreateBonusInput, actorId?: string) {
+export async function createBonus(input: CreateBonusInput) {
   const employee = await prisma.employee.findUnique({
     where: { id: input.employeeId },
   });
@@ -109,9 +110,9 @@ export async function rejectBonus(bonusId: string, rejectedBy: string, reason?: 
 
 export async function getBonuses(
   companyId: string,
-  filters: { employeeId?: string; month?: number; year?: number; status?: string }
+  filters: { employeeId?: string; month?: number; year?: number; status?: AdvanceStatus }
 ) {
-  const where: any = { companyId };
+  const where: Prisma.EmployeeBonusWhereInput = { companyId };
   if (filters.employeeId) where.employeeId = filters.employeeId;
   if (filters.month) where.targetMonth = filters.month;
   if (filters.year) where.targetYear = filters.year;
@@ -132,7 +133,7 @@ export async function getBonuses(
 // PENALTIES (الخصومات والجزاءات)
 // ───────────────────────────────────────────────
 
-export async function createPenalty(input: CreatePenaltyInput, actorId?: string) {
+export async function createPenalty(input: CreatePenaltyInput) {
   const employee = await prisma.employee.findUnique({
     where: { id: input.employeeId },
   });
@@ -206,9 +207,9 @@ export async function rejectPenalty(penaltyId: string, rejectedBy: string, reaso
 
 export async function getPenalties(
   companyId: string,
-  filters: { employeeId?: string; month?: number; year?: number; status?: string }
+  filters: { employeeId?: string; month?: number; year?: number; status?: AdvanceStatus }
 ) {
-  const where: any = { companyId };
+  const where: Prisma.EmployeePenaltyWhereInput = { companyId };
   if (filters.employeeId) where.employeeId = filters.employeeId;
   if (filters.month) where.targetMonth = filters.month;
   if (filters.year) where.targetYear = filters.year;

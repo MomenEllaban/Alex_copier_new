@@ -125,10 +125,7 @@ export default function ProductsPage() {
   }, []);
   const { refresh, refreshing } = useAutoRefresh(fetchData, ["products", "inventory", "sales", "purchases", "returns", "warehouses"]);
 
-  const autoAddOpen = useAutoAddForm();
-  useEffect(() => {
-    if (autoAddOpen) setShowForm(true);
-  }, [autoAddOpen]);
+  useAutoAddForm(() => setShowForm(true));
 
   const filtered = useMemo(
     () =>

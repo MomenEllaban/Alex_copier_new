@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AddFormBoundary, useAutoAddForm } from "@/hooks/useAutoAddForm";
 import { useSession } from "next-auth/react";
@@ -153,12 +153,11 @@ export default function ServiceRequestsPage() {
 
   const { refresh, refreshing } = useAutoRefresh(fetchData, ["service-requests", "engineers", "machines", "customers", "notifications"]);
 
-  useEffect(() => { fetchData(); }, []);
-
-  const autoAddOpen = useAutoAddForm();
   useEffect(() => {
-    if (autoAddOpen) setShowForm(true);
-  }, [autoAddOpen]);
+    refresh();
+  }, [refresh]);
+
+  useAutoAddForm(() => setShowForm(true));
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -245,16 +244,14 @@ export default function ServiceRequestsPage() {
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  const stats = useMemo(() => {
-    const openStatuses = ["NEW", "ASSIGNED", "VISITED", "REASSIGNED", "NOT_RESOLVED"];
-    const urgentPriorities = ["URGENT", "EMERGENCY"];
-    return {
-      total: filtered.length,
-      open: filtered.filter((r) => openStatuses.includes(r.status)).length,
-      urgent: filtered.filter((r) => urgentPriorities.includes(r.priority) && openStatuses.includes(r.status)).length,
-      resolved: filtered.filter((r) => r.status === "RESOLVED").length,
-    };
-  }, [filtered]);
+  const openStatuses = ["NEW", "ASSIGNED", "VISITED", "REASSIGNED", "NOT_RESOLVED"];
+  const urgentPriorities = ["URGENT", "EMERGENCY"];
+  const stats = {
+    total: filtered.length,
+    open: filtered.filter((r) => openStatuses.includes(r.status)).length,
+    urgent: filtered.filter((r) => urgentPriorities.includes(r.priority) && openStatuses.includes(r.status)).length,
+    resolved: filtered.filter((r) => r.status === "RESOLVED").length,
+  };
 
   const exportRequests = () => ({
     headers: [

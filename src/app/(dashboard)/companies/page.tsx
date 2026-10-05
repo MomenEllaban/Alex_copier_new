@@ -106,10 +106,7 @@ export default function CompaniesPage() {
   }, []);
   const { refresh, refreshing } = useAutoRefresh(fetchCompanies, ["companies", "expenses"]);
 
-  const autoAddOpen = useAutoAddForm();
-  useEffect(() => {
-    if (autoAddOpen) setShowForm(true);
-  }, [autoAddOpen]);
+  useAutoAddForm(() => setShowForm(true));
 
   const totalSales = companies.reduce((s, c) => s + c.totalSales, 0);
   const totalPurchases = companies.reduce((s, c) => s + c.totalPurchases, 0);

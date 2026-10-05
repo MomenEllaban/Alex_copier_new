@@ -176,26 +176,6 @@ const statusBadge = (status: string) => {
   );
 };
 
-const paymentMethodLabel = (method: string) => {
-  const map: Record<string, string> = {
-    CASH: "كاش",
-    CREDIT: "أجل",
-    INSTALLMENT: "أجل",
-    MIXED: "أجل",
-  };
-  return map[method] ?? method;
-};
-
-const paymentStatusLabel = (status: string) => {
-  const map: Record<string, string> = {
-    PENDING: "معلق",
-    PAID: "مدفوع",
-    PARTIAL: "جزئي",
-    OVERDUE: "متأخر",
-  };
-  return map[status] ?? status;
-};
-
 const SubtotalRow = ({ label, value, colSpan, color }: { label: string; value: number; colSpan: number; color?: string }) => (
   <tr className="border-t-2 border-slate-300 bg-slate-50 font-bold">
     <td colSpan={colSpan} className="px-4 py-3 text-sm text-start">
@@ -209,7 +189,7 @@ const SubtotalRow = ({ label, value, colSpan, color }: { label: string; value: n
 
 export default function CompanyReportPage() {
   const { dir, t } = useI18n();
-  const { success: toastSuccess, error: toastError } = useToast();
+  const { error: toastError } = useToast();
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
@@ -254,10 +234,12 @@ export default function CompanyReportPage() {
     "sales", "purchases", "settlements", "expenses", "returns", "companies",
   ]);
 
+  // Mount goes through `refresh`, the same entry point the RefreshButton and
+  // the event bus use, so there is only one fetch path to reason about.
   useEffect(() => {
-    fetchReport();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+    refresh();
+    // Re-fetch when the company being reported on changes.
+  }, [id, refresh]);
 
   const salesTotal = useMemo(
     () => report?.sales?.total ?? 0,

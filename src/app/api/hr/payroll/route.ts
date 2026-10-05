@@ -7,6 +7,8 @@ import {
   approvePayrollRun,
   lockPayrollRun,
 } from "@/lib/services/hr/payroll-service";
+import { errorMessage } from "@/lib/prisma-errors";
+import { Prisma } from "@/generated/prisma/client";
 
 export async function GET(request: Request) {
   try {
@@ -56,7 +58,7 @@ export async function GET(request: Request) {
       return NextResponse.json(run);
     }
 
-    const where: any = {};
+    const where: Prisma.PayrollRunWhereInput = {};
     if (actor.companyId) where.companyId = actor.companyId;
     if (monthStr && yearStr) {
       where.Period = {
@@ -138,8 +140,8 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
-  } catch (error: any) {
+  } catch (error) {
     console.error("POST /api/hr/payroll error:", error);
-    return NextResponse.json({ error: error.message || "Failed to process payroll" }, { status: 400 });
+    return NextResponse.json({ error: errorMessage(error, "Failed to process payroll") }, { status: 400 });
   }
 }

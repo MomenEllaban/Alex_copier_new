@@ -6,6 +6,7 @@ import {
   updateCompanyHrSettings,
   validatePayrollAccountMapping,
 } from "@/lib/services/hr/hr-settings-service";
+import { errorMessage } from "@/lib/prisma-errors";
 
 export async function GET(request: Request) {
   try {
@@ -40,9 +41,9 @@ export async function GET(request: Request) {
       mappingValidation,
       accounts: companyAccounts,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error("GET /api/hr/settings error:", error);
-    return NextResponse.json({ error: error.message || "Failed to fetch settings" }, { status: 500 });
+    return NextResponse.json({ error: errorMessage(error, "Failed to fetch settings") }, { status: 500 });
   }
 }
 
@@ -66,8 +67,8 @@ export async function PUT(request: Request) {
 
     const updated = await updateCompanyHrSettings(companyId, body);
     return NextResponse.json(updated);
-  } catch (error: any) {
+  } catch (error) {
     console.error("PUT /api/hr/settings error:", error);
-    return NextResponse.json({ error: error.message || "Failed to update settings" }, { status: 400 });
+    return NextResponse.json({ error: errorMessage(error, "Failed to update settings") }, { status: 400 });
   }
 }

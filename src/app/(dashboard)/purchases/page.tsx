@@ -7,7 +7,7 @@ import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
 import DateRangeFilter, { inDateRange } from "@/components/DateRangeFilter";
-import { Eye, Pencil, Plus, Printer, Save, ShoppingCart, Trash2, Truck, Wallet, ArrowLeftRight, X } from "lucide-react";
+import { Eye, Pencil, Plus, Printer, Save, ShoppingCart, Trash2, Truck, Wallet, X } from "lucide-react";
 import ExportButton from "@/components/ExportButton";
 import PrinterLoader from "@/components/PrinterLoader";
 import FormModal from "@/components/FormModal";
@@ -165,10 +165,7 @@ export default function PurchasesPage() {
     setShowForm(true);
   };
 
-  const autoAddOpen = useAutoAddForm();
-  useEffect(() => {
-    if (autoAddOpen) openCreateOrder();
-  }, [autoAddOpen]);
+  useAutoAddForm(() => openCreateOrder());
 
   const filtered = orders.filter(order =>
     (!statusFilter || order.status === statusFilter) &&
@@ -196,18 +193,16 @@ export default function PurchasesPage() {
   const icSafePage = Math.min(icPage, icTotalPages);
   const icPaged = icFiltered.slice((icSafePage - 1) * IC_PAGE_SIZE, icSafePage * IC_PAGE_SIZE);
 
-  const stats = useMemo(() => {
-    const totalValue = filtered.reduce((sum, o) => sum + (o.total || 0), 0);
-    const received = filtered.filter((o) => o.status === "RECEIVED").length;
-    const pending = filtered.filter((o) => o.status !== "RECEIVED" && o.status !== "CANCELLED").length;
-    return {
-      totalOrders: filtered.length,
-      totalValue,
-      received,
-      pending,
-      icTotal: intercompanyInvoices.length,
-    };
-  }, [filtered, intercompanyInvoices]);
+  const totalValue = filtered.reduce((sum, o) => sum + (o.total || 0), 0);
+  const received = filtered.filter((o) => o.status === "RECEIVED").length;
+  const pending = filtered.filter((o) => o.status !== "RECEIVED" && o.status !== "CANCELLED").length;
+  const stats = {
+    totalOrders: filtered.length,
+    totalValue,
+    received,
+    pending,
+    icTotal: intercompanyInvoices.length,
+  };
 
   const exportPurchases = () => ({
     headers: [

@@ -151,9 +151,11 @@ export default function CustomersPage() {
 
   const { refresh, refreshing } = useAutoRefresh(fetchCustomers, ["customers", "sales", "payments"]);
 
+  // Mount goes through `refresh`, the same entry point the RefreshButton and
+  // the event bus use, so there is only one fetch path to reason about.
   useEffect(() => {
-    fetchCustomers();
-  }, []);
+    refresh();
+  }, [refresh]);
 
   const filtered = customers.filter(
     (c) =>

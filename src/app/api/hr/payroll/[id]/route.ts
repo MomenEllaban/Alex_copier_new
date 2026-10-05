@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
+import { errorMessage } from "@/lib/prisma-errors";
 
 export async function GET(
   _request: Request,
@@ -47,8 +48,8 @@ export async function GET(
     }
 
     return NextResponse.json(run);
-  } catch (error: any) {
+  } catch (error) {
     console.error("GET /api/hr/payroll/[id] error:", error);
-    return NextResponse.json({ error: error.message || "Failed to fetch payroll run details" }, { status: 500 });
+    return NextResponse.json({ error: errorMessage(error, "Failed to fetch payroll run details") }, { status: 500 });
   }
 }

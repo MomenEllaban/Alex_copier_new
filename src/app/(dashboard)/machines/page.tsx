@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AddFormBoundary, useAutoAddForm } from "@/hooks/useAutoAddForm";
 import { useI18n } from "@/i18n/context";
@@ -89,7 +89,7 @@ const emptyForm = {
 };
 
 export default function MachinesPage() {
-  const { t, dir, locale } = useI18n();
+  const { t, dir } = useI18n();
   const confirmAction = useConfirm();
   const { success: toastSuccess, error: toastError } = useToast();
   
@@ -130,15 +130,15 @@ export default function MachinesPage() {
     }
   };
 
-  useEffect(() => {
-    fetchMachines();
-  }, []);
   const { refresh, refreshing } = useAutoRefresh(fetchMachines, ["machines", "sales", "contracts", "workshop", "customers"]);
 
-  const autoAddOpen = useAutoAddForm();
+  // Mount goes through `refresh`, the same entry point the RefreshButton and
+  // the event bus use, so there is only one fetch path to reason about.
   useEffect(() => {
-    if (autoAddOpen) setShowForm(true);
-  }, [autoAddOpen]);
+    refresh();
+  }, [refresh]);
+
+  useAutoAddForm(() => setShowForm(true));
 
   const filtered = machines.filter(
     (m) =>
@@ -154,15 +154,12 @@ export default function MachinesPage() {
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  const stats = useMemo(
-    () => ({
-      total: filtered.length,
-      sold: filtered.filter((m) => m.currentStatus === "SOLD").length,
-      inWarehouse: filtered.filter((m) => m.currentStatus === "IN_WAREHOUSE").length,
-      underMaintenance: filtered.filter((m) => m.currentStatus === "UNDER_MAINTENANCE").length,
-    }),
-    [filtered]
-  );
+  const stats = {
+    total: filtered.length,
+    sold: filtered.filter((m) => m.currentStatus === "SOLD").length,
+    inWarehouse: filtered.filter((m) => m.currentStatus === "IN_WAREHOUSE").length,
+    underMaintenance: filtered.filter((m) => m.currentStatus === "UNDER_MAINTENANCE").length,
+  };
 
   const exportMachines = () => ({
     headers: [

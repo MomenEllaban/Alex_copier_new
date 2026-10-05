@@ -16,7 +16,7 @@ export interface HrPolicyConfig {
   overtimeWeekendRate: number;
   absenceDeductionMultiplier: number;
   lateGraceMinutes: number;
-  lateDeductionTiers?: any;
+  lateDeductionTiers?: LateDeductionTier[];
   annualLeaveDefaultDays: number;
   sickLeaveDefaultDays: number;
   emergencyLeaveDefaultDays: number;
@@ -30,7 +30,7 @@ export interface HrPolicyConfig {
   insuranceMaxSalary: number;
   taxEnabled: boolean;
   taxPersonalExemption: number;
-  taxBrackets?: any;
+  taxBrackets?: TaxBracket[];
   payrollExpenseAccountId?: string | null;
   salariesPayableAccountId?: string | null;
   treasuryAccountId?: string | null;
@@ -38,6 +38,44 @@ export interface HrPolicyConfig {
   loansAccountId?: string | null;
   socialInsuranceAccountId?: string | null;
   taxAuthorityAccountId?: string | null;
+}
+
+/**
+ * One step of the "how much of a day's wage a late arrival costs" table.
+ * Stored as a JSON column, so it needs a real shape before it is read back.
+ *
+ * Declared as a `type` rather than an `interface` on purpose: TypeScript only
+ * gives implicit index signatures to type aliases, and Prisma's JSON input
+ * types require one. An `interface` here would need an unsafe cast on every
+ * write.
+ */
+export type LateDeductionTier = {
+  /** Minutes late at which this tier starts counting. */
+  fromMinutes: number;
+  /** Minutes late at which this tier stops counting. */
+  toMinutes: number;
+  /** Share of the daily wage deducted, 0–1. */
+  deductionRate: number;
+};
+
+/** One band of the progressive annual income tax scale. */
+export type TaxBracket = {
+  minAnnual: number;
+  maxAnnual: number;
+  rate: number;
+};
+
+/**
+ * Reads a JSON settings column back into its declared shape.
+ *
+ * These columns are nullable and editable from the settings form, so the value
+ * really can be anything; returning the fallback for a malformed entry beats
+ * letting an `any` leak into the payroll arithmetic.
+ */
+function readJson<T>(value: unknown, fallback: T): T {
+  if (value === null || value === undefined) return fallback;
+  if (Array.isArray(value)) return value as T;
+  return fallback;
 }
 
 /**
@@ -88,7 +126,11 @@ export async function getCompanyHrSettings(companyId: string): Promise<HrPolicyC
     });
   }
 
-  return settings;
+  return {
+    ...settings,
+    lateDeductionTiers: readJson<LateDeductionTier[]>(settings.lateDeductionTiers, []),
+    taxBrackets: readJson<TaxBracket[]>(settings.taxBrackets, DEFAULT_TAX_BRACKETS),
+  };
 }
 
 /**
@@ -100,10 +142,16 @@ export async function updateCompanyHrSettings(
 ): Promise<HrPolicyConfig> {
   const existing = await getCompanyHrSettings(companyId);
 
-  return prisma.hrSetting.update({
+  const row = await prisma.hrSetting.update({
     where: { id: existing.id },
     data,
   });
+
+  return {
+    ...row,
+    lateDeductionTiers: readJson<LateDeductionTier[]>(row.lateDeductionTiers, []),
+    taxBrackets: readJson<TaxBracket[]>(row.taxBrackets, DEFAULT_TAX_BRACKETS),
+  };
 }
 
 /**

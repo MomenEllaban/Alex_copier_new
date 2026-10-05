@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
@@ -110,15 +110,19 @@ export default function InventoryPage() {
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  const stats = useMemo(() => {
-    // Follows the filters above, so the cards describe the rows on screen.
-    const totalQty = filtered.reduce((sum, item) => sum + (item.quantity || 0), 0);
-    const outOfStock = filtered.filter((item) => (item.quantity || 0) === 0).length;
-    // Counted from the whole list, not `filtered`: switching the filter on
-    // would otherwise report "1 deficit" and hide the other seven.
-    const negative = inventory.filter((item) => (item.quantity || 0) < 0).length;
-    return { items: filtered.length, totalQty, warehouses: warehouses.length, outOfStock, negative };
-  }, [filtered, inventory, warehouses]);
+  // Follows the filters above, so the cards describe the rows on screen.
+  const totalQty = filtered.reduce((sum, item) => sum + (item.quantity || 0), 0);
+  const outOfStock = filtered.filter((item) => (item.quantity || 0) === 0).length;
+  // Counted from the whole list, not `filtered`: switching the filter on
+  // would otherwise report "1 deficit" and hide the other seven.
+  const negative = inventory.filter((item) => (item.quantity || 0) < 0).length;
+  const stats = {
+    items: filtered.length,
+    totalQty,
+    warehouses: warehouses.length,
+    outOfStock,
+    negative,
+  };
 
   const exportInventory = () => ({
     headers: [

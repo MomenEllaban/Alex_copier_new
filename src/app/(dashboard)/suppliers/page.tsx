@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
@@ -100,11 +100,9 @@ export default function SuppliersPage() {
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  const stats = useMemo(() => {
-    const active = filtered.filter((s) => s.isActive).length;
-    const companiesCount = new Set(filtered.filter((s) => s.companyId).map((s) => s.companyId)).size;
-    return { total: filtered.length, active, companiesCount };
-  }, [filtered]);
+  const active = filtered.filter((s) => s.isActive).length;
+  const companiesCount = new Set(filtered.filter((s) => s.companyId).map((s) => s.companyId)).size;
+  const stats = { total: filtered.length, active, companiesCount };
 
   const exportSuppliers = () => ({
     headers: [

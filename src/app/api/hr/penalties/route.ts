@@ -6,6 +6,9 @@ import {
   rejectPenalty,
   getPenalties,
 } from "@/lib/services/hr/bonus-penalty-service";
+import { errorMessage } from "@/lib/prisma-errors";
+import { enumFilter } from "@/lib/enum-filter";
+import { ADVANCE_STATUSES } from "@/lib/hr/hr-statuses";
 
 export async function GET(request: Request) {
   try {
@@ -23,15 +26,15 @@ export async function GET(request: Request) {
     if (!companyId) return NextResponse.json({ error: "companyId required" }, { status: 400 });
 
     const employeeId = searchParams.get("employeeId") || undefined;
-    const status = searchParams.get("status") || undefined;
+    const status = enumFilter(searchParams.get("status"), ADVANCE_STATUSES);
     const month = searchParams.get("month") ? parseInt(searchParams.get("month")!) : undefined;
     const year = searchParams.get("year") ? parseInt(searchParams.get("year")!) : undefined;
 
     const penalties = await getPenalties(companyId, { employeeId, status, month, year });
     return NextResponse.json(penalties);
-  } catch (error: any) {
+  } catch (error) {
     console.error("GET /api/hr/penalties error:", error);
-    return NextResponse.json({ error: error.message || "Failed to fetch penalties" }, { status: 500 });
+    return NextResponse.json({ error: errorMessage(error, "Failed to fetch penalties") }, { status: 500 });
   }
 }
 
@@ -65,14 +68,13 @@ export async function POST(request: Request) {
         targetMonth: parseInt(body.targetMonth),
         targetYear: parseInt(body.targetYear),
         reason: body.reason,
-      },
-      actor.id
+      }
     );
 
     return NextResponse.json(penalty, { status: 201 });
-  } catch (error: any) {
+  } catch (error) {
     console.error("POST /api/hr/penalties error:", error);
-    return NextResponse.json({ error: error.message || "Failed to create penalty" }, { status: 400 });
+    return NextResponse.json({ error: errorMessage(error, "Failed to create penalty") }, { status: 400 });
   }
 }
 
@@ -102,8 +104,8 @@ export async function PATCH(request: Request) {
     }
 
     return NextResponse.json(result);
-  } catch (error: any) {
+  } catch (error) {
     console.error("PATCH /api/hr/penalties error:", error);
-    return NextResponse.json({ error: error.message || "Failed to update penalty" }, { status: 400 });
+    return NextResponse.json({ error: errorMessage(error, "Failed to update penalty") }, { status: 400 });
   }
 }

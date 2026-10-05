@@ -117,8 +117,6 @@ export default function ReturnsPage() {
   const confirmAction = useConfirm();
   const [returns, setReturns] = useState<ReturnRecord[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showForm, setShowForm] = useState(false);
@@ -144,32 +142,45 @@ export default function ReturnsPage() {
     reason: "",
   });
 
-  const [selectedOrder, setSelectedOrder] = useState<SalesOrder | null>(null);
-  const [selectedItem, setSelectedItem] = useState<SalesOrderItem | null>(null);
-  const [selectedPurchaseOrder, setSelectedPurchaseOrder] = useState<PurchaseOrder | null>(null);
-  const [selectedPurchaseItem, setSelectedPurchaseItem] = useState<PurchaseOrderItem | null>(null);
+  // The selected order/item are derived from the id in the form and the loaded
+  // order list, so they are computed during render instead of being mirrored
+  // into state from an effect.
+  const selectedOrder = useMemo(
+    () => salesOrders.find((o) => o.id === form.salesOrderId) ?? null,
+    [salesOrders, form.salesOrderId]
+  );
+
+  const selectedItem = useMemo(
+    () => selectedOrder?.items.find((i) => i.id === form.salesOrderItemId) ?? null,
+    [selectedOrder, form.salesOrderItemId]
+  );
+
+  const selectedPurchaseOrder = useMemo(
+    () => purchaseOrders.find((o) => o.id === form.purchaseOrderId) ?? null,
+    [purchaseOrders, form.purchaseOrderId]
+  );
+
+  const selectedPurchaseItem = useMemo(
+    () =>
+      selectedPurchaseOrder?.items.find((i) => i.id === form.purchaseOrderItemId) ?? null,
+    [selectedPurchaseOrder, form.purchaseOrderItemId]
+  );
 
   const [viewingReturn, setViewingReturn] = useState<ReturnRecord | null>(null);
   const [editingReturn, setEditingReturn] = useState<ReturnRecord | null>(null);
 
   const fetchData = async () => {
     try {
-      const [returnsRes, companiesRes, customersRes, suppliersRes] = await Promise.all([
+      const [returnsRes, companiesRes] = await Promise.all([
         fetch("/api/returns"),
         fetch("/api/companies"),
-        fetch("/api/customers"),
-        fetch("/api/suppliers"),
       ]);
 
       const returnData = await returnsRes.json();
       const companiesData = await companiesRes.json();
-      const customersData = await customersRes.json();
-      const suppliersData = await suppliersRes.json();
 
       setReturns(Array.isArray(returnData) ? returnData : []);
       setCompanies(Array.isArray(companiesData) ? companiesData : []);
-      setCustomers(Array.isArray(customersData) ? customersData : []);
-      setSuppliers(Array.isArray(suppliersData) ? suppliersData : []);
     } finally {
       setLoading(false);
     }
@@ -178,10 +189,7 @@ export default function ReturnsPage() {
   useEffect(() => { fetchData(); }, []);
   const { refresh, refreshing } = useAutoRefresh(fetchData, ["returns", "sales", "purchases", "customers", "suppliers", "products", "inventory"]);
 
-  const autoAddOpen = useAutoAddForm();
-  useEffect(() => {
-    if (autoAddOpen) setShowForm(true);
-  }, [autoAddOpen]);
+  useAutoAddForm(() => setShowForm(true));
 
   const fetchSalesOrders = async (companyId: string) => {
     setSalesOrdersLoading(true);
@@ -209,63 +217,49 @@ export default function ReturnsPage() {
     }
   };
 
-  useEffect(() => {
-    if (form.companyId && form.type === "SALE_RETURN") {
-      fetchSalesOrders(form.companyId);
+  // Changing company or return type invalidates both order selections, so the
+  // form is reset here at the source of the change rather than in an effect
+  // that mirrors the new values back into state.
+  const handleTypeChange = (type: "SALE_RETURN" | "PURCHASE_RETURN") => {
+    setForm((prev) => ({ ...prev, type, salesOrderId: "", salesOrderItemId: "", purchaseOrderId: "", purchaseOrderItemId: "" }));
+    // The list to populate now depends on the company already selected, so the
+    // switch refetches for the current company instead of only clearing.
+    if (form.companyId) {
+      if (type === "SALE_RETURN") {
+        void fetchSalesOrders(form.companyId);
+      } else {
+        void fetchPurchaseOrders(form.companyId);
+      }
+    }
+    if (type === "SALE_RETURN") {
       setPurchaseOrders([]);
-    } else if (form.companyId && form.type === "PURCHASE_RETURN") {
-      fetchPurchaseOrders(form.companyId);
-      setSalesOrders([]);
     } else {
       setSalesOrders([]);
+    }
+  };
+
+  const handleCompanyChange = (companyId: string) => {
+    setForm((prev) => ({ ...prev, companyId, salesOrderId: "", salesOrderItemId: "", purchaseOrderId: "", purchaseOrderItemId: "" }));
+    if (form.type === "SALE_RETURN") {
+      if (companyId) fetchSalesOrders(companyId);
+      else setSalesOrders([]);
       setPurchaseOrders([]);
-    }
-    setForm((prev) => ({ ...prev, salesOrderId: "", salesOrderItemId: "", purchaseOrderId: "", purchaseOrderItemId: "" }));
-    setSelectedOrder(null);
-    setSelectedItem(null);
-    setSelectedPurchaseOrder(null);
-    setSelectedPurchaseItem(null);
-  }, [form.companyId, form.type]);
-
-  useEffect(() => {
-    if (form.salesOrderId) {
-      const order = salesOrders.find((o) => o.id === form.salesOrderId);
-      setSelectedOrder(order || null);
     } else {
-      setSelectedOrder(null);
+      if (companyId) fetchPurchaseOrders(companyId);
+      else setPurchaseOrders([]);
+      setSalesOrders([]);
     }
-    setForm((prev) => ({ ...prev, salesOrderItemId: "" }));
-    setSelectedItem(null);
-  }, [form.salesOrderId, salesOrders]);
+  };
 
-  useEffect(() => {
-    if (form.salesOrderItemId && selectedOrder) {
-      const item = selectedOrder.items.find((i) => i.id === form.salesOrderItemId);
-      setSelectedItem(item || null);
-    } else {
-      setSelectedItem(null);
-    }
-  }, [form.salesOrderItemId, selectedOrder]);
+  // Picking an order clears the stale line-item id, since item ids are only
+  // unique within their order.
+  const handleSalesOrderChange = (id: string) => {
+    setForm((prev) => ({ ...prev, salesOrderId: id, salesOrderItemId: "" }));
+  };
 
-  useEffect(() => {
-    if (form.purchaseOrderId) {
-      const order = purchaseOrders.find((o) => o.id === form.purchaseOrderId);
-      setSelectedPurchaseOrder(order || null);
-    } else {
-      setSelectedPurchaseOrder(null);
-    }
-    setForm((prev) => ({ ...prev, purchaseOrderItemId: "" }));
-    setSelectedPurchaseItem(null);
-  }, [form.purchaseOrderId, purchaseOrders]);
-
-  useEffect(() => {
-    if (form.purchaseOrderItemId && selectedPurchaseOrder) {
-      const it = selectedPurchaseOrder.items.find((i) => i.id === form.purchaseOrderItemId);
-      setSelectedPurchaseItem(it || null);
-    } else {
-      setSelectedPurchaseItem(null);
-    }
-  }, [form.purchaseOrderItemId, selectedPurchaseOrder]);
+  const handlePurchaseOrderChange = (id: string) => {
+    setForm((prev) => ({ ...prev, purchaseOrderId: id, purchaseOrderItemId: "" }));
+  };
 
   const filteredReturns = useMemo(() => {
     return returns.filter((item) => {
@@ -446,10 +440,6 @@ export default function ReturnsPage() {
 
   const resetForm = () => {
     setForm({ companyId: "", type: "SALE_RETURN", salesOrderId: "", salesOrderItemId: "", purchaseOrderId: "", purchaseOrderItemId: "", quantity: "1", reason: "" });
-    setSelectedOrder(null);
-    setSelectedItem(null);
-    setSelectedPurchaseOrder(null);
-    setSelectedPurchaseItem(null);
     setSalesOrders([]);
     setPurchaseOrders([]);
   };
@@ -596,7 +586,7 @@ export default function ReturnsPage() {
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1.5">
               <label className="block text-sm font-medium text-gray-700">{t("common.type")}</label>
-              <select className={inputClass} value={form.type} onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value as "SALE_RETURN" | "PURCHASE_RETURN" }))}>
+              <select className={inputClass} value={form.type} onChange={(e) => handleTypeChange(e.target.value as "SALE_RETURN" | "PURCHASE_RETURN")}>
                 <option value="SALE_RETURN">{RETURN_TYPE_LABELS.SALE_RETURN}</option>
                 <option value="PURCHASE_RETURN">{RETURN_TYPE_LABELS.PURCHASE_RETURN}</option>
               </select>
@@ -604,7 +594,7 @@ export default function ReturnsPage() {
 
             <div className="space-y-1.5">
               <label className="block text-sm font-medium text-gray-700">{t("common.company")}</label>
-              <select className={inputClass} value={form.companyId} onChange={(e) => setForm((prev) => ({ ...prev, companyId: e.target.value }))} required>
+              <select className={inputClass} value={form.companyId} onChange={(e) => handleCompanyChange(e.target.value)} required>
                 <option value="">{t("common.selectOption")}</option>
                 {companies.map((c) => (
                   <option key={c.id} value={c.id}>{c.nameAr || c.name}</option>
@@ -621,7 +611,7 @@ export default function ReturnsPage() {
                   <PrinterLoader size="sm" label={t("common.loading")} />
                 </div>
               ) : (
-                <SearchableSelect value={form.salesOrderId} onChange={(v) => setForm((prev) => ({ ...prev, salesOrderId: v }))} options={salesOrders.map((order) => ({ value: order.id, label: `${order.id.slice(0, 8)} — ${order.customer?.name || ""} — ${new Date(order.orderDate).toLocaleDateString("en-GB")} ${new Date(order.orderDate).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}` }))} placeholder={t("common.selectOption")} required />
+                <SearchableSelect value={form.salesOrderId} onChange={(v) => handleSalesOrderChange(v)} options={salesOrders.map((order) => ({ value: order.id, label: `${order.id.slice(0, 8)} — ${order.customer?.name || ""} — ${new Date(order.orderDate).toLocaleDateString("en-GB")} ${new Date(order.orderDate).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}` }))} placeholder={t("common.selectOption")} required />
               )}
             </div>
           )}
@@ -673,7 +663,7 @@ export default function ReturnsPage() {
                   <PrinterLoader size="sm" label={t("common.loading")} />
                 </div>
               ) : (
-                <SearchableSelect value={form.purchaseOrderId} onChange={(v) => setForm((prev) => ({ ...prev, purchaseOrderId: v }))} options={purchaseOrders.map((order) => ({ value: order.id, label: `${order.id.slice(0, 8)} — ${order.supplier?.name || ""} — ${new Date(order.orderDate).toLocaleDateString("en-GB")} ${new Date(order.orderDate).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}` }))} placeholder={t("common.selectOption")} required />
+                <SearchableSelect value={form.purchaseOrderId} onChange={(v) => handlePurchaseOrderChange(v)} options={purchaseOrders.map((order) => ({ value: order.id, label: `${order.id.slice(0, 8)} — ${order.supplier?.name || ""} — ${new Date(order.orderDate).toLocaleDateString("en-GB")} ${new Date(order.orderDate).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}` }))} placeholder={t("common.selectOption")} required />
               )}
             </div>
           )}

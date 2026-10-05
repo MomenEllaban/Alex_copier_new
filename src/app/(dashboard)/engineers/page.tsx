@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
@@ -212,10 +212,7 @@ export default function EngineersPage() {
     };
   }, []);
 
-  const autoAddOpen = useAutoAddForm();
-  useEffect(() => {
-    if (autoAddOpen) setShowForm(true);
-  }, [autoAddOpen]);
+  useAutoAddForm(() => setShowForm(true));
 
   const filtered = engineers.filter(
     (e) =>
@@ -230,16 +227,14 @@ export default function EngineersPage() {
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  const stats = useMemo(() => {
-    const totalSalaries = filtered.reduce((sum, e) => sum + (e.baseSalary || 0), 0);
-    const openRequests = filtered.reduce((sum, e) => sum + (e.openAssignedCount || 0), 0);
-    return {
-      total: filtered.length,
-      active: filtered.filter((e) => e.isActive).length,
-      salaries: totalSalaries,
-      openRequests,
-    };
-  }, [filtered]);
+  const totalSalaries = filtered.reduce((sum, e) => sum + (e.baseSalary || 0), 0);
+  const openRequests = filtered.reduce((sum, e) => sum + (e.openAssignedCount || 0), 0);
+  const stats = {
+    total: filtered.length,
+    active: filtered.filter((e) => e.isActive).length,
+    salaries: totalSalaries,
+    openRequests,
+  };
 
   const exportEngineers = () => ({
     headers: [

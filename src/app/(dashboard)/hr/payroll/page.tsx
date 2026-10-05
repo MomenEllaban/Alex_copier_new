@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useI18n } from "@/i18n/context";
 import PrinterLoader from "@/components/PrinterLoader";
+import { errorMessage } from "@/lib/prisma-errors";
 import Pagination from "@/components/Pagination";
 import FormModal from "@/components/FormModal";
 import RefreshButton from "@/components/RefreshButton";
@@ -21,19 +22,211 @@ import {
   Settings,
   Plus,
   CheckCircle2,
-  XCircle,
   Clock,
   Calendar,
   DollarSign,
-  TrendingDown,
   TrendingUp,
-  FileText,
   Building,
-  HelpCircle,
 } from "lucide-react";
 
+// ─────────────────────────────────────────────
+// Shapes returned by the HR APIs this page reads.
+// Declared here because the screen renders every field the endpoints send;
+// `any` would let a renamed column render `undefined` instead of failing the
+// type check. Date columns arrive as ISO strings because they cross JSON.
+// ─────────────────────────────────────────────
+type BonusCalcType = "FIXED_AMOUNT" | "PERCENTAGE_OF_BASIC";
+type PenaltyCalcType = "FIXED_AMOUNT" | "DAILY_RATE";
+
+interface HREmployeeRef {
+  id: string;
+  code: string;
+  fullName: string;
+  fullNameAr: string | null;
+  baseSalary: number;
+}
+
+interface HRDepartmentRef {
+  name: string;
+  nameAr: string | null;
+}
+
+/** GET /api/hr/payroll -> `include: { Period: true, _count: { Items: true } }` */
+interface PayrollRun {
+  id: string;
+  status: string;
+  totalGross: number;
+  totalDeductions: number;
+  totalNet: number;
+  employeeCount: number;
+  calculatedAt: string | null;
+  createdAt: string;
+  Period: PayrollPeriod;
+  _count: { Items: number };
+}
+
+interface PayrollPeriod {
+  id: string;
+  month: number;
+  year: number;
+  status: string;
+}
+
+/** GET /api/hr/payroll/[id] -> `include: { Period: true, Items: { include: { Employee } } }` */
+interface PayrollRunDetail {
+  id: string;
+  status: string;
+  totalGross: number;
+  totalDeductions: number;
+  totalNet: number;
+  Period: PayrollPeriod;
+  Items: PayrollItem[];
+}
+
+interface PayrollItem {
+  id: string;
+  employeeId: string;
+  basicSalary: number;
+  allowancesAmount: number;
+  overtimeAmount: number;
+  absenceAmount: number;
+  lateAmount: number;
+  loansAmount: number;
+  advancesAmount: number;
+  bonusesAmount: number;
+  penaltiesAmount: number;
+  taxAmount: number;
+  employeeInsuranceAmount: number;
+  netSalary: number;
+  Employee: HREmployeeRef;
+}
+
+/** GET /api/hr/advances -> Employee includes Department. */
+interface Advance {
+  id: string;
+  employeeId: string;
+  amount: number;
+  status: string;
+  deductMonth: number | null;
+  deductYear: number | null;
+  reason: string;
+  approvedAt: string | null;
+  disbursedAt: string | null;
+  disbursementMethod: string | null;
+  createdAt: string;
+  Employee: HREmployeeRef & { Department: HRDepartmentRef | null };
+}
+
+/** GET /api/hr/loans -> EmployeeLoan with nested Installments. */
+interface Loan {
+  id: string;
+  employeeId: string;
+  totalAmount: number;
+  monthlyAmount: number;
+  installmentCount: number;
+  startDate: string;
+  status: string;
+  reason: string;
+  approvedAt: string | null;
+  disbursedAt: string | null;
+  disbursementMethod: string | null;
+  createdAt: string;
+  Employee: HREmployeeRef;
+  Installments: LoanInstallment[];
+}
+
+interface LoanInstallment {
+  id: string;
+  installmentNo: number;
+  amount: number;
+  dueDate: string;
+  paidDate: string | null;
+  status: string;
+  postponedReason: string | null;
+}
+
+interface Bonus {
+  id: string;
+  employeeId: string;
+  title: string;
+  bonusType: string;
+  calcType: BonusCalcType;
+  percentage: number | null;
+  amount: number;
+  status: string;
+  targetMonth: number;
+  targetYear: number;
+  reason: string | null;
+  approvedAt: string | null;
+  createdAt: string;
+  Employee: HREmployeeRef;
+}
+
+interface Penalty {
+  id: string;
+  employeeId: string;
+  title: string;
+  penaltyType: string;
+  calcType: PenaltyCalcType;
+  deductionDays: number | null;
+  amount: number;
+  status: string;
+  targetMonth: number;
+  targetYear: number;
+  reason: string;
+  approvedAt: string | null;
+  createdAt: string;
+  Employee: HREmployeeRef;
+}
+
+/** GET /api/hr/employees -> full Employee rows with JobTitle/Shift/User. */
+interface Employee {
+  id: string;
+  code: string;
+  fullName: string;
+  fullNameAr: string | null;
+  baseSalary: number;
+}
+
+interface AccountRef {
+  id: string;
+  code: string;
+  name: string;
+  accountType: string;
+}
+
+interface HrSettings {
+  standardWorkingDays: number;
+  dailyWorkingHours: number;
+  overtimeWeekdayRate: number;
+  overtimeWeekendRate: number;
+  absenceDeductionMultiplier: number;
+  lateGraceMinutes: number;
+  maxAdvancePercentOfSalary: number;
+  maxActiveLoansPerEmployee: number;
+  maxLoanSalaryMultiple: number;
+  insuranceEnabled: boolean;
+  insuranceEmployeeRate: number;
+  insuranceCompanyRate: number;
+  insuranceMinSalary: number;
+  insuranceMaxSalary: number;
+  taxEnabled: boolean;
+  taxPersonalExemption: number;
+  payrollExpenseAccountId: string | null;
+  salariesPayableAccountId: string | null;
+  treasuryAccountId: string | null;
+  advancesAccountId: string | null;
+  loansAccountId: string | null;
+  socialInsuranceAccountId: string | null;
+  taxAuthorityAccountId: string | null;
+}
+
+interface MappingValidation {
+  isValid: boolean;
+  missingAccounts: string[];
+}
 export default function ComprehensivePayrollPage() {
-  const { t, dir } = useI18n();
+  const { dir } = useI18n();
   const confirmAction = useConfirm();
   const { success: toastSuccess, error: toastError } = useToast();
   const [isPending, startTransition] = useTransition();
@@ -44,12 +237,12 @@ export default function ComprehensivePayrollPage() {
   // ─────────────────────────────────────────────
   // 1. PAYROLL RUNS STATE
   // ─────────────────────────────────────────────
-  const [runs, setRuns] = useState<any[]>([]);
+  const [runs, setRuns] = useState<PayrollRun[]>([]);
   const [loadingRuns, setLoadingRuns] = useState(true);
   const [runsPage, setRunsPage] = useState(1);
   const PAGE_SIZE = 10;
 
-  const [selectedRunDetails, setSelectedRunDetails] = useState<any | null>(null);
+  const [selectedRunDetails, setSelectedRunDetails] = useState<PayrollRunDetail | null>(null);
   const [showCalcModal, setShowCalcModal] = useState(false);
   const [calcMonth, setCalcMonth] = useState<number>(new Date().getMonth() + 1);
   const [calcYear, setCalcYear] = useState<number>(new Date().getFullYear());
@@ -57,8 +250,8 @@ export default function ComprehensivePayrollPage() {
   // ─────────────────────────────────────────────
   // 2. ADVANCES & LOANS STATE
   // ─────────────────────────────────────────────
-  const [advances, setAdvances] = useState<any[]>([]);
-  const [loans, setLoans] = useState<any[]>([]);
+  const [advances, setAdvances] = useState<Advance[]>([]);
+  const [loans, setLoans] = useState<Loan[]>([]);
   const [loadingLoans, setLoadingLoans] = useState(false);
   const [loansSubTab, setLoansSubTab] = useState<"advances" | "loans">("advances");
 
@@ -76,7 +269,7 @@ export default function ComprehensivePayrollPage() {
   const [loanStartDate, setLoanStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [loanReason, setLoanReason] = useState("");
 
-  const [selectedLoanForInstallments, setSelectedLoanForInstallments] = useState<any | null>(null);
+  const [selectedLoanForInstallments, setSelectedLoanForInstallments] = useState<Loan | null>(null);
   const [showPostponeModal, setShowPostponeModal] = useState(false);
   const [postponeInstallmentId, setPostponeInstallmentId] = useState<string | null>(null);
   const [postponeReason, setPostponeReason] = useState("");
@@ -84,16 +277,18 @@ export default function ComprehensivePayrollPage() {
   // ─────────────────────────────────────────────
   // 3. BONUSES & PENALTIES STATE
   // ─────────────────────────────────────────────
-  const [bonuses, setBonuses] = useState<any[]>([]);
-  const [penalties, setPenalties] = useState<any[]>([]);
+  const [bonuses, setBonuses] = useState<Bonus[]>([]);
+  const [penalties, setPenalties] = useState<Penalty[]>([]);
   const [loadingBonuses, setLoadingBonuses] = useState(false);
   const [bonusesSubTab, setBonusesSubTab] = useState<"bonuses" | "penalties">("bonuses");
 
   const [showBonusModal, setShowBonusModal] = useState(false);
   const [bonusEmployeeId, setBonusEmployeeId] = useState("");
   const [bonusTitle, setBonusTitle] = useState("");
-  const [bonusType, setBonusType] = useState("PERFORMANCE");
-  const [bonusCalcType, setBonusCalcType] = useState<"FIXED_AMOUNT" | "PERCENTAGE_OF_BASIC">("FIXED_AMOUNT");
+  // The bonus/penalty form has no control for these, so they are fixed rather
+  // than state the user can never change.
+  const bonusType = "PERFORMANCE";
+  const [bonusCalcType, setBonusCalcType] = useState<BonusCalcType>("FIXED_AMOUNT");
   const [bonusPercentage, setBonusPercentage] = useState("");
   const [bonusAmount, setBonusAmount] = useState("");
   const [bonusMonth, setBonusMonth] = useState<number>(new Date().getMonth() + 1);
@@ -103,8 +298,8 @@ export default function ComprehensivePayrollPage() {
   const [showPenaltyModal, setShowPenaltyModal] = useState(false);
   const [penaltyEmployeeId, setPenaltyEmployeeId] = useState("");
   const [penaltyTitle, setPenaltyTitle] = useState("");
-  const [penaltyType, setPenaltyType] = useState("ADMINISTRATIVE");
-  const [penaltyCalcType, setPenaltyCalcType] = useState<"FIXED_AMOUNT" | "DAILY_RATE">("DAILY_RATE");
+  const penaltyType = "ADMINISTRATIVE";
+  const [penaltyCalcType, setPenaltyCalcType] = useState<PenaltyCalcType>("DAILY_RATE");
   const [penaltyDays, setPenaltyDays] = useState("1");
   const [penaltyAmount, setPenaltyAmount] = useState("");
   const [penaltyMonth, setPenaltyMonth] = useState<number>(new Date().getMonth() + 1);
@@ -114,28 +309,24 @@ export default function ComprehensivePayrollPage() {
   // ─────────────────────────────────────────────
   // 4. SETTINGS & ACCOUNTS STATE
   // ─────────────────────────────────────────────
-  const [settings, setSettings] = useState<any | null>(null);
-  const [accounts, setAccounts] = useState<any[]>([]);
-  const [mappingValidation, setMappingValidation] = useState<any | null>(null);
+  const [settings, setSettings] = useState<HrSettings | null>(null);
+  const [accounts, setAccounts] = useState<AccountRef[]>([]);
+  const [mappingValidation, setMappingValidation] = useState<MappingValidation | null>(null);
   const [loadingSettings, setLoadingSettings] = useState(false);
   const [savingSettings, setSavingSettings] = useState(false);
 
   // Common: Employees for Dropdowns
-  const [employees, setEmployees] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
 
   // ─────────────────────────────────────────────
   // DATA FETCHING
   // ─────────────────────────────────────────────
-  const fetchEmployees = async () => {
+  // `raiseSpinner` is false for the initial load: `loadingRuns` already starts
+  // true, and raising it from inside the mount effect would be a synchronous
+  // setState there. Later loads go through `reloadRuns`.
+  const fetchRuns = async (raiseSpinner = true) => {
     try {
-      const res = await fetch("/api/hr/employees");
-      if (res.ok) setEmployees(await res.json());
-    } catch {}
-  };
-
-  const fetchRuns = async () => {
-    try {
-      setLoadingRuns(true);
+      if (raiseSpinner) setLoadingRuns(true);
       const res = await fetch("/api/hr/payroll");
       if (res.ok) setRuns(await res.json());
     } catch {
@@ -144,6 +335,9 @@ export default function ComprehensivePayrollPage() {
       setLoadingRuns(false);
     }
   };
+
+  // Refetches behind the spinner, after a mutation or a tab switch.
+  const reloadRuns = () => fetchRuns(true);
 
   const fetchLoansAndAdvances = async () => {
     try {
@@ -194,17 +388,34 @@ export default function ComprehensivePayrollPage() {
     }
   };
 
-  useEffect(() => {
-    fetchEmployees();
-    fetchRuns();
-  }, []);
+  // Switching tabs is a user action, so it loads that tab's data directly rather
+  // than through an effect that would mirror the click back into state.
+  const switchTab = (tab: typeof activeTab) => {
+    setActiveTab(tab);
+    if (tab === "runs") void reloadRuns();
+    if (tab === "loans") void fetchLoansAndAdvances();
+    if (tab === "bonuses") void fetchBonusesAndPenalties();
+    if (tab === "settings") void fetchSettings();
+  };
 
+  // The requests are issued inline and their results applied in `.then`
+  // callbacks. Calling the fetchers themselves from the effect body is a
+  // synchronous setState (the `setState`-in-effect rule); in a promise chain
+  // every state change happens in a callback instead, so the first paint is
+  // not followed by a cascading render.
   useEffect(() => {
-    if (activeTab === "runs") fetchRuns();
-    if (activeTab === "loans") fetchLoansAndAdvances();
-    if (activeTab === "bonuses") fetchBonusesAndPenalties();
-    if (activeTab === "settings") fetchSettings();
-  }, [activeTab]);
+    Promise.all([fetch("/api/hr/employees"), fetch("/api/hr/payroll")])
+      .then(async ([empRes, runRes]) => {
+        if (empRes.ok) setEmployees(await empRes.json());
+        if (runRes.ok) setRuns(await runRes.json());
+      })
+      .catch(() => {
+        toastError("فشل تحميل بيانات الرواتب");
+      })
+      .finally(() => {
+        setLoadingRuns(false);
+      });
+  }, [toastError]);
 
   // ─────────────────────────────────────────────
   // RUNS ACTIONS
@@ -229,8 +440,8 @@ export default function ComprehensivePayrollPage() {
         toastSuccess("تم احتساب مسير الرواتب بنجاح");
         setShowCalcModal(false);
         fetchRuns();
-      } catch (err: any) {
-        toastError(err.message);
+      } catch (err) {
+        toastError(errorMessage(err, "حدث خطأ غير متوقع"));
       }
     });
   };
@@ -253,8 +464,8 @@ export default function ComprehensivePayrollPage() {
 
       toastSuccess("تم اعتماد كشف الرواتب بنجاح");
       fetchRuns();
-    } catch (err: any) {
-      toastError(err.message);
+    } catch (err) {
+      toastError(errorMessage(err, "حدث خطأ غير متوقع"));
     }
   };
 
@@ -276,8 +487,8 @@ export default function ComprehensivePayrollPage() {
 
       toastSuccess("تم قفل وصرف كشف الرواتب وتوليد القيد المحاسبي بنجاح!");
       fetchRuns();
-    } catch (err: any) {
-      toastError(err.message);
+    } catch (err) {
+      toastError(errorMessage(err, "حدث خطأ غير متوقع"));
     }
   };
 
@@ -320,8 +531,8 @@ export default function ComprehensivePayrollPage() {
       setAdvAmount("");
       setAdvReason("");
       fetchLoansAndAdvances();
-    } catch (err: any) {
-      toastError(err.message);
+    } catch (err) {
+      toastError(errorMessage(err, "حدث خطأ غير متوقع"));
     }
   };
 
@@ -344,8 +555,8 @@ export default function ComprehensivePayrollPage() {
 
       toastSuccess(`تم ${actionLabel} السلفة بنجاح`);
       fetchLoansAndAdvances();
-    } catch (err: any) {
-      toastError(err.message);
+    } catch (err) {
+      toastError(errorMessage(err, "حدث خطأ غير متوقع"));
     }
   };
 
@@ -371,8 +582,8 @@ export default function ComprehensivePayrollPage() {
       setLoanAmount("");
       setLoanReason("");
       fetchLoansAndAdvances();
-    } catch (err: any) {
-      toastError(err.message);
+    } catch (err) {
+      toastError(errorMessage(err, "حدث خطأ غير متوقع"));
     }
   };
 
@@ -395,8 +606,8 @@ export default function ComprehensivePayrollPage() {
 
       toastSuccess(`تم ${actionLabel} القرض بنجاح`);
       fetchLoansAndAdvances();
-    } catch (err: any) {
-      toastError(err.message);
+    } catch (err) {
+      toastError(errorMessage(err, "حدث خطأ غير متوقع"));
     }
   };
 
@@ -423,12 +634,12 @@ export default function ComprehensivePayrollPage() {
       fetchLoansAndAdvances();
       if (selectedLoanForInstallments) {
         // Refresh open loan modal
-        const refreshedLoans = await (await fetch("/api/hr/loans")).json();
-        const updatedLoan = refreshedLoans.find((l: any) => l.id === selectedLoanForInstallments.id);
+        const refreshedLoans: Loan[] = await (await fetch("/api/hr/loans")).json();
+        const updatedLoan = refreshedLoans.find((l) => l.id === selectedLoanForInstallments.id);
         if (updatedLoan) setSelectedLoanForInstallments(updatedLoan);
       }
-    } catch (err: any) {
-      toastError(err.message);
+    } catch (err) {
+      toastError(errorMessage(err, "حدث خطأ غير متوقع"));
     }
   };
 
@@ -454,12 +665,12 @@ export default function ComprehensivePayrollPage() {
       toastSuccess("تم سداد القسط بنجاح");
       fetchLoansAndAdvances();
       if (selectedLoanForInstallments) {
-        const refreshedLoans = await (await fetch("/api/hr/loans")).json();
-        const updatedLoan = refreshedLoans.find((l: any) => l.id === selectedLoanForInstallments.id);
+        const refreshedLoans: Loan[] = await (await fetch("/api/hr/loans")).json();
+        const updatedLoan = refreshedLoans.find((l) => l.id === selectedLoanForInstallments.id);
         if (updatedLoan) setSelectedLoanForInstallments(updatedLoan);
       }
-    } catch (err: any) {
-      toastError(err.message);
+    } catch (err) {
+      toastError(errorMessage(err, "حدث خطأ غير متوقع"));
     }
   };
 
@@ -493,8 +704,8 @@ export default function ComprehensivePayrollPage() {
       setBonusAmount("");
       setBonusPercentage("");
       fetchBonusesAndPenalties();
-    } catch (err: any) {
-      toastError(err.message);
+    } catch (err) {
+      toastError(errorMessage(err, "حدث خطأ غير متوقع"));
     }
   };
 
@@ -517,8 +728,8 @@ export default function ComprehensivePayrollPage() {
 
       toastSuccess(`تم ${actionLabel} المكافأة بنجاح`);
       fetchBonusesAndPenalties();
-    } catch (err: any) {
-      toastError(err.message);
+    } catch (err) {
+      toastError(errorMessage(err, "حدث خطأ غير متوقع"));
     }
   };
 
@@ -549,8 +760,8 @@ export default function ComprehensivePayrollPage() {
       setPenaltyAmount("");
       setPenaltyReason("");
       fetchBonusesAndPenalties();
-    } catch (err: any) {
-      toastError(err.message);
+    } catch (err) {
+      toastError(errorMessage(err, "حدث خطأ غير متوقع"));
     }
   };
 
@@ -573,8 +784,8 @@ export default function ComprehensivePayrollPage() {
 
       toastSuccess(`تم ${actionLabel} الجزاء بنجاح`);
       fetchBonusesAndPenalties();
-    } catch (err: any) {
-      toastError(err.message);
+    } catch (err) {
+      toastError(errorMessage(err, "حدث خطأ غير متوقع"));
     }
   };
 
@@ -597,8 +808,8 @@ export default function ComprehensivePayrollPage() {
 
       toastSuccess("تم تحديث سياسات وإعدادات الـ HR والربط المحاسبي بنجاح");
       fetchSettings();
-    } catch (err: any) {
-      toastError(err.message);
+    } catch (err) {
+      toastError(errorMessage(err, "حدث خطأ غير متوقع"));
     } finally {
       setSavingSettings(false);
     }
@@ -621,7 +832,7 @@ export default function ComprehensivePayrollPage() {
         {/* Subtabs Switcher */}
         <div className="flex bg-gray-100 p-1.5 rounded-xl gap-1 text-sm font-medium w-full sm:w-auto overflow-x-auto">
           <button
-            onClick={() => setActiveTab("runs")}
+            onClick={() => switchTab("runs")}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all whitespace-nowrap ${
               activeTab === "runs"
                 ? "bg-white text-blue-700 shadow-sm font-semibold"
@@ -632,7 +843,7 @@ export default function ComprehensivePayrollPage() {
             مسيرات الرواتب
           </button>
           <button
-            onClick={() => setActiveTab("loans")}
+            onClick={() => switchTab("loans")}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all whitespace-nowrap ${
               activeTab === "loans"
                 ? "bg-white text-blue-700 shadow-sm font-semibold"
@@ -643,7 +854,7 @@ export default function ComprehensivePayrollPage() {
             السلف والقروض
           </button>
           <button
-            onClick={() => setActiveTab("bonuses")}
+            onClick={() => switchTab("bonuses")}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all whitespace-nowrap ${
               activeTab === "bonuses"
                 ? "bg-white text-blue-700 shadow-sm font-semibold"
@@ -654,7 +865,7 @@ export default function ComprehensivePayrollPage() {
             الحوافز والجزاءات
           </button>
           <button
-            onClick={() => setActiveTab("settings")}
+            onClick={() => switchTab("settings")}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all whitespace-nowrap ${
               activeTab === "settings"
                 ? "bg-white text-blue-700 shadow-sm font-semibold"
@@ -717,7 +928,7 @@ export default function ComprehensivePayrollPage() {
                   {runs.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="p-8 text-center text-gray-500">
-                        لم يتم احتساب أي مسيرات رواتب حتى الآن. اضغط "احتساب مسير جديد" للبدء.
+                        لم يتم احتساب أي مسيرات رواتب حتى الآن. اضغط &quot;احتساب مسير جديد&quot; للبدء.
                       </td>
                     </tr>
                   ) : (
@@ -944,12 +1155,12 @@ export default function ComprehensivePayrollPage() {
                   {loans.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="p-8 text-center text-gray-500">
-                        لا توجد قروض مسجلة حالياً. اضغط "إنشاء قرض مجدول" لجدولة أول قرض.
+                        لا توجد قروض مسجلة حالياً. اضغط &quot;إنشاء قرض مجدول&quot; لجدولة أول قرض.
                       </td>
                     </tr>
                   ) : (
                     loans.map((loan) => {
-                      const paidCount = loan.Installments?.filter((i: any) => i.status === "PAID").length || 0;
+                      const paidCount = loan.Installments?.filter((i) => i.status === "PAID").length || 0;
                       return (
                         <tr key={loan.id} className="hover:bg-gray-50">
                           <td className="p-3 font-bold text-gray-900">
@@ -1657,7 +1868,7 @@ export default function ComprehensivePayrollPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {selectedRunDetails.Items?.map((item: any) => (
+                  {selectedRunDetails.Items?.map((item) => (
                     <tr key={item.id} className="hover:bg-gray-50">
                       <td className="p-2 font-bold text-gray-900">
                         {item.Employee?.fullNameAr || item.Employee?.fullName}
@@ -1915,7 +2126,7 @@ export default function ComprehensivePayrollPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {selectedLoanForInstallments.Installments?.map((inst: any) => (
+                {selectedLoanForInstallments.Installments?.map((inst) => (
                   <tr key={inst.id} className="hover:bg-gray-50">
                     <td className="p-2 font-bold text-gray-700">قسط {inst.installmentNo}</td>
                     <td className="p-2">{new Date(inst.dueDate).toLocaleDateString()}</td>
@@ -2048,7 +2259,7 @@ export default function ComprehensivePayrollPage() {
               <label className="block text-xs font-semibold text-gray-700 mb-1">طريقة الاحتساب *</label>
               <select
                 value={bonusCalcType}
-                onChange={(e) => setBonusCalcType(e.target.value as any)}
+                onChange={(e) => setBonusCalcType(e.target.value as BonusCalcType)}
                 className="w-full border rounded-lg p-2.5 text-sm"
               >
                 <option value="FIXED_AMOUNT">مبلغ مالي ثابت (ج.م)</option>
@@ -2184,7 +2395,7 @@ export default function ComprehensivePayrollPage() {
               <label className="block text-xs font-semibold text-gray-700 mb-1">طريقة الخصم *</label>
               <select
                 value={penaltyCalcType}
-                onChange={(e) => setPenaltyCalcType(e.target.value as any)}
+                onChange={(e) => setPenaltyCalcType(e.target.value as PenaltyCalcType)}
                 className="w-full border rounded-lg p-2.5 text-sm"
               >
                 <option value="DAILY_RATE">خصم عدد أيام عمل</option>

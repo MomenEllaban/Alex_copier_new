@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
+import { Prisma } from "@/generated/prisma/client";
+import { enumFilter } from "@/lib/enum-filter";
+import { EMPLOYMENT_STATUSES } from "@/lib/hr/hr-statuses";
 
 export async function GET(request: Request) {
   try {
@@ -16,9 +19,9 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search") || "";
     const departmentId = searchParams.get("departmentId");
-    const status = searchParams.get("status");
+    const status = enumFilter(searchParams.get("status"), EMPLOYMENT_STATUSES);
 
-    const where: any = {};
+    const where: Prisma.EmployeeWhereInput = {};
     if (actor.companyId) where.companyId = actor.companyId;
     if (departmentId) where.departmentId = departmentId;
     if (status) where.status = status;

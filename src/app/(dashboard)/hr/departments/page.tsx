@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import { useI18n } from "@/i18n/context";
+import { errorMessage } from "@/lib/prisma-errors";
 import PrinterLoader from "@/components/PrinterLoader";
 import Pagination from "@/components/Pagination";
 import FormModal from "@/components/FormModal";
@@ -47,27 +48,37 @@ export default function DepartmentsPage() {
   const [deptForm, setDeptForm] = useState({ code: "", name: "", nameAr: "" });
   const [jobForm, setJobForm] = useState({ code: "", title: "", titleAr: "", departmentId: "" });
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [dRes, jRes] = await Promise.all([
-        fetch("/api/hr/departments"),
-        fetch("/api/hr/job-titles"),
-      ]);
+  // A promise chain rather than `async`/`await`: the mount effect calls this, and
+  // a direct async call from an effect body is a second synchronous render pass
+  // (the `setState`-in-effect rule). Here every state change lands in a
+  // callback, so the first paint happens once.
+  //
+  // `loading` already starts true, so only the reload path flips it on; doing it
+  // here instead would set state synchronously inside the mount effect.
+  const fetchData = useCallback(() => {
+    Promise.all([fetch("/api/hr/departments"), fetch("/api/hr/job-titles")])
+      .then(async ([dRes, jRes]) => {
+        if (dRes.ok) setDepartments(await dRes.json());
+        if (jRes.ok) setJobTitles(await jRes.json());
+      })
+      .catch((err: unknown) => {
+        console.error("Error loading departments & job titles:", err);
+        toastError(t("hr.departments.toastLoadFailed"));
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [t, toastError]);
 
-      if (dRes.ok) setDepartments(await dRes.json());
-      if (jRes.ok) setJobTitles(await jRes.json());
-    } catch (err) {
-      console.error("Error loading departments & job titles:", err);
-      toastError(t("hr.departments.toastLoadFailed"));
-    } finally {
-      setLoading(false);
-    }
+  // Refetches after a save, where the list should show its spinner again.
+  const reload = () => {
+    setLoading(true);
+    fetchData();
   };
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   const handleCreateDept = (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,9 +103,9 @@ export default function DepartmentsPage() {
         toastSuccess(t("hr.departments.toastDeptAdded"));
         setShowDeptModal(false);
         setDeptForm({ code: "", name: "", nameAr: "" });
-        fetchData();
-      } catch (err: any) {
-        setFormError(err.message || t("hr.departments.toastAddError"));
+        reload();
+      } catch (err) {
+        setFormError(errorMessage(err, t("hr.departments.toastAddError")));
       }
     });
   };
@@ -122,9 +133,9 @@ export default function DepartmentsPage() {
         toastSuccess(t("hr.departments.toastJobAdded"));
         setShowJobModal(false);
         setJobForm({ code: "", title: "", titleAr: "", departmentId: "" });
-        fetchData();
-      } catch (err: any) {
-        setFormError(err.message || t("hr.departments.toastAddError"));
+        reload();
+      } catch (err) {
+        setFormError(errorMessage(err, t("hr.departments.toastAddError")));
       }
     });
   };

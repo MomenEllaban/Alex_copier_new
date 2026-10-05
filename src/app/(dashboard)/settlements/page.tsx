@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { AddFormBoundary, useAutoAddForm } from "@/hooks/useAutoAddForm";
 import { useSession } from "next-auth/react";
 import { useI18n } from "@/i18n/context";
@@ -37,7 +37,6 @@ interface Settlement {
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = { CASH: "كاش", CREDIT: "أجل", INSTALLMENT: "أجل", MIXED: "أجل" };
 const STATUS_LABELS: Record<string, string> = { INITIAL: "أولي", VERIFIED: "تم التحقق" };
-const DIRECTION_LABELS: Record<string, string> = { ADDITION: "إضافة (+)", SUBTRACTION: "طرح (−)" };
 
 const CAN_VERIFY_ROLES = ["GENERAL_MANAGER", "ACCOUNTANT", "COMPANY_MANAGER"];
 
@@ -85,10 +84,7 @@ export default function SettlementsPage() {
   useEffect(() => { fetchData(); }, []);
   const { refresh, refreshing } = useAutoRefresh(fetchData, ["settlements", "customers", "engineers", "sales"]);
 
-  const autoAddOpen = useAutoAddForm();
-  useEffect(() => {
-    if (autoAddOpen) setShowForm(true);
-  }, [autoAddOpen]);
+  useAutoAddForm(() => setShowForm(true));
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,21 +136,19 @@ export default function SettlementsPage() {
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  const stats = useMemo(() => {
-    const netAmount = filtered.reduce(
-      (sum, s) => sum + (s.direction === "SUBTRACTION" ? -1 : 1) * (s.amount || 0),
-      0
-    );
-    const collected = filtered
-      .filter((s) => s.status === "VERIFIED")
-      .reduce((sum, s) => sum + (s.amount || 0), 0);
-    return {
-      total: filtered.length,
-      netAmount,
-      pending: filtered.filter((s) => s.status === "INITIAL").length,
-      collected,
-    };
-  }, [filtered]);
+  const netAmount = filtered.reduce(
+    (sum, s) => sum + (s.direction === "SUBTRACTION" ? -1 : 1) * (s.amount || 0),
+    0
+  );
+  const collected = filtered
+    .filter((s) => s.status === "VERIFIED")
+    .reduce((sum, s) => sum + (s.amount || 0), 0);
+  const stats = {
+    total: filtered.length,
+    netAmount,
+    pending: filtered.filter((s) => s.status === "INITIAL").length,
+    collected,
+  };
 
   const exportSettlements = () => ({
     headers: [

@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useTransition, useMemo, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useCallback, useEffect, useState, useTransition, useMemo, Suspense } from "react";
 import { useI18n } from "@/i18n/context";
+import { errorMessage } from "@/lib/prisma-errors";
+import { useAutoAddForm } from "@/hooks/useAutoAddForm";
 import PrinterLoader from "@/components/PrinterLoader";
 import SearchInput from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
@@ -42,8 +43,6 @@ interface Employee {
 
 function EmployeesContent() {
   const { t, dir, locale } = useI18n();
-  const searchParams = useSearchParams();
-  const router = useRouter();
   const confirmAction = useConfirm();
   const { success: toastSuccess, error: toastError } = useToast();
 
@@ -81,36 +80,43 @@ function EmployeesContent() {
     notes: "",
   });
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
-      const [empRes, jtRes, compRes] = await Promise.all([
-        fetch("/api/hr/employees"),
-        fetch("/api/hr/job-titles"),
-        fetch("/api/companies"),
-      ]);
+  // A promise chain rather than `async`/`await`: the mount effect calls this, and
+  // a direct async call from an effect body is a second synchronous render pass
+  // (the `setState`-in-effect rule). Here every state change lands in a
+  // callback, so the first paint happens once.
+  //
+  // `loading` already starts true, so only the reload path flips it on; doing it
+  // here instead would set state synchronously inside the mount effect.
+  const fetchData = useCallback(() => {
+    Promise.all([
+      fetch("/api/hr/employees"),
+      fetch("/api/hr/job-titles"),
+      fetch("/api/companies"),
+    ])
+      .then(async ([empRes, jtRes, compRes]) => {
+        if (empRes.ok) setEmployees(await empRes.json());
+        if (jtRes.ok) setJobTitles(await jtRes.json());
+        if (compRes.ok) setCompanies(await compRes.json());
+      })
+      .catch((err: unknown) => {
+        console.error("Error loading employees:", err);
+        toastError(t("hr.employees.toastLoadFailed"));
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [t, toastError]);
 
-      if (empRes.ok) setEmployees(await empRes.json());
-      if (jtRes.ok) setJobTitles(await jtRes.json());
-      if (compRes.ok) setCompanies(await compRes.json());
-    } catch (err) {
-      console.error("Error loading employees:", err);
-      toastError(t("hr.employees.toastLoadFailed"));
-    } finally {
-      setLoading(false);
-    }
+  // Refetches after a save or a delete, where the list should show its spinner
+  // again.
+  const reload = () => {
+    setLoading(true);
+    fetchData();
   };
 
   useEffect(() => {
     fetchData();
-  }, []);
-
-  // Handle ?add=1 from query param
-  useEffect(() => {
-    if (searchParams.get("add") === "1") {
-      openAddModal();
-    }
-  }, [searchParams]);
+  }, [fetchData]);
 
   const openAddModal = () => {
     setEditingEmployee(null);
@@ -135,6 +141,9 @@ function EmployeesContent() {
     });
     setShowModal(true);
   };
+
+  // Opens the form when the page is entered with ?add=1.
+  useAutoAddForm(openAddModal);
 
   const openEditModal = (emp: Employee) => {
     setEditingEmployee(emp);
@@ -191,9 +200,9 @@ function EmployeesContent() {
 
         toastSuccess(editingEmployee ? t("hr.employees.toastUpdated") : t("hr.employees.toastAdded"));
         setShowModal(false);
-        fetchData();
-      } catch (err: any) {
-        setFormError(err.message || t("hr.employees.toastUnexpected"));
+        reload();
+      } catch (err) {
+        setFormError(errorMessage(err, t("hr.employees.toastUnexpected")));
       }
     });
   };
@@ -209,9 +218,9 @@ function EmployeesContent() {
       const res = await fetch(`/api/hr/employees/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error(t("hr.employees.toastDeleteFailed"));
       toastSuccess(t("hr.employees.toastDeleted"));
-      fetchData();
-    } catch (err: any) {
-      toastError(err.message || t("hr.employees.toastDeleteError"));
+      reload();
+    } catch (err) {
+      toastError(errorMessage(err, t("hr.employees.toastDeleteError")));
     }
   };
 

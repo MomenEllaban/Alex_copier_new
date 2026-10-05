@@ -49,7 +49,7 @@ const emptyForm = {
 };
 
 export default function SettingsPage() {
-  const { t, locale, dir } = useI18n();
+  const { t, dir } = useI18n();
   const confirmAction = useConfirm();
 
   const { data: session } = useSession();

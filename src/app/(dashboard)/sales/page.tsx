@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { AddFormBoundary, useAutoAddForm } from "@/hooks/useAutoAddForm";
 import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
@@ -54,15 +54,21 @@ interface Customer { id: string; name: string; remainingDebt?: number; }
 interface Company { id: string; name: string; }
 interface Engineer { id: string; name: string; email?: string | null; }
 interface SalesCategory { id: string; name: string; companyId: string; }
-interface Product { id: string; name: string; companyId?: string; retailPrice?: number | null; wholesalePrice?: number | null; purchasePrice?: number | null; pricingTiers?: Record<string, number | null> | null; }
-interface SalesItem { id: string; productId: string; quantity: number; unitPrice: number; discount: number; product: Product; }
+interface Product { id: string; name: string; companyId?: string; retailPrice?: number | null; wholesalePrice?: number | null; purchasePrice?: number | null; pricingTiers?: Record<string, number | null> | null; description?: string | null; brand?: string | null; condition?: string | null; }
+/**
+ * A machine the customer handed over as part of the deal. It becomes a real
+ * Product row, so the API returns it under `tradeInProduct` on the invoice
+ * line — spelling that out here is what keeps the trade-in columns typed
+ * instead of reached for through `any`.
+ */
+interface SalesItem { id: string; productId: string; quantity: number; unitPrice: number; discount: number; product: Product; tradeInProduct?: Product | null; tradeInValue: number; }
 interface SalesOrder {
   id: string; companyId: string; customerId: string; engineerId?: string | null; orderType: string; status: string; total: number; discount: number;
   discountType: string; taxRate: number; paymentMethod: string; paymentStatus: string;
   notes: string | null; orderDate: string; createdAt: string; customer: Customer; company?: Company; engineer?: Engineer | null; items: SalesItem[];
   salesCategory?: SalesCategory | null;
   categoryId?: string | null;
-  tradeInTotal?: number; isIntercompany?: boolean; paidAmount?: number;
+  tradeInTotal: number; isIntercompany?: boolean; paidAmount?: number;
   interCompanyFromCompanyId?: string; interCompanyToCompanyId?: string; interCompanyTotal?: number;
 }
 interface ItemRow { 
@@ -144,7 +150,7 @@ const orderKind = (order: SalesOrder): OrderKind => {
   if (order.isIntercompany) return "inter";
   const hasTradeIn =
     Number(order.tradeInTotal) > 0 ||
-    (Array.isArray(order.items) && order.items.some((item) => (item as any).tradeInProduct));
+    (Array.isArray(order.items) && order.items.some((item) => Boolean(item.tradeInProduct)));
   if (hasTradeIn) return "tradeIn";
   return "regular";
 };
@@ -225,12 +231,10 @@ export default function SalesPage() {
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  const stats = useMemo(() => {
-    const totalValue = filtered.reduce((sum, o) => sum + (o.total || 0), 0);
-    const paid = filtered.filter((o) => o.paymentStatus === "PAID").length;
-    const unpaid = filtered.filter((o) => o.paymentStatus !== "PAID").length;
-    return { totalOrders: filtered.length, totalValue, paid, unpaid };
-  }, [filtered]);
+  const totalValue = filtered.reduce((sum, o) => sum + (o.total || 0), 0);
+  const paid = filtered.filter((o) => o.paymentStatus === "PAID").length;
+  const unpaid = filtered.filter((o) => o.paymentStatus !== "PAID").length;
+  const stats = { totalOrders: filtered.length, totalValue, paid, unpaid };
 
   const companyStock = (companyId: string) => inventoryByProductPerCompany[companyId] ?? {};
   const companyProducts = (companyId: string) => {
@@ -308,10 +312,7 @@ export default function SalesPage() {
 
   useEffect(() => { fetchData(); }, []);
 
-  const autoAddOpen = useAutoAddForm();
-  useEffect(() => {
-    if (autoAddOpen) setShowForm(true);
-  }, [autoAddOpen]);
+  useAutoAddForm(() => setShowForm(true));
 
   const updateItemRow = (index: number, next: Partial<ItemRow>) => {
     setItemRows((current) => current.map((row, rowIndex) => {
@@ -366,7 +367,7 @@ export default function SalesPage() {
   const openEdit = (order: SalesOrder) => {
     const kind = orderKind(order);
     if (kind === "inter") {
-      const inter = order as any;
+      const inter = order;
       const fromCompanyId = inter.interCompanyFromCompanyId || "";
       const toCompanyId = inter.interCompanyToCompanyId || order.companyId;
       const tier = COMPANY_ORDER_TIERS[toCompanyId] || "sectori";
@@ -389,7 +390,7 @@ export default function SalesPage() {
       });
       setInterRows(
         order.items.length > 0
-          ? order.items.map((item: any) => {
+          ? order.items.map((item) => {
               const product = products.find((p) => p.id === item.productId);
               const internalPrice = product ? getProductTierPrice(product, tier) : 0;
               const costPrice = product?.purchasePrice || 0;
@@ -425,7 +426,7 @@ export default function SalesPage() {
     });
     setItemRows(
       order.items.length > 0
-        ? order.items.map((item: any) => ({
+        ? order.items.map((item) => ({
             productId: item.productId,
             quantity: String(item.quantity),
             unitPrice: String(item.unitPrice),
@@ -439,14 +440,14 @@ export default function SalesPage() {
       order.companyId
     );
     if (hasTradeIn) {
-      const tradeInItem = order.items.find((item: any) => item.tradeInProduct);
+      const tradeInItem = order.items.find((item) => item.tradeInProduct);
       if (tradeInItem) {
-        const tip = (tradeInItem as any).tradeInProduct;
+        const tip = tradeInItem.tradeInProduct;
         setTradeInProduct({
           name: tip?.name || "",
           brand: tip?.brand || "",
           condition: tip?.condition || "",
-          value: String((tradeInItem as any).tradeInValue || ""),
+          value: String(tradeInItem.tradeInValue || ""),
           serialNumber: tip?.description?.replace("S/N: ", "") || "",
         });
       }
@@ -1072,7 +1073,7 @@ export default function SalesPage() {
         <FormModal open={!!viewingOrder} onClose={() => setViewingOrder(null)} title="تفاصيل فاتورة بيع" wide>
           <div className="space-y-4">
             {(() => {
-              const isTradeIn = (viewingOrder as any).tradeInTotal > 0 || viewingOrder.items.some((it: any) => it.tradeInProduct);
+              const isTradeIn = viewingOrder.tradeInTotal > 0 || viewingOrder.items.some((it) => it.tradeInProduct);
               const kind = viewingOrder.orderType === "SPARE_PART_SALE" ? "spare" : isTradeIn ? "tradein" : "machine";
               const cfg: Record<string, string> = { machine: "border-blue-200 bg-blue-50 text-blue-700", spare: "border-green-200 bg-green-50 text-green-700", tradein: "border-amber-200 bg-amber-50 text-amber-700" };
               const label = isTradeIn ? "فاتورة استبدال" : (ORDER_TYPE_LABELS[viewingOrder.orderType] || viewingOrder.orderType);
@@ -1116,13 +1117,13 @@ export default function SalesPage() {
                       <tr key={item.id}>
                         <td className="px-3 py-2 text-sm">
                           {item.product.name}
-                          {(item as any).tradeInProduct && (
+                          {item.tradeInProduct && (
                             <div className="mt-2 rounded-lg border border-dashed border-amber-300 bg-amber-50 p-2">
                               <div className="flex items-center gap-2 text-xs text-amber-700">
                                 <span>🔄 استبدال:</span>
-                                <span className="font-medium">{(item as any).tradeInProduct.name}</span>
-                                {(item as any).tradeInProduct.brand && <span>({(item as any).tradeInProduct.brand})</span>}
-                                {(item as any).tradeInValue > 0 && <span className="font-bold">- {(item as any).tradeInValue.toLocaleString()} ج.م</span>}
+                                <span className="font-medium">{item.tradeInProduct.name}</span>
+                                {item.tradeInProduct.brand && <span>({item.tradeInProduct.brand})</span>}
+                                {item.tradeInValue > 0 && <span className="font-bold">- {item.tradeInValue.toLocaleString()} ج.م</span>}
                               </div>
                             </div>
                           )}
@@ -1214,8 +1215,8 @@ export default function SalesPage() {
                       </td>
                       <td className="px-4 py-3 text-sm">
                         {order.total.toLocaleString()}
-                        {(order as any).tradeInTotal > 0 && (
-                          <div className="text-xs text-amber-600">🔄 -{(order as any).tradeInTotal.toLocaleString()} ج.م</div>
+                        {order.tradeInTotal > 0 && (
+                          <div className="text-xs text-amber-600">🔄 -{order.tradeInTotal.toLocaleString()} ج.م</div>
                         )}
                       </td>
                       <td className="px-4 py-3 text-sm">{order.discount > 0 ? `${order.discount} (${order.discountType === "FIXED" ? t("sales.discountTypeFixed") : t("sales.discountTypePercent")})` : "-"}</td>
@@ -1265,13 +1266,13 @@ export default function SalesPage() {
                                 <tr key={item.id}>
                                   <td className="px-3 py-2 text-sm">
                                     {item.product.name}
-                                    {(item as any).tradeInProduct && (
+                                    {item.tradeInProduct && (
                                       <div className="mt-1 rounded-lg border border-dashed border-amber-300 bg-amber-50 p-1.5">
                                         <div className="flex items-center gap-1 text-[11px] text-amber-700">
                                           <span>🔄 استبدال:</span>
-                                          <span className="font-medium">{(item as any).tradeInProduct.name}</span>
-                                          {(item as any).tradeInProduct.brand && <span>({(item as any).tradeInProduct.brand})</span>}
-                                          {(item as any).tradeInValue > 0 && <span className="font-bold">- {(item as any).tradeInValue.toLocaleString()}</span>}
+                                          <span className="font-medium">{item.tradeInProduct.name}</span>
+                                          {item.tradeInProduct.brand && <span>({item.tradeInProduct.brand})</span>}
+                                          {item.tradeInValue > 0 && <span className="font-bold">- {item.tradeInValue.toLocaleString()}</span>}
                                         </div>
                                       </div>
                                     )}

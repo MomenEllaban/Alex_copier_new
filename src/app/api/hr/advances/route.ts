@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@/generated/prisma/client";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
+import { errorMessage } from "@/lib/prisma-errors";
+import { enumFilter } from "@/lib/enum-filter";
+import { ADVANCE_STATUSES } from "@/lib/hr/hr-statuses";
 import {
   requestAdvance,
   approveAdvance,
@@ -21,11 +25,11 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const employeeId = searchParams.get("employeeId");
-    const status = searchParams.get("status");
+    const status = enumFilter(searchParams.get("status"), ADVANCE_STATUSES);
     const month = searchParams.get("month");
     const year = searchParams.get("year");
 
-    const where: any = {};
+    const where: Prisma.EmployeeAdvanceWhereInput = {};
     if (actor.companyId) where.companyId = actor.companyId;
     if (employeeId) where.employeeId = employeeId;
     if (status) where.status = status;
@@ -50,9 +54,9 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json(advances);
-  } catch (error: any) {
+  } catch (error) {
     console.error("GET /api/hr/advances error:", error);
-    return NextResponse.json({ error: error.message || "Failed to fetch advances" }, { status: 500 });
+    return NextResponse.json({ error: errorMessage(error, "Failed to fetch advances") }, { status: 500 });
   }
 }
 
@@ -80,13 +84,13 @@ export async function POST(request: Request) {
       amount: parseFloat(body.amount),
       deductMonth: parseInt(body.deductMonth),
       deductYear: parseInt(body.deductYear),
-      reason: body.reason || "طلب سلفة موظف",
+      reason: body.reason || "Ø·Ù„Ø¨ Ø³Ù„ÙØ© Ù…ÙˆØ¸Ù",
     });
 
     return NextResponse.json(advance, { status: 201 });
-  } catch (error: any) {
+  } catch (error) {
     console.error("POST /api/hr/advances error:", error);
-    return NextResponse.json({ error: error.message || "Failed to request advance" }, { status: 400 });
+    return NextResponse.json({ error: errorMessage(error, "Failed to request advance") }, { status: 400 });
   }
 }
 
@@ -120,8 +124,8 @@ export async function PATCH(request: Request) {
     }
 
     return NextResponse.json(result);
-  } catch (error: any) {
+  } catch (error) {
     console.error("PATCH /api/hr/advances error:", error);
-    return NextResponse.json({ error: error.message || "Failed to update advance" }, { status: 400 });
+    return NextResponse.json({ error: errorMessage(error, "Failed to update advance") }, { status: 400 });
   }
 }
