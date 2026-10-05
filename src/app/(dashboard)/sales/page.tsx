@@ -277,15 +277,15 @@ export default function SalesPage() {
         fetch("/api/sales"),
         fetch("/api/customers"),
         fetch("/api/companies"),
-        fetch("/api/engineers"),
+        fetch("/api/engineers/options"),
         fetch("/api/inventory?catalog=true"),
         fetch("/api/sales-categories")
       ]);
       const ordersData = await sRes.json();
       const customersData = await cRes.json();
       const companiesData = await coRes.json();
-      const engineersData = await eRes.json();
-      const inventoryData = await inventoryRes.json();
+      const engineersData = await eRes.json().catch(() => []);
+      const inventoryData = await inventoryRes.json().catch(() => ({}));
       const catsData = await catRes.json().catch(() => []);
       setOrders(Array.isArray(ordersData) ? ordersData : []);
       setCustomers(Array.isArray(customersData) ? customersData : []);

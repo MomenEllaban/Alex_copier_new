@@ -150,7 +150,7 @@ export default function CopierTestsPage() {
   // One-shot lookups for the filters + the form.
   useEffect(() => {
     let alive = true;
-    Promise.all([fetch("/api/customers"), fetch("/api/engineers")])
+    Promise.all([fetch("/api/customers"), fetch("/api/engineers/options")])
       .then(async ([cRes, eRes]) => {
         const [cData, eData] = await Promise.all([cRes.json().catch(() => null), eRes.json().catch(() => null)]);
         if (!alive) return;

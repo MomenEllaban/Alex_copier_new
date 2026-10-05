@@ -130,7 +130,7 @@ export default function CustomersPage() {
       const [customersRes, companiesRes, engineersRes] = await Promise.all([
         fetch("/api/customers"),
         fetch("/api/companies"),
-        fetch("/api/engineers"),
+        fetch("/api/engineers/options"),
       ]);
       const [customersData, companiesData, engineersData] = await Promise.all([
         customersRes.json(),

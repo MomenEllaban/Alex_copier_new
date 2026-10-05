@@ -135,13 +135,13 @@ export default function PurchasesPage() {
 
   const fetchData = async () => {
     try {
-      const [pRes, sRes, prRes, coRes, cuRes, enRes] = await Promise.all([fetch("/api/purchases"), fetch("/api/suppliers"), fetch("/api/inventory"), fetch("/api/companies"), fetch("/api/customers"), fetch("/api/engineers")]);
-      const pData = await pRes.json();
+      const [pRes, sRes, prRes, coRes, cuRes, enRes] = await Promise.all([fetch("/api/purchases"), fetch("/api/suppliers"), fetch("/api/inventory"), fetch("/api/companies"), fetch("/api/customers"), fetch("/api/engineers/options")]);
+      const pData = await pRes.json().catch(() => []);
       setOrders(Array.isArray(pData) ? pData : pData.orders || []);
       setIntercompanyInvoices(Array.isArray(pData) ? [] : pData.intercompany || []);
-      setSuppliers(await sRes.json());
-      setCompanies(await coRes.json());
-      const en = await enRes.json();
+      setSuppliers(await sRes.json().catch(() => []));
+      setCompanies(await coRes.json().catch(() => []));
+      const en = await enRes.json().catch(() => []);
       setEngineers(Array.isArray(en) ? en.map((e: { id: string; name: string }) => ({ id: e.id, name: e.name })) : []);
       const cu = await cuRes.json();
       setCustomers(Array.isArray(cu) ? cu.map((c: { id: string; name: string }) => ({ id: c.id, name: c.name })) : []);

@@ -98,7 +98,7 @@ export default function CopierTests({ customerId, machines = [], defaultEngineer
     try {
       const [testsRes, engineersRes] = await Promise.all([
         fetch(`/api/customers/${customerId}/tests`),
-        fetch("/api/engineers"),
+        fetch("/api/engineers/options"),
       ]);
       if (testsRes.ok) {
         const data = await testsRes.json();

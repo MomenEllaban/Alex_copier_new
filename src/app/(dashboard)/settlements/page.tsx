@@ -67,7 +67,7 @@ export default function SettlementsPage() {
 
   const fetchData = async () => {
     try {
-      const [sRes, coRes, cuRes, eRes] = await Promise.all([fetch("/api/settlements"), fetch("/api/companies"), fetch("/api/customers"), fetch("/api/engineers")]);
+      const [sRes, coRes, cuRes, eRes] = await Promise.all([fetch("/api/settlements"), fetch("/api/companies"), fetch("/api/customers"), fetch("/api/engineers/options")]);
       const sData = await sRes.json().catch(() => []);
       const cData = await coRes.json().catch(() => []);
       const cuData = await cuRes.json().catch(() => []);
