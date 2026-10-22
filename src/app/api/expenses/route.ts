@@ -52,9 +52,12 @@ export async function POST(request: Request) {
     }
 
     if (categoryId) {
-      const cat = await prisma.expenseCategory.findUnique({ where: { id: categoryId }, select: { id: true } });
+      const cat = await prisma.expenseCategory.findUnique({ where: { id: categoryId }, select: { id: true, companyId: true } });
       if (!cat) {
         return NextResponse.json({ error: "الفئة غير موجودة", code: "CATEGORY_NOT_FOUND" }, { status: 400 });
+      }
+      if (cat.companyId !== companyId) {
+        return NextResponse.json({ error: "الفئة لا تخص الشركة المختارة", code: "CATEGORY_COMPANY_MISMATCH" }, { status: 400 });
       }
     }
 

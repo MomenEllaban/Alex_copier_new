@@ -32,6 +32,16 @@ export async function PUT(
       return NextResponse.json({ error: "الشركة غير موجودة", code: "COMPANY_NOT_FOUND" }, { status: 400 });
     }
 
+    if (categoryId) {
+      const cat = await prisma.expenseCategory.findUnique({ where: { id: categoryId }, select: { id: true, companyId: true } });
+      if (!cat) {
+        return NextResponse.json({ error: "الفئة غير موجودة", code: "CATEGORY_NOT_FOUND" }, { status: 400 });
+      }
+      if (cat.companyId !== companyId) {
+        return NextResponse.json({ error: "الفئة لا تخص الشركة المختارة", code: "CATEGORY_COMPANY_MISMATCH" }, { status: 400 });
+      }
+    }
+
     const expense = await prisma.expense.update({
       where: { id },
       data: { companyId, categoryId: categoryId || null, category, description, amount },

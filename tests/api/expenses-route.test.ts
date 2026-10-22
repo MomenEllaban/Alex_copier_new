@@ -12,6 +12,9 @@ const mocks = vi.hoisted(() => ({
     company: {
       findUnique: vi.fn(),
     },
+    expenseCategory: {
+      findUnique: vi.fn(),
+    },
   },
   requireAuth: vi.fn(),
   requirePageAccess: vi.fn(),
@@ -162,6 +165,29 @@ describe("POST /api/expenses", () => {
     expect(arg.data.amount).toBe(2500);
     expect((await res.json()).payer.name).toBe("مدير");
   });
+
+  it("accepts a category that belongs to the expense company", async () => {
+    mocks.prisma.expenseCategory.findUnique.mockResolvedValue({ id: "cat_1", companyId: "cmp_1" });
+    const res = await POST(postRequest({ ...validPayload, categoryId: "cat_1" }));
+    expect(res.status).toBe(201);
+    expect(mocks.prisma.expense.create.mock.calls[0][0].data.categoryId).toBe("cat_1");
+  });
+
+  it("rejects a category that belongs to another company", async () => {
+    mocks.prisma.expenseCategory.findUnique.mockResolvedValue({ id: "cat_1", companyId: "cmp_other" });
+    const res = await POST(postRequest({ ...validPayload, categoryId: "cat_1" }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).code).toBe("CATEGORY_COMPANY_MISMATCH");
+    expect(mocks.prisma.expense.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects an unknown categoryId", async () => {
+    mocks.prisma.expenseCategory.findUnique.mockResolvedValue(null);
+    const res = await POST(postRequest({ ...validPayload, categoryId: "cat_missing" }));
+    expect(res.status).toBe(400);
+    expect((await res.json()).code).toBe("CATEGORY_NOT_FOUND");
+    expect(mocks.prisma.expense.create).not.toHaveBeenCalled();
+  });
 });
 
 describe("PUT /api/expenses/[id]", () => {
@@ -231,6 +257,14 @@ describe("PUT /api/expenses/[id]", () => {
     mocks.prisma.expense.update.mockRejectedValue({ code: "P2025" });
     const res = await callPut("exp_1", validPayload);
     expect(res.status).toBe(404);
+  });
+
+  it("rejects a category that belongs to another company", async () => {
+    mocks.prisma.expenseCategory.findUnique.mockResolvedValue({ id: "cat_1", companyId: "cmp_other" });
+    const res = await callPut("exp_1", { ...validPayload, categoryId: "cat_1" });
+    expect(res.status).toBe(400);
+    expect((await res.json()).code).toBe("CATEGORY_COMPANY_MISMATCH");
+    expect(mocks.prisma.expense.update).not.toHaveBeenCalled();
   });
 });
 

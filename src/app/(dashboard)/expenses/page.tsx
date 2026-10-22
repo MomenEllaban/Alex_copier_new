@@ -12,6 +12,7 @@ import ExportButton from "@/components/ExportButton";
 import PrinterLoader from "@/components/PrinterLoader";
 import { AddFormBoundary } from "@/hooks/useAutoAddForm";
 import FormModal from "@/components/FormModal";
+import SelectWithAdd from "@/components/SelectWithAdd";
 import StatsCards from "@/components/StatsCards";
 import SubmitButton from "@/components/SubmitButton";
 import { DateTimeCell } from "@/components/DateTimeCell";
@@ -276,7 +277,28 @@ export default function FinancePage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">{t("finance.selectCompany")}</label><select value={form.companyId} onChange={(e) => setForm({ ...form, companyId: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" required><option value="">{t("finance.selectCompany")}</option>{companies.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}</select></div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">{t("finance.category")}</label><select value={form.categoryId} onChange={(e) => selectCategory(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" required><option value="">{t("finance.selectCategory")}</option>{formCategoryOptions.map((opt) => (<option key={opt.value} value={opt.value}>{opt.label}</option>))}</select></div>
+              <SelectWithAdd
+                label={t("finance.category")}
+                value={form.categoryId}
+                onChange={selectCategory}
+                options={formCategoryOptions}
+                placeholder={t("finance.selectCategory")}
+                required
+                quickAddTitle={t("finance.addCategory")}
+                quickAddFields={[
+                  { key: "name", label: t("finance.categoryName"), required: true },
+                  { key: "companyId", label: t("common.company"), type: "select", required: true, options: companies.map((c) => ({ value: c.id, label: c.name })) },
+                ]}
+                quickAddDefaults={{ companyId: form.companyId }}
+                quickAddEndpoint="/api/expense-categories"
+                onQuickAddSuccess={(item) => {
+                  const companyId = item.companyId || form.companyId;
+                  setCategories((prev) => [...prev, { id: item.id, name: item.name, companyId }]);
+                  setForm((f) => ({ ...f, companyId, categoryId: item.id, category: item.name }));
+                  toastSuccess(t("common.addedSuccessfully"));
+                  notifyDataChanged(["expenses"]);
+                }}
+              />
               <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">{t("common.amount")}</label><input type="number" placeholder={t("common.amount")} value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" required min="0" step="0.01" /></div>
             </div>
             <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">{t("common.description")}</label><textarea placeholder={t("common.description")} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" rows={2} required /></div>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import SearchableSelect from "./SearchableSelect";
+import { useI18n } from "@/i18n/context";
 
 export interface QuickAddField {
   key: string;
@@ -26,7 +27,7 @@ interface SelectWithAddProps {
   quickAddFields: QuickAddField[];
   quickAddEndpoint: string;
   quickAddDefaults?: Record<string, string>;
-  onQuickAddSuccess?: (newItem: { id: string; name: string }) => void;
+  onQuickAddSuccess?: (newItem: { id: string; name: string; companyId?: string }) => void;
   selectClassName?: string;
 }
 
@@ -50,6 +51,7 @@ export default function SelectWithAdd({
   const [quickAddForm, setQuickAddForm] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const { t } = useI18n();
 
   const inputClass =
     selectClassName ||
@@ -86,15 +88,19 @@ export default function SelectWithAdd({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || "حدث خطأ");
+        setError(data.error || t("common.error"));
         return;
       }
       if (onQuickAddSuccess) {
-        onQuickAddSuccess({ id: data.id, name: data.name || quickAddForm.name || "" });
+        onQuickAddSuccess({
+          id: data.id,
+          name: data.name || quickAddForm.name || "",
+          companyId: typeof data.companyId === "string" ? data.companyId : undefined,
+        });
       }
       setShowQuickAdd(false);
     } catch {
-      setError("حدث خطأ في الاتصال");
+      setError(t("common.connectionError"));
     } finally {
       setSaving(false);
     }
@@ -111,7 +117,7 @@ export default function SelectWithAdd({
           value={value}
           onChange={onChange}
           options={options}
-          placeholder={placeholder || `اختر ${label}`}
+          placeholder={placeholder || `${t("common.select")} ${label}`}
           disabled={disabled}
           required={required}
           className="flex-1"
@@ -120,7 +126,7 @@ export default function SelectWithAdd({
           type="button"
           onClick={openQuickAdd}
           disabled={disabled}
-          title={`إضافة ${label}`}
+          title={`${t("common.add")} ${label}`}
           className="inline-flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-600 transition hover:bg-blue-100 disabled:opacity-50"
         >
           <Plus size={18} />
@@ -159,7 +165,7 @@ export default function SelectWithAdd({
                         setQuickAddForm({ ...quickAddForm, [field.key]: v })
                       }
                       options={field.options}
-                      placeholder={field.placeholder || `اختر ${field.label}`}
+                      placeholder={field.placeholder || `${t("common.select")} ${field.label}`}
                       required={field.required}
                     />
                   ) : (
@@ -193,7 +199,7 @@ export default function SelectWithAdd({
                   onClick={() => setShowQuickAdd(false)}
                   className="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
                 >
-                  إلغاء
+                  {t("common.cancel")}
                 </button>
                 <button
                   type="button"
@@ -201,7 +207,7 @@ export default function SelectWithAdd({
                   disabled={saving}
                   className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50"
                 >
-                  {saving ? "جاري الحفظ..." : "إضافة"}
+                  {saving ? t("common.saving") : t("common.add")}
                 </button>
               </div>
             </div>
