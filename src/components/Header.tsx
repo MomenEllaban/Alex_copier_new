@@ -5,8 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/i18n/context";
 import { useSession, signOut } from "next-auth/react";
-import { Bell, User, ChevronDown, LogOut, Globe, CheckCheck, Volume2, VolumeX } from "lucide-react";
+import { Bell, User, ChevronDown, LogOut, Globe, CheckCheck, Volume2, VolumeX, Menu } from "lucide-react";
 import { roleLabel } from "@/lib/permissions";
+import { useSidebar } from "@/components/SidebarContext";
 
 type NotificationItem = {
   id: string;
@@ -59,6 +60,8 @@ export default function Header({ title }: { title: string }) {
   const notificationRef = useRef<HTMLDivElement>(null);
   const hasInitialLoadRef = useRef(false);
   const previousUnreadCountRef = useRef(0);
+
+  const { openMobile } = useSidebar();
 
   const userName = session?.user?.name || t("common.defaultUserName");
   const userRole = session?.user?.role;
@@ -202,14 +205,23 @@ export default function Header({ title }: { title: string }) {
   return (
     <header
       className="flex items-center justify-between gap-2 border-b border-gray-200 bg-white py-3
-        pr-16 pl-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:py-4 sm:pl-6 lg:px-6"
+        pr-3 pl-3 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:py-4 sm:pl-4 lg:px-6"
     >
-      <h2
-        className="truncate text-[length:var(--text-subtitle)] font-semibold text-gray-800
-          dark:text-slate-100"
-      >
-        {title}
-      </h2>
+      <div className="flex min-w-0 items-center gap-2">
+        <button
+          onClick={openMobile}
+          aria-label={t("common.openMenu")}
+          className="flex min-h-10 min-w-10 items-center justify-center rounded-lg text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white lg:hidden"
+        >
+          <Menu size={20} />
+        </button>
+        <h2
+          className="truncate text-[length:var(--text-subtitle)] font-semibold text-gray-800
+            dark:text-slate-100"
+        >
+          {title}
+        </h2>
+      </div>
 
       <div className="flex items-center gap-1 sm:gap-3 shrink-0">
         <button

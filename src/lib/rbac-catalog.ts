@@ -168,6 +168,7 @@ export const NO_ACTION_ROUTES = [
   "roles",
   "roles/[id]",
   "roles/[id]/permissions",
+  "roles/company-access",
 ];
 
 /**

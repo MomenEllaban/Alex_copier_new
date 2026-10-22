@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireAction } from "@/lib/auth-helpers";
+import { canActOnCompany } from "@/lib/company-scope";
 
 export async function PUT(
   request: Request,
@@ -17,6 +18,9 @@ export async function PUT(
     }
 
     const { id } = await params;
+    if (!canActOnCompany(actor, id)) {
+      return NextResponse.json({ error: "هذا الإجراء مخصص لشركتك فقط", code: "CROSS_COMPANY" }, { status: 403 });
+    }
     const body = await request.json();
     const existing = await prisma.company.findUnique({ where: { id } });
     if (!existing) {
@@ -72,6 +76,9 @@ export async function DELETE(
     }
 
     const { id } = await params;
+    if (!canActOnCompany(actor, id)) {
+      return NextResponse.json({ error: "هذا الإجراء مخصص لشركتك فقط", code: "CROSS_COMPANY" }, { status: 403 });
+    }
     const existing = await prisma.company.findUnique({ where: { id } });
     if (!existing) {
       return NextResponse.json({ error: "الشركة غير موجودة", code: "COMPANY_NOT_FOUND" }, { status: 404 });

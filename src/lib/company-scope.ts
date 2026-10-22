@@ -1,21 +1,32 @@
 /**
  * Company scoping rules shared by every module that acts on a company.
  *
- * A user is either tied to one company (`User.companyId`) — the accountant of
- * "شركة القطاعي" for example — or is a group-level user who works across the
- * group: the general manager, or an HR manager with no home company.
+ * Two different questions live here, and they must not be mixed:
  *
- * The rule is the same one the notifications already use
- * (`src/lib/notification-recipients.ts`): a user may act on a company when
- * they have no company of their own, when they are the general manager, or
- * when it is their own company. Expressing it once here keeps every route
- * from inventing its own version of "whose company is this?".
+ * 1. Operational scope — who may post into a company, read its HR, edit its
+ *    record. A user tied to a company (`User.companyId`) works in that company
+ *    only; the general manager, or a user with no home company, works across
+ *    the group. See `canActOnCompany` / `companyScopeFilter` /
+ *    `resolveCompanyId`.
+ *
+ * 2. Report scope — which companies' financial reports a user may open. This is
+ *    the per-user grant edited on the roles screen (`UserCompanyAccess`). The
+ *    rows are authoritative when present, so the general manager can also take
+ *    a company away; with no rows the user falls back to their home company, or
+ *    to every company when they have none. See `reportCompanyIds` /
+ *    `canViewCompanyReport`.
+ *
+ * Keeping them apart matters: widening the report scope must never widen the
+ * operational one, or an accountant granted a second company's report would
+ * also start seeing that company's payroll and employees.
  */
 
 export interface CompanyScopedActor {
   id: string;
   role?: string | null;
   companyId?: string | null;
+  /** Explicit report grants (`UserCompanyAccess`) — empty when none are set. */
+  companyAccessIds?: string[] | null;
 }
 
 /** Roles that work across every company of the group. */
@@ -65,4 +76,40 @@ export function resolveCompanyId(
 ): string | null {
   if (!isGroupLevelActor(actor)) return actor.companyId ?? requested ?? null;
   return requested || actor.companyId || null;
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Financial-report scope (per-user grants)
+// ───────────────────────────────────────────────────────────────────────────
+
+/**
+ * The companies whose financial reports this actor may open.
+ *
+ * `null` means "every company". Order of precedence:
+ *   1. the general manager — always every company;
+ *   2. explicit grants — exactly those companies (a grant can restrict);
+ *   3. no grants but a home company — that company;
+ *   4. no grants and no home company — every company (group-level user,
+ *      the same access they had before grants existed).
+ */
+export function reportCompanyIds(actor: CompanyScopedActor): string[] | null {
+  if (GROUP_LEVEL_ROLES.includes(actor.role ?? "")) return null;
+
+  const granted = (actor.companyAccessIds ?? []).filter(
+    (id): id is string => typeof id === "string" && id.length > 0
+  );
+  if (granted.length > 0) return Array.from(new Set(granted));
+
+  if (!actor.companyId) return null;
+  return [actor.companyId];
+}
+
+/** True when the actor may open this company's financial report. */
+export function canViewCompanyReport(
+  actor: CompanyScopedActor,
+  companyId: string | null | undefined
+): boolean {
+  if (!companyId) return false;
+  const ids = reportCompanyIds(actor);
+  return ids === null || ids.includes(companyId);
 }

@@ -50,7 +50,7 @@ const ROUTES: Array<[string, () => Promise<Response>, string[]]> = [
     async () => (await import("@/app/api/investors/[id]/route")).GET(new Request("http://x"), { params: Promise.resolve({ id: "i1" }) }),
     ["investors"],
   ],
-  ["companies", async () => (await import("@/app/api/companies/route")).GET(), ["companies"]],
+  ["companies", async () => (await import("@/app/api/companies/route")).GET(new Request("http://x")), ["companies"]],
   ["customers", async () => (await import("@/app/api/customers/route")).GET(), ["customers"]],
   [
     "customers/[id]",

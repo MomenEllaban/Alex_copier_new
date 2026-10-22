@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
+import { reportCompanyIds } from "@/lib/company-scope";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const user = await requirePageAccess("companies");
     if (!user) {
@@ -13,7 +14,22 @@ export async function GET() {
       );
     }
 
+    // The plain list is what every picker uses (sales, purchases, expenses,
+    // warehouses...). It carries no financial figures, so a user restricted to
+    // one company's report cannot read the other companies' totals by calling
+    // the API directly.
+    const { searchParams } = new URL(request.url);
+    if (searchParams.get("withFinance") !== "1") {
+      const companies = await prisma.company.findMany({ orderBy: { createdAt: "desc" } });
+      return NextResponse.json(companies);
+    }
+
+    // The companies screen shows each company's financial summary, so it asks
+    // for `withFinance=1`. Only the companies in the actor's report scope are
+    // returned: a user granted one company does not even see the other cards.
+    const allowed = reportCompanyIds(user);
     const companies = await prisma.company.findMany({
+      where: allowed === null ? undefined : { id: { in: allowed } },
       orderBy: { createdAt: "desc" },
     });
 

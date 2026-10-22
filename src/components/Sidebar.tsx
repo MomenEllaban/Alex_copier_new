@@ -6,6 +6,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useI18n } from "@/i18n/context";
 import { signOut } from "next-auth/react";
 import { usePermissions } from "@/components/PermissionsProvider";
+import { useSidebar } from "@/components/SidebarContext";
 import type { Page } from "@/lib/permissions";
 import {
   LayoutDashboard,
@@ -161,7 +162,7 @@ const navGroups: NavGroup[] = [
 
 export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const { mobileOpen, setMobileOpen } = useSidebar();
   const [isDesktop, setIsDesktop] = useState(false);
   /** Which collapsible groups the user has opened; unset means the group default. */
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
@@ -358,17 +359,8 @@ export default function Sidebar() {
 
   return (
     <>
-      <button
-        onClick={() => setMobileOpen(true)}
-        aria-label="Open navigation menu"
-        aria-expanded={mobileOpen}
-        className={`fixed end-3 top-3 z-50 flex min-h-11 min-w-11 items-center justify-center rounded-xl bg-gray-900 p-2 text-white shadow-lg transition-opacity lg:hidden ${mobileOpen ? "pointer-events-none opacity-0" : "opacity-100"}`}
-      >
-        <Menu size={24} />
-      </button>
-
       <div
-        className={`fixed inset-0 z-40 bg-black/50 transition-opacity duration-300 lg:hidden ${
+        className={`fixed inset-0 z-40 bg-black/60 transition-opacity duration-300 lg:hidden ${
           mobileOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
         }`}
         onClick={() => setMobileOpen(false)}
@@ -377,9 +369,9 @@ export default function Sidebar() {
 
       <aside
         id="dashboard-sidebar"
-        className={`fixed top-0 end-0 z-50 h-screen w-[min(20rem,86vw)] bg-gray-900 shadow-2xl transition-transform duration-300 ease-out will-change-transform lg:sticky lg:z-40 lg:top-0 lg:h-screen lg:shadow-none lg:transition-all ${
+        className={`fixed top-0 start-0 z-50 h-screen w-[min(20rem,86vw)] bg-gray-900 shadow-2xl transition-transform duration-300 ease-out will-change-transform lg:sticky lg:z-40 lg:top-0 lg:h-screen lg:shadow-none lg:transition-all ${
           collapsed ? "lg:w-16" : "lg:w-64"
-        } ${mobileOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"}`}
+        } ${mobileOpen ? "translate-x-0" : "-translate-x-full rtl:translate-x-full lg:translate-x-0 rtl:lg:translate-x-0"}`}
       >
         {sidebarContent}
       </aside>

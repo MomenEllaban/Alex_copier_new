@@ -76,7 +76,7 @@ export default function CompaniesPage() {
   const confirmAction = useConfirm();
 
   const fetchCompanies = () => {
-    fetch("/api/companies")
+    fetch("/api/companies?withFinance=1")
       .then((r) => r.json())
       .then((data) => {
         setCompanies(Array.isArray(data) ? data : []);

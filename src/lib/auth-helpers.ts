@@ -15,6 +15,7 @@ export interface AuthedUser {
   role?: string;
   roleId?: string | null;
   companyId?: string | null;
+  companyAccessIds?: string[] | null;
   [key: string]: unknown;
 }
 
@@ -35,7 +36,14 @@ export async function requireAuth(): Promise<AuthedUser | null> {
 
   const dbUser = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, isActive: true, role: true, roleId: true, companyId: true },
+    select: {
+      id: true,
+      isActive: true,
+      role: true,
+      roleId: true,
+      companyId: true,
+      companyAccess: { select: { companyId: true } },
+    },
   });
   if (!dbUser || !dbUser.isActive) return null;
 
@@ -45,6 +53,7 @@ export async function requireAuth(): Promise<AuthedUser | null> {
     role: dbUser.role,
     roleId: dbUser.roleId,
     companyId: dbUser.companyId,
+    companyAccessIds: (dbUser.companyAccess ?? []).map((c) => c.companyId),
   };
 }
 

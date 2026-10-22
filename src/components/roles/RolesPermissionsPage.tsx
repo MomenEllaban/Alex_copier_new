@@ -13,6 +13,7 @@ import PermissionsMatrix, {
 import { apiErrorMessage } from "@/lib/api-client";
 import { roleLabel } from "@/lib/permissions";
 import PrinterLoader from "@/components/PrinterLoader";
+import CompanyAccessSection from "@/components/roles/CompanyAccessSection";
 
 interface Diff {
   pagesOn: number;
@@ -327,6 +328,10 @@ export default function RolesPermissionsPage() {
         </>
       )}
 
+      {/* Per-user financial-report access, shown below the role matrix so the
+          most common task — toggling a role — stays at the top. */}
+      <CompanyAccessSection />
+
       {/* Role administration sits below the matrix so the most-used screen —
           adjusting permissions — stays at the top. */}
       <details className="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
@@ -334,7 +339,6 @@ export default function RolesPermissionsPage() {
           className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm
             font-semibold text-slate-800 dark:text-slate-200"
         >
-          <ArrowRight size={15} className="text-slate-400 dark:text-slate-500 rtl:rotate-180" />
           {t("roles.manageRoles")}
         </summary>
         <div className="border-t border-slate-100 p-4 dark:border-slate-800">

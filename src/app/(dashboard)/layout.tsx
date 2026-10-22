@@ -4,6 +4,7 @@ import Sidebar from "@/components/Sidebar";
 import Header from "@/components/Header";
 import UIProvider from "@/components/UIProvider";
 import { PermissionsProvider } from "@/components/PermissionsProvider";
+import { SidebarProvider } from "@/components/SidebarContext";
 import { useI18n } from "@/i18n/context";
 import { usePathname } from "next/navigation";
 
@@ -64,13 +65,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       dir={dir}
     >
       <PermissionsProvider>
-        <Sidebar />
-        <div className="flex min-w-0 flex-1 flex-col min-h-0">
-          <Header title={t(titleKey)} />
-          <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-5 lg:p-6">
-            <UIProvider>{children}</UIProvider>
-          </main>
-        </div>
+        <SidebarProvider>
+          <Sidebar />
+          <div className="flex min-w-0 flex-1 flex-col min-h-0">
+            <Header title={t(titleKey)} />
+            <main className="flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-5 lg:p-6">
+              <UIProvider>{children}</UIProvider>
+            </main>
+          </div>
+        </SidebarProvider>
       </PermissionsProvider>
     </div>
   );
