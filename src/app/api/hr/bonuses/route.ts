@@ -12,10 +12,11 @@ import { enumFilter } from "@/lib/enum-filter";
 import { ADVANCE_STATUSES } from "@/lib/hr/hr-statuses";
 import {
   employeeNotInCompanyResponse,
+  findEmployeeForActor,
   findEmployeeInCompany,
-  resolveCompanyId,
   scopedRecord,
 } from "@/lib/services/hr/company-scope";
+import { companyScopeFilter } from "@/lib/company-scope";
 
 export async function GET(request: Request) {
   try {
@@ -29,11 +30,10 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const companyId = resolveCompanyId(actor, searchParams.get("companyId"));
-    if (!companyId) return NextResponse.json({ error: "companyId required" }, { status: 400 });
+    const companyId = companyScopeFilter(actor, searchParams.get("companyId"));
 
     const employeeId = searchParams.get("employeeId") || undefined;
-    if (employeeId) {
+    if (employeeId && companyId) {
       const emp = await findEmployeeInCompany(employeeId, companyId);
       if (!emp) return employeeNotInCompanyResponse();
     }
@@ -61,14 +61,19 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const companyId = resolveCompanyId(actor, body.companyId);
 
-    if (!companyId || !body.employeeId || !body.title || !body.targetMonth || !body.targetYear) {
+    if (!body.employeeId || !body.title || !body.targetMonth || !body.targetYear) {
       return NextResponse.json({ error: "Missing required bonus fields" }, { status: 400 });
     }
 
-    const employee = await findEmployeeInCompany(body.employeeId, companyId);
+    // The bonus belongs to the employee, so the employee's company is the
+    // company it is booked in — whatever the body says.
+    const employee = await findEmployeeForActor(actor, body.employeeId);
     if (!employee) return employeeNotInCompanyResponse();
+    if (body.companyId && String(body.companyId) !== employee.companyId) {
+      return employeeNotInCompanyResponse();
+    }
+    const companyId = employee.companyId;
 
     const bonus = await createBonus(
       {

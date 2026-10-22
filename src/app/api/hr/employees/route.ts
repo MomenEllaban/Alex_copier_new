@@ -4,7 +4,7 @@ import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helper
 import { Prisma } from "@/generated/prisma/client";
 import { enumFilter } from "@/lib/enum-filter";
 import { EMPLOYMENT_STATUSES } from "@/lib/hr/hr-statuses";
-import { resolveCompanyId } from "@/lib/services/hr/company-scope";
+import { companyScopeFilter, resolveCompanyId } from "@/lib/company-scope";
 
 export async function GET(request: Request) {
   try {
@@ -23,7 +23,8 @@ export async function GET(request: Request) {
     const status = enumFilter(searchParams.get("status"), EMPLOYMENT_STATUSES);
 
     const where: Prisma.EmployeeWhereInput = {};
-    if (actor.companyId) where.companyId = actor.companyId;
+    const scopeCompanyId = companyScopeFilter(actor, searchParams.get("companyId"));
+    if (scopeCompanyId) where.companyId = scopeCompanyId;
     if (departmentId) where.departmentId = departmentId;
     if (status) where.status = status;
 

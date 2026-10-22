@@ -4,8 +4,9 @@ import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helper
 import { Prisma } from "@/generated/prisma/client";
 import {
   employeeNotInCompanyResponse,
-  findEmployeeInCompany,
+  findEmployeeForActor,
 } from "@/lib/services/hr/company-scope";
+import { companyScopeFilter } from "@/lib/company-scope";
 
 export async function GET(request: Request) {
   try {
@@ -29,7 +30,8 @@ export async function GET(request: Request) {
     // Built up in one object: `where.Employee` is a relation filter union, so
     // spreading it into a new literal would widen it out of the generated type.
     const employeeFilter: Prisma.EmployeeWhereInput = {};
-    if (actor.companyId) employeeFilter.companyId = actor.companyId;
+    const scopeCompanyId = companyScopeFilter(actor, searchParams.get("companyId"));
+    if (scopeCompanyId) employeeFilter.companyId = scopeCompanyId;
     if (departmentId) employeeFilter.departmentId = departmentId;
     if (employeeFilter.companyId || departmentId) where.Employee = employeeFilter;
     if (employeeId) where.employeeId = employeeId;
@@ -87,12 +89,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "employeeId and date are required" }, { status: 400 });
     }
 
-    // The attendance record belongs to an employee — it must be an employee of
-    // the company the request works on.
-    if (actor.companyId) {
-      const employee = await findEmployeeInCompany(employeeId, actor.companyId);
-      if (!employee) return employeeNotInCompanyResponse();
-    }
+    // The attendance record belongs to an employee — it must be an employee the
+    // actor may act for.
+    const employee = await findEmployeeForActor(actor, employeeId);
+    if (!employee) return employeeNotInCompanyResponse();
 
     const date = new Date(dateStr);
     date.setHours(0, 0, 0, 0);

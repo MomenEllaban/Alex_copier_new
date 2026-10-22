@@ -156,6 +156,25 @@ describe("GET /api/companies/[id]/report - HR section", () => {
     expect((await res.json()).code).toBe("CROSS_COMPANY");
   });
 
+  it("lets the general manager read any company's report", async () => {
+    // The general manager owns the group: a company of their own is only
+    // their home company, not a limit on where they may look.
+    mocks.requireAuth.mockResolvedValue({ id: "u1", role: "GENERAL_MANAGER", companyId: "c2" });
+
+    const res = await GET(req(), { params: Promise.resolve({ id: "c1" }) });
+
+    expect(res.status).toBe(200);
+    expect((await res.json()).company.id).toBe("c1");
+  });
+
+  it("lets a user read the report of their own company", async () => {
+    mocks.requireAuth.mockResolvedValue({ id: "u1", role: "ACCOUNTANT", companyId: "c1" });
+
+    const res = await GET(req(), { params: Promise.resolve({ id: "c1" }) });
+
+    expect(res.status).toBe(200);
+  });
+
   it("books the employer's payroll cost in the income statement", async () => {
     // 10,000 gross + 500 company insurance - 300 penalties - 200 absence - 100 late
     mocks.db.payrollRun.findMany.mockResolvedValue([

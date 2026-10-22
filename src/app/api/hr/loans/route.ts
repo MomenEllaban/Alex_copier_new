@@ -18,10 +18,11 @@ import { ADVANCE_STATUSES } from "@/lib/hr/hr-statuses";
 import {
   crossCompanyResponse,
   employeeNotInCompanyResponse,
+  findEmployeeForActor,
   findEmployeeInCompany,
-  resolveCompanyId,
   scopedRecord,
 } from "@/lib/services/hr/company-scope";
+import { companyScopeFilter } from "@/lib/company-scope";
 
 export async function GET(request: Request) {
   try {
@@ -39,9 +40,11 @@ export async function GET(request: Request) {
     const status = enumFilter(searchParams.get("status"), ADVANCE_STATUSES);
     const summaryOnly = searchParams.get("summaryOnly");
 
+    const scopeCompanyId = companyScopeFilter(actor, searchParams.get("companyId"));
+
     if (employeeId && summaryOnly === "true") {
-      if (actor.companyId) {
-        const emp = await findEmployeeInCompany(employeeId, actor.companyId);
+      if (scopeCompanyId) {
+        const emp = await findEmployeeInCompany(employeeId, scopeCompanyId);
         if (!emp) return employeeNotInCompanyResponse();
       }
       const summary = await getEmployeeLoanSummary(employeeId);
@@ -49,10 +52,10 @@ export async function GET(request: Request) {
     }
 
     const where: Prisma.EmployeeLoanWhereInput = {};
-    if (actor.companyId) where.companyId = actor.companyId;
+    if (scopeCompanyId) where.companyId = scopeCompanyId;
     if (employeeId) {
-      if (actor.companyId) {
-        const emp = await findEmployeeInCompany(employeeId, actor.companyId);
+      if (scopeCompanyId) {
+        const emp = await findEmployeeInCompany(employeeId, scopeCompanyId);
         if (!emp) return employeeNotInCompanyResponse();
       }
       where.employeeId = employeeId;
@@ -98,14 +101,19 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const companyId = resolveCompanyId(actor, body.companyId);
 
-    if (!companyId || !body.employeeId || !body.totalAmount || !body.installmentCount || !body.startDate) {
+    if (!body.employeeId || !body.totalAmount || !body.installmentCount || !body.startDate) {
       return NextResponse.json({ error: "Missing required loan fields" }, { status: 400 });
     }
 
-    const employee = await findEmployeeInCompany(body.employeeId, companyId);
+    // The loan belongs to the employee, so the employee's company is the
+    // company it is booked in — whatever the body says.
+    const employee = await findEmployeeForActor(actor, body.employeeId);
     if (!employee) return employeeNotInCompanyResponse();
+    if (body.companyId && String(body.companyId) !== employee.companyId) {
+      return employeeNotInCompanyResponse();
+    }
+    const companyId = employee.companyId;
 
     const loan = await createLoan(
       {

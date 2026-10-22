@@ -13,10 +13,11 @@ import { enumFilter } from "@/lib/enum-filter";
 import { ADVANCE_STATUSES } from "@/lib/hr/hr-statuses";
 import {
   employeeNotInCompanyResponse,
+  findEmployeeForActor,
   findEmployeeInCompany,
-  resolveCompanyId,
   scopedRecord,
 } from "@/lib/services/hr/company-scope";
+import { companyScopeFilter } from "@/lib/company-scope";
 
 export async function GET(request: Request) {
   try {
@@ -35,11 +36,12 @@ export async function GET(request: Request) {
     const month = searchParams.get("month");
     const year = searchParams.get("year");
 
+    const scopeCompanyId = companyScopeFilter(actor, searchParams.get("companyId"));
     const where: Prisma.EmployeeAdvanceWhereInput = {};
-    if (actor.companyId) where.companyId = actor.companyId;
+    if (scopeCompanyId) where.companyId = scopeCompanyId;
     if (employeeId) {
-      if (actor.companyId) {
-        const emp = await findEmployeeInCompany(employeeId, actor.companyId);
+      if (scopeCompanyId) {
+        const emp = await findEmployeeInCompany(employeeId, scopeCompanyId);
         if (!emp) return employeeNotInCompanyResponse();
       }
       where.employeeId = employeeId;
@@ -84,14 +86,19 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const companyId = resolveCompanyId(actor, body.companyId);
 
-    if (!companyId || !body.employeeId || !body.amount || !body.deductMonth || !body.deductYear) {
+    if (!body.employeeId || !body.amount || !body.deductMonth || !body.deductYear) {
       return NextResponse.json({ error: "Missing required advance fields" }, { status: 400 });
     }
 
-    const employee = await findEmployeeInCompany(body.employeeId, companyId);
+    // The advance belongs to the employee, so the employee's company is the
+    // company it is booked in — whatever the body says.
+    const employee = await findEmployeeForActor(actor, body.employeeId);
     if (!employee) return employeeNotInCompanyResponse();
+    if (body.companyId && String(body.companyId) !== employee.companyId) {
+      return employeeNotInCompanyResponse();
+    }
+    const companyId = employee.companyId;
 
     const advance = await requestAdvance({
       companyId,

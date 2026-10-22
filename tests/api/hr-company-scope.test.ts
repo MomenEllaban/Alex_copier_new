@@ -103,6 +103,7 @@ import * as bonuses from "@/app/api/hr/bonuses/route";
 import * as penalties from "@/app/api/hr/penalties/route";
 import * as loans from "@/app/api/hr/loans/route";
 import * as payroll from "@/app/api/hr/payroll/route";
+import * as employees from "@/app/api/hr/employees/route";
 import * as employeeById from "@/app/api/hr/employees/[id]/route";
 
 const POST = (body: unknown) =>
@@ -344,6 +345,43 @@ describe("HR API — company scoping", () => {
     expect(res.status).toBe(201);
     expect(mocks.requestAdvance).toHaveBeenCalledWith(
       expect.objectContaining({ companyId: "c9" }),
+    );
+  });
+
+  it("limits a list to the user's own company", async () => {
+    mocks.db.employee.findMany.mockResolvedValue([]);
+
+    await employees.GET(new Request("http://localhost/api/hr/employees"));
+
+    expect(mocks.db.employee.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ companyId: "c1" }) }),
+    );
+  });
+
+  it("lists every company for a group-level user", async () => {
+    const groupActor = { id: "u2", role: "GENERAL_MANAGER", companyId: "c1" };
+    mocks.requireAuth.mockResolvedValue(groupActor);
+    mocks.requirePageAccess.mockResolvedValue(groupActor);
+    mocks.db.employee.findMany.mockResolvedValue([]);
+
+    await employees.GET(new Request("http://localhost/api/hr/employees"));
+
+    const args = mocks.db.employee.findMany.mock.calls[0][0] as {
+      where: Record<string, unknown>;
+    };
+    expect(args.where.companyId).toBeUndefined();
+  });
+
+  it("limits a group-level user to the company they name", async () => {
+    const groupActor = { id: "u2", role: "GENERAL_MANAGER", companyId: "c1" };
+    mocks.requireAuth.mockResolvedValue(groupActor);
+    mocks.requirePageAccess.mockResolvedValue(groupActor);
+    mocks.db.employee.findMany.mockResolvedValue([]);
+
+    await employees.GET(new Request("http://localhost/api/hr/employees?companyId=c9"));
+
+    expect(mocks.db.employee.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ companyId: "c9" }) }),
     );
   });
 });

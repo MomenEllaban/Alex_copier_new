@@ -109,10 +109,10 @@ export async function rejectBonus(bonusId: string, rejectedBy: string, reason?: 
 }
 
 export async function getBonuses(
-  companyId: string,
+  companyId: string | null,
   filters: { employeeId?: string; month?: number; year?: number; status?: AdvanceStatus }
 ) {
-  const where: Prisma.EmployeeBonusWhereInput = { companyId };
+  const where: Prisma.EmployeeBonusWhereInput = companyId ? { companyId } : {};
   if (filters.employeeId) where.employeeId = filters.employeeId;
   if (filters.month) where.targetMonth = filters.month;
   if (filters.year) where.targetYear = filters.year;
@@ -206,10 +206,10 @@ export async function rejectPenalty(penaltyId: string, rejectedBy: string, reaso
 }
 
 export async function getPenalties(
-  companyId: string,
+  companyId: string | null,
   filters: { employeeId?: string; month?: number; year?: number; status?: AdvanceStatus }
 ) {
-  const where: Prisma.EmployeePenaltyWhereInput = { companyId };
+  const where: Prisma.EmployeePenaltyWhereInput = companyId ? { companyId } : {};
   if (filters.employeeId) where.employeeId = filters.employeeId;
   if (filters.month) where.targetMonth = filters.month;
   if (filters.year) where.targetYear = filters.year;

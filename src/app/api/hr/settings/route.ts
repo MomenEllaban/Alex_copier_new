@@ -7,6 +7,7 @@ import {
   validatePayrollAccountMapping,
 } from "@/lib/services/hr/hr-settings-service";
 import { errorMessage } from "@/lib/prisma-errors";
+import { resolveCompanyId } from "@/lib/company-scope";
 
 export async function GET(request: Request) {
   try {
@@ -20,7 +21,7 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const companyId = actor.companyId || searchParams.get("companyId");
+    const companyId = resolveCompanyId(actor, searchParams.get("companyId"));
 
     if (!companyId) {
       return NextResponse.json({ error: "companyId is required" }, { status: 400 });
@@ -59,7 +60,7 @@ export async function PUT(request: Request) {
     }
 
     const body = await request.json();
-    const companyId = actor.companyId || body.companyId;
+    const companyId = resolveCompanyId(actor, body.companyId);
 
     if (!companyId) {
       return NextResponse.json({ error: "companyId is required" }, { status: 400 });

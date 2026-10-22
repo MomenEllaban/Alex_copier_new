@@ -11,6 +11,7 @@ import {
 import { errorMessage } from "@/lib/prisma-errors";
 import { Prisma } from "@/generated/prisma/client";
 import { scopedRecord, crossCompanyResponse } from "@/lib/services/hr/company-scope";
+import { companyScopeFilter, resolveCompanyId } from "@/lib/company-scope";
 
 export async function GET(request: Request) {
   try {
@@ -65,7 +66,8 @@ export async function GET(request: Request) {
     }
 
     const where: Prisma.PayrollRunWhereInput = {};
-    if (actor.companyId) where.companyId = actor.companyId;
+    const scopeCompanyId = companyScopeFilter(actor, searchParams.get("companyId"));
+    if (scopeCompanyId) where.companyId = scopeCompanyId;
     if (monthStr && yearStr) {
       where.Period = {
         month: parseInt(monthStr),
@@ -102,7 +104,9 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const { action, companyId: requestedCompanyId, month, year, runId } = body;
-    const companyId = actor.companyId || requestedCompanyId;
+    // A company-scoped user always acts on their own company; a group-level
+    // user names the company they work on.
+    const companyId = resolveCompanyId(actor, requestedCompanyId);
     const actorId = actor.id;
 
     if (!companyId) {

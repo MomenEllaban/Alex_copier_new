@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireAnyPage } from "@/lib/auth-helpers";
+import { canActOnCompany } from "@/lib/company-scope";
 
 interface MonthlyData {
   month: string;
@@ -46,10 +47,11 @@ export async function GET(
       return NextResponse.json({ error: "Company not found" }, { status: 404 });
     }
 
-    // A user tied to a company may only read that company's report. The report
-    // now exposes salaries, so reading another company's numbers is not a
-    // harmless mistake.
-    if (user.companyId && user.companyId !== id) {
+    // The report exposes salaries, so reading another company's numbers is not
+    // a harmless mistake: a user tied to a company may only read that
+    // company's report. The general manager owns the group and may read any
+    // of them — see `@/lib/company-scope`.
+    if (!canActOnCompany(user, id)) {
       return NextResponse.json(
         { error: "هذا التقرير يخص شركة أخرى", code: "CROSS_COMPANY" },
         { status: 403 }

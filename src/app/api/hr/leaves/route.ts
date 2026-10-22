@@ -8,8 +8,9 @@ import { LEAVE_STATUSES } from "@/lib/hr/hr-statuses";
 import {
   crossCompanyResponse,
   employeeNotInCompanyResponse,
-  findEmployeeInCompany,
+  findEmployeeForActor,
 } from "@/lib/services/hr/company-scope";
+import { companyScopeFilter } from "@/lib/company-scope";
 
 export async function GET(request: Request) {
   try {
@@ -27,7 +28,8 @@ export async function GET(request: Request) {
     const status = enumFilter(searchParams.get("status"), LEAVE_STATUSES);
 
     const where: Prisma.LeaveRequestWhereInput = {};
-    if (actor.companyId) where.Employee = { companyId: actor.companyId };
+    const scopeCompanyId = companyScopeFilter(actor, searchParams.get("companyId"));
+    if (scopeCompanyId) where.Employee = { companyId: scopeCompanyId };
     if (employeeId) where.employeeId = employeeId;
     if (status) where.status = status;
 
@@ -72,11 +74,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    // The employee must belong to the company the request works on.
-    if (actor.companyId) {
-      const employee = await findEmployeeInCompany(employeeId, actor.companyId);
-      if (!employee) return employeeNotInCompanyResponse();
-    }
+    // The employee must be one the actor may act for.
+    const employee = await findEmployeeForActor(actor, employeeId);
+    if (!employee) return employeeNotInCompanyResponse();
 
     const startDate = new Date(startStr);
     const endDate = new Date(endStr);

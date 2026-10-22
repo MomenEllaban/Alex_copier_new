@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
 import { Prisma } from "@/generated/prisma/client";
+import { companyScopeFilter, resolveCompanyId } from "@/lib/company-scope";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const actor = await requirePageAccess("hrSettings");
     if (!actor) {
@@ -14,8 +15,10 @@ export async function GET() {
       );
     }
 
+    const { searchParams } = new URL(request.url);
     const where: Prisma.DepartmentWhereInput = {};
-    if (actor.companyId) where.companyId = actor.companyId;
+    const scopeCompanyId = companyScopeFilter(actor, searchParams.get("companyId"));
+    if (scopeCompanyId) where.companyId = scopeCompanyId;
 
     const departments = await prisma.department.findMany({
       where,
@@ -45,7 +48,7 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const { code, name, nameAr, managerId } = body;
-    const companyId = actor.companyId || body.companyId;
+    const companyId = resolveCompanyId(actor, body.companyId);
 
     if (!code || !name || !companyId) {
       return NextResponse.json({ error: "code, name, and companyId are required" }, { status: 400 });

@@ -66,9 +66,9 @@ const ENDPOINTS: {
   { label: "PATCH /api/hr/leaves", page: "hrLeaves", model: "leaveRequest", call: () => leaves.PATCH(PATCH()) },
   { label: "GET /api/hr/attendance", page: "hrAttendance", model: "dailyAttendanceRecord", call: () => attendance.GET(GET()) },
   { label: "POST /api/hr/attendance", page: "hrAttendance", model: "dailyAttendanceRecord", call: () => attendance.POST(POST()) },
-  { label: "GET /api/hr/departments", page: "hrSettings", model: "department", call: () => departments.GET() },
+  { label: "GET /api/hr/departments", page: "hrSettings", model: "department", call: () => departments.GET(GET()) },
   { label: "POST /api/hr/departments", page: "hrSettings", model: "department", call: () => departments.POST(POST()) },
-  { label: "GET /api/hr/job-titles", page: "hrSettings", model: "jobTitle", call: () => jobTitles.GET() },
+  { label: "GET /api/hr/job-titles", page: "hrSettings", model: "jobTitle", call: () => jobTitles.GET(GET()) },
   { label: "POST /api/hr/job-titles", page: "hrSettings", model: "jobTitle", call: () => jobTitles.POST(POST()) },
 ];
 
@@ -132,7 +132,7 @@ describe("HR API — page access is enforced on every endpoint", () => {
         : null,
     );
 
-    const res = await departments.GET();
+    const res = await departments.GET(GET());
 
     expect(res.status).toBe(200);
     expect(mocks.db.department.findMany).toHaveBeenCalled();
