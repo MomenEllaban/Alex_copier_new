@@ -10,7 +10,7 @@ import {
 } from "@/lib/services/hr/payroll-service";
 import { errorMessage } from "@/lib/prisma-errors";
 import { Prisma } from "@/generated/prisma/client";
-import { scopedRecord } from "@/lib/services/hr/company-scope";
+import { scopedRecord, crossCompanyResponse } from "@/lib/services/hr/company-scope";
 
 export async function GET(request: Request) {
   try {
@@ -56,6 +56,10 @@ export async function GET(request: Request) {
       if (!run) {
         return NextResponse.json({ error: "كشف الرواتب غير موجود" }, { status: 404 });
       }
+
+      // A run of another company must not be readable through the query.
+      const denied = crossCompanyResponse(actor, run.companyId);
+      if (denied) return denied;
 
       return NextResponse.json(run);
     }
