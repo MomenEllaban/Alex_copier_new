@@ -53,6 +53,7 @@ function EmployeesContent() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [companyFilter, setCompanyFilter] = useState("");
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 10;
 
@@ -232,7 +233,8 @@ function EmployeesContent() {
       (emp.phone && emp.phone.includes(search)) ||
       (emp.fingerprintId && emp.fingerprintId.includes(search));
     const matchesStatus = !statusFilter || emp.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesCompany = !companyFilter || emp.companyId === companyFilter;
+    return matchesSearch && matchesStatus && matchesCompany;
   });
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE) || 1;
@@ -249,6 +251,22 @@ function EmployeesContent() {
       jobTitlesCount,
     };
   }, [employees]);
+
+  const companyBreakdown = useMemo(() => {
+    return companies
+      .map((company) => {
+        const list = employees.filter((e) => e.companyId === company.id);
+        const totalSalary = list.reduce((sum, e) => sum + (e.baseSalary || 0), 0);
+        return {
+          id: company.id,
+          name: company.name,
+          count: list.length,
+          totalSalary,
+        };
+      })
+      .filter((item) => item.count > 0 || companyFilter)
+      .sort((a, b) => b.count - a.count);
+  }, [companies, employees, companyFilter]);
 
   if (loading) return <PrinterLoader label={t("hr.employees.loading")} />;
 
@@ -301,8 +319,43 @@ function EmployeesContent() {
         ]}
       />
 
+      {companyBreakdown.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {companyBreakdown.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => {
+                setCompanyFilter((current) => (current === item.id ? "" : item.id));
+                setPage(1);
+              }}
+              className={`flex items-center justify-between rounded-xl border px-4 py-3 text-start shadow-sm transition ${
+                companyFilter === item.id
+                  ? "border-blue-500 bg-blue-50/70 ring-1 ring-blue-200"
+                  : "border-gray-100 bg-white hover:border-blue-200 hover:bg-blue-50/40"
+              }`}
+            >
+              <div>
+                <p className="text-sm font-semibold text-gray-900">{item.name}</p>
+                <p className="text-xs text-gray-500">
+                  {item.count.toLocaleString("en-US")} {locale === "ar" ? "موظف" : "employees"}
+                </p>
+              </div>
+              <div className="text-end">
+                <p className="text-sm font-bold text-emerald-700">
+                  {item.totalSalary.toLocaleString("en-US")} {t("hr.currency")}
+                </p>
+                <p className="text-xs text-gray-400">
+                  {locale === "ar" ? "إجمالي الرواتب" : "Total salaries"}
+                </p>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Search & Filters */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <SearchInput
           value={search}
           onChange={(v) => { setSearch(v); setPage(1); }}
@@ -319,6 +372,12 @@ function EmployeesContent() {
             { label: t("hr.employees.statusTerminated"), value: "TERMINATED" },
           ]}
         />
+        <FilterSelect
+          value={companyFilter}
+          onChange={(v) => { setCompanyFilter(v); setPage(1); }}
+          allLabel={locale === "ar" ? "كل الشركات" : "All companies"}
+          options={companies.map((c) => ({ label: c.name, value: c.id }))}
+        />
       </div>
 
       {/* Employees Table */}
@@ -329,6 +388,7 @@ function EmployeesContent() {
               <tr>
                 <th className="p-3 font-semibold text-start">{t("hr.employees.thCodeFp")}</th>
                 <th className="p-3 font-semibold text-start">{t("hr.employees.thName")}</th>
+                <th className="p-3 font-semibold text-start">{locale === "ar" ? "الشركة" : "Company"}</th>
                 <th className="p-3 font-semibold text-start">{t("hr.employees.thJobTitle")}</th>
                 <th className="p-3 font-semibold text-start">{t("hr.employees.thPhoneNid")}</th>
                 <th className="p-3 font-semibold text-start">{t("hr.employees.thBaseSalary")}</th>
@@ -339,7 +399,7 @@ function EmployeesContent() {
             <tbody className="divide-y divide-gray-100">
               {paginated.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-gray-500">
+                  <td colSpan={8} className="p-8 text-center text-gray-500">
                     {t("hr.employees.noMatch")}
                   </td>
                 </tr>
@@ -357,6 +417,11 @@ function EmployeesContent() {
                     <td className="p-3">
                       <div className="font-medium text-gray-900">{emp.fullName}</div>
                       {emp.fullNameAr && <div className="text-xs text-gray-500">{emp.fullNameAr}</div>}
+                    </td>
+                    <td className="p-3">
+                      <div className="text-gray-900 font-medium">
+                        {companies.find((c) => c.id === emp.companyId)?.name || "-"}
+                      </div>
                     </td>
                     <td className="p-3">
                       <div className="text-gray-900 font-medium">{emp.JobTitle?.titleAr || emp.JobTitle?.title || t("hr.employees.noTitle")}</div>
