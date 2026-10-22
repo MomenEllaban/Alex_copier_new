@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import RefreshButton from "@/components/RefreshButton";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { notifyDataChanged } from "@/lib/data-events";
+import { formatEgyptDateISO } from "@/lib/datetime";
 
 interface Company { id: string; name: string; }
 interface Category { id: string; name: string; companyId?: string; }
@@ -109,7 +110,7 @@ export default function FinancePage() {
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = formatEgyptDateISO(new Date());
   const currentMonth = today.slice(0, 7);
   const total = filtered.reduce((sum, e) => sum + (e.amount || 0), 0);
   const todayTotal = filtered

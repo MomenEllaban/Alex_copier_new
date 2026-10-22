@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useI18n } from "@/i18n/context";
 import PrinterLoader from "@/components/PrinterLoader";
 import { errorMessage } from "@/lib/prisma-errors";
+import { formatEgyptDateISO, getEgyptMonth, getEgyptYear } from "@/lib/datetime";
 import Pagination from "@/components/Pagination";
 import FormModal from "@/components/FormModal";
 import RefreshButton from "@/components/RefreshButton";
@@ -247,8 +248,8 @@ export default function ComprehensivePayrollPage() {
 
   const [selectedRunDetails, setSelectedRunDetails] = useState<PayrollRunDetail | null>(null);
   const [showCalcModal, setShowCalcModal] = useState(false);
-  const [calcMonth, setCalcMonth] = useState<number>(new Date().getMonth() + 1);
-  const [calcYear, setCalcYear] = useState<number>(new Date().getFullYear());
+  const [calcMonth, setCalcMonth] = useState<number>(getEgyptMonth());
+  const [calcYear, setCalcYear] = useState<number>(getEgyptYear());
 
   // ─────────────────────────────────────────────
   // 2. ADVANCES & LOANS STATE
@@ -261,15 +262,15 @@ export default function ComprehensivePayrollPage() {
   const [showAdvanceModal, setShowAdvanceModal] = useState(false);
   const [advEmployeeId, setAdvEmployeeId] = useState("");
   const [advAmount, setAdvAmount] = useState("");
-  const [advMonth, setAdvMonth] = useState<number>(new Date().getMonth() + 1);
-  const [advYear, setAdvYear] = useState<number>(new Date().getFullYear());
+  const [advMonth, setAdvMonth] = useState<number>(getEgyptMonth());
+  const [advYear, setAdvYear] = useState<number>(getEgyptYear());
   const [advReason, setAdvReason] = useState("");
 
   const [showLoanModal, setShowLoanModal] = useState(false);
   const [loanEmployeeId, setLoanEmployeeId] = useState("");
   const [loanAmount, setLoanAmount] = useState("");
   const [loanCount, setLoanCount] = useState("6");
-  const [loanStartDate, setLoanStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [loanStartDate, setLoanStartDate] = useState(formatEgyptDateISO(new Date()));
   const [loanReason, setLoanReason] = useState("");
 
   const [selectedLoanForInstallments, setSelectedLoanForInstallments] = useState<Loan | null>(null);
@@ -294,8 +295,8 @@ export default function ComprehensivePayrollPage() {
   const [bonusCalcType, setBonusCalcType] = useState<BonusCalcType>("FIXED_AMOUNT");
   const [bonusPercentage, setBonusPercentage] = useState("");
   const [bonusAmount, setBonusAmount] = useState("");
-  const [bonusMonth, setBonusMonth] = useState<number>(new Date().getMonth() + 1);
-  const [bonusYear, setBonusYear] = useState<number>(new Date().getFullYear());
+  const [bonusMonth, setBonusMonth] = useState<number>(getEgyptMonth());
+  const [bonusYear, setBonusYear] = useState<number>(getEgyptYear());
   const [bonusReason, setBonusReason] = useState("");
 
   const [showPenaltyModal, setShowPenaltyModal] = useState(false);
@@ -305,8 +306,8 @@ export default function ComprehensivePayrollPage() {
   const [penaltyCalcType, setPenaltyCalcType] = useState<PenaltyCalcType>("DAILY_RATE");
   const [penaltyDays, setPenaltyDays] = useState("1");
   const [penaltyAmount, setPenaltyAmount] = useState("");
-  const [penaltyMonth, setPenaltyMonth] = useState<number>(new Date().getMonth() + 1);
-  const [penaltyYear, setPenaltyYear] = useState<number>(new Date().getFullYear());
+  const [penaltyMonth, setPenaltyMonth] = useState<number>(getEgyptMonth());
+  const [penaltyYear, setPenaltyYear] = useState<number>(getEgyptYear());
   const [penaltyReason, setPenaltyReason] = useState("");
 
   // ─────────────────────────────────────────────

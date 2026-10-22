@@ -14,17 +14,73 @@ export function getEgyptNow(): Date {
 }
 
 /**
+ * The offset of Africa/Cairo from UTC, in minutes, at the given moment.
+ * Egypt is UTC+2 in winter and UTC+3 in summer, so the offset is read from
+ * the timezone itself instead of being hard-coded.
+ */
+function egyptOffsetMinutes(date: Date): number {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: EGYPT_TIMEZONE,
+    timeZoneName: "longOffset",
+  }).formatToParts(date);
+  const name = parts.find((p) => p.type === "timeZoneName")?.value ?? "GMT+00:00";
+  const match = /GMT([+-])(\d{1,2})(?::(\d{2}))?/.exec(name);
+  if (!match) return 0;
+  const sign = match[1] === "-" ? -1 : 1;
+  const hours = parseInt(match[2], 10);
+  const minutes = match[3] ? parseInt(match[3], 10) : 0;
+  return sign * (hours * 60 + minutes);
+}
+
+/**
  * Get current date/time formatted for datetime-local input (YYYY-MM-DDTHH:mm).
  * This is the local time in Egypt.
  */
 export function getEgyptDateTimeLocal(): string {
   const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  const hours = String(now.getHours()).padStart(2, "0");
-  const minutes = String(now.getMinutes()).padStart(2, "0");
+  const local = new Date(now.getTime() + egyptOffsetMinutes(now) * 60_000);
+  const year = local.getUTCFullYear();
+  const month = String(local.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(local.getUTCDate()).padStart(2, "0");
+  const hours = String(local.getUTCHours()).padStart(2, "0");
+  const minutes = String(local.getUTCMinutes()).padStart(2, "0");
   return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+/**
+ * Format a date as a calendar date (YYYY-MM-DD) in Egypt timezone.
+ *
+ * The server and the browser must agree on "today": the server runs in UTC
+ * while the office is in Egypt, so `toISOString()` — which is UTC — would
+ * hand the browser a different day for a few hours every evening. Reading
+ * the day from the Egypt timezone gives both sides the same answer.
+ */
+export function formatEgyptDateISO(date: Date | string | null | undefined): string {
+  const d = typeof date === "string" ? new Date(date) : date;
+  if (!d || Number.isNaN(d.getTime())) return "";
+  const local = new Date(d.getTime() + egyptOffsetMinutes(d) * 60_000);
+  const year = local.getUTCFullYear();
+  const month = String(local.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(local.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * The month (1-12) in Egypt timezone.
+ * Used for defaults that end up in a form field, where the server and the
+ * browser must pick the same month.
+ */
+export function getEgyptMonth(date: Date = new Date()): number {
+  const local = new Date(date.getTime() + egyptOffsetMinutes(date) * 60_000);
+  return local.getUTCMonth() + 1;
+}
+
+/**
+ * The year in Egypt timezone.
+ */
+export function getEgyptYear(date: Date = new Date()): number {
+  const local = new Date(date.getTime() + egyptOffsetMinutes(date) * 60_000);
+  return local.getUTCFullYear();
 }
 
 /**
@@ -33,15 +89,26 @@ export function getEgyptDateTimeLocal(): string {
  * Use this when receiving dates from datetime-local inputs.
  */
 export function parseEgyptDateTimeLocal(value: string): Date {
-  // datetime-local gives "YYYY-MM-DDTHH:mm" without timezone suffix
-  // We need to interpret this as Egypt local time, not browser local time
-  // Create a date object and adjust for the timezone offset
-  const date = new Date(value);
-  // Get the timezone offset in minutes (positive for west of UTC, negative for east)
-  const offsetMinutes = date.getTimezoneOffset();
-  // Adjust the date to represent the same wall-clock time in Egypt
-  // Egypt is UTC+2 or UTC+3, so we need to add the offset to get UTC
-  return new Date(date.getTime() - offsetMinutes * 60 * 1000);
+  // datetime-local gives "YYYY-MM-DDTHH:mm" without timezone suffix. It is
+  // read as a wall-clock time in Egypt, not in the timezone of whichever
+  // machine happens to run this code.
+  const match = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/.exec(value.trim());
+  if (!match) return new Date(value);
+  const [, year, month, day, hour = "00", minute = "00"] = match;
+  const wallClock = Date.UTC(
+    parseInt(year, 10),
+    parseInt(month, 10) - 1,
+    parseInt(day, 10),
+    parseInt(hour, 10),
+    parseInt(minute, 10)
+  );
+  // The offset depends on the moment, so it is read twice: once for the
+  // guess, and once more for the instant it produces.
+  const guessOffset = egyptOffsetMinutes(new Date(wallClock));
+  const result = new Date(wallClock - guessOffset * 60_000);
+  const realOffset = egyptOffsetMinutes(result);
+  if (realOffset === guessOffset) return result;
+  return new Date(wallClock - realOffset * 60_000);
 }
 
 /**

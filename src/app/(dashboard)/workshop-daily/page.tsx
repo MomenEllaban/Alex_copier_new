@@ -16,6 +16,7 @@ import SubmitButton from "@/components/SubmitButton";
 import PrinterLoader from "@/components/PrinterLoader";
 import { useConfirm, useToast } from "@/components/UIProvider";
 import { usePermissions } from "@/components/PermissionsProvider";
+import { formatEgyptDateISO } from "@/lib/datetime";
 
 interface Tx {
   id: string;
@@ -95,12 +96,8 @@ const STATUS_STYLES: Record<string, string> = {
 
 const PAGE_SIZE = 10;
 const DAYS_PAGE_SIZE = 15;
-
-/** `YYYY-MM-DD` in local time — the shape an `<input type="date">` uses. */
-const toDateKey = (value: string | Date) => {
-  const d = typeof value === "string" ? new Date(value) : value;
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-};
+/** `YYYY-MM-DD` in Egypt time — the shape an `<input type="date">` uses. */
+const toDateKey = (value: string | Date) => formatEgyptDateISO(value);
 
 export default function WorkshopDailyPage() {
   const { t, locale, dir } = useI18n();

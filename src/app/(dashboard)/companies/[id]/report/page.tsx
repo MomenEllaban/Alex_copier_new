@@ -9,6 +9,7 @@ import { ArrowLeft, ArrowDownRight, ArrowUpRight, Printer } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import RefreshButton from "@/components/RefreshButton";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
+import { formatEgyptDateISO } from "@/lib/datetime";
 
 interface ReportData {
   company: {
@@ -326,12 +327,15 @@ export default function CompanyReportPage() {
   const router = useRouter();
   const id = params.id as string;
 
-  const today = new Date();
-  const firstOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-  const toISODate = (d: Date) => d.toISOString().slice(0, 10);
+  // "Today" and the first of the month are read in Egypt time, so the server
+  // and the browser compute the same range. Using UTC here made the server
+  // render one day (or one month) ahead of the browser, which React reports
+  // as a hydration mismatch, and it sent the report the wrong start date.
+  const todayISO = formatEgyptDateISO(new Date());
+  const monthStartISO = `${todayISO.slice(0, 7)}-01`;
 
-  const [from, setFrom] = useState(toISODate(firstOfMonth));
-  const [to, setTo] = useState(toISODate(today));
+  const [from, setFrom] = useState(monthStartISO);
+  const [to, setTo] = useState(todayISO);
   const [report, setReport] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
