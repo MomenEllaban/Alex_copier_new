@@ -615,7 +615,7 @@ export async function lockPayrollRun(runId: string, actorId?: string) {
 
     // 7. Create Balanced Journal Entry (القيد المحاسبي المتوازن آلياً)
     const entryNumber = `JV-PAY-${run.Period.year}-${String(run.Period.month).padStart(2, "0")}-${run.id.slice(-4).toUpperCase()}`;
-    const description = `استحقاق وصرف رواتب وأجور شهر ${run.Period.month}/${run.Period.year}`;
+    const description = `استحقاق رواتب وأجور شهر ${run.Period.month}/${run.Period.year}`;
 
     // Build journal items with strict mathematical balance:
     // Debits:
@@ -753,4 +753,137 @@ export async function lockPayrollRun(runId: string, actorId?: string) {
   },
   { timeout: 45000, maxWait: 15000 }
 );
+}
+
+export interface DisbursePayrollOptions {
+  runId: string;
+  actorId?: string;
+  /** Overrides the treasury account configured in the company HR settings. */
+  treasuryAccountId?: string;
+  disbursementMethod?: string;
+}
+
+/**
+ * Pays the employees of a locked run (صرف الرواتب).
+ *
+ * Locking posts the ACCRUAL — the salary is owed to the employees but the
+ * money has not moved. Paying them is a second entry: Salaries Payable is
+ * debited and the treasury is credited, which is the moment the company's
+ * cash actually leaves. Without this step the company report can never show
+ * a single pound of salary leaving the bank.
+ *
+ * Only the NET amount is paid out here. The other credits created at lock
+ * time (employee insurance, tax, advance and loan recovery) are owed to
+ * third parties and stay open as liabilities until they are remitted.
+ */
+export async function disbursePayrollRun(options: DisbursePayrollOptions) {
+  const { runId, actorId } = options;
+
+  const run = await prisma.payrollRun.findUnique({
+    where: { id: runId },
+    include: { Period: true },
+  });
+
+  if (!run) throw new Error("كشف الرواتب غير موجود");
+  if (run.status !== "LOCKED") {
+    throw new Error("يجب قفل كشف الرواتب واعتماده قبل الصرف");
+  }
+  if (run.disbursedAt) {
+    throw new Error("تم صرف هذا الكشف مسبقاً");
+  }
+
+  const amount = Math.round((run.totalNet || 0) * 100) / 100;
+  if (amount <= 0) {
+    throw new Error("لا يوجد صافي رواتب للصرف في هذا الكشف");
+  }
+
+  const validation = await validatePayrollAccountMapping(run.companyId);
+  if (!validation.isValid) {
+    throw new Error(
+      `فشل صرف الرواتب! يجب أولاً تحديد الحسابات المحاسبية المرتبطة في شاشة الإعدادات:\n- ${validation.missingAccounts.join("\n- ")}`
+    );
+  }
+
+  const { accountIds } = validation;
+  if (!accountIds.salariesPayable) {
+    throw new Error("حساب مستحقات الرواتب غير محدد في إعدادات الموارد البشرية");
+  }
+  if (!accountIds.treasury) {
+    throw new Error("حساب الخزينة / البنك غير محدد في إعدادات الموارد البشرية");
+  }
+
+  const treasuryAccountId = options.treasuryAccountId || accountIds.treasury;
+
+  // The treasury account has to belong to the same company as the run —
+  // otherwise the disbursement would move money in one company's books to
+  // pay another company's employees.
+  const treasuryAccount = await prisma.account.findFirst({
+    where: { id: treasuryAccountId, companyId: run.companyId, isActive: true },
+    select: { id: true, name: true },
+  });
+  if (!treasuryAccount) {
+    throw new Error("حساب الخزينة المحدد غير موجود ضمن حسابات الشركة");
+  }
+
+  const entryNumber = `JV-PAYOUT-${run.Period.year}-${String(run.Period.month).padStart(2, "0")}-${run.id.slice(-4).toUpperCase()}`;
+  const description = `صرف رواتب وأجور شهر ${run.Period.month}/${run.Period.year}`;
+
+  return prisma.$transaction(
+    async (tx) => {
+      const journalEntry = await tx.journalEntry.create({
+        data: {
+          companyId: run.companyId,
+          entryNumber,
+          date: new Date(),
+          description,
+          referenceType: "PayrollDisbursement",
+          referenceId: run.id,
+          isVerified: true,
+          items: {
+            create: [
+              {
+                accountId: accountIds.salariesPayable!,
+                debit: amount,
+                credit: 0,
+              },
+              {
+                accountId: treasuryAccount.id,
+                debit: 0,
+                credit: amount,
+              },
+            ],
+          },
+        },
+      });
+
+      const paidRun = await tx.payrollRun.update({
+        where: { id: runId },
+        data: {
+          totalPaid: amount,
+          disbursedAt: new Date(),
+          disbursedBy: actorId || null,
+          disbursementMethod: options.disbursementMethod || "CASH",
+          treasuryAccountId: treasuryAccount.id,
+          disbursementJournalEntryId: journalEntry.id,
+        },
+        include: { Period: true },
+      });
+
+      await tx.approvalLog.create({
+        data: {
+          userId: actorId || "system",
+          action: "DISBURSE",
+          entityType: "PayrollRun",
+          entityId: run.id,
+          notes: `صرف رواتب شهر ${run.Period.month}/${run.Period.year} بمبلغ ${amount} عبر القيد ${entryNumber}`,
+        },
+      });
+
+      return {
+        run: paidRun,
+        journalEntry,
+      };
+    },
+    { timeout: 45000, maxWait: 15000 }
+  );
 }

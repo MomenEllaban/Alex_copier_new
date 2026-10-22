@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
+import { crossCompanyResponse } from "@/lib/services/hr/company-scope";
 
 export async function GET(
   _request: Request,
@@ -34,6 +35,9 @@ export async function GET(
       return NextResponse.json({ error: "الموظف غير موجود" }, { status: 404 });
     }
 
+    const denied = crossCompanyResponse(actor, employee.companyId);
+    if (denied) return denied;
+
     return NextResponse.json(employee);
   } catch (error) {
     console.error("GET /api/hr/employees/[id] error:", error);
@@ -62,6 +66,9 @@ export async function PUT(
     if (!existing) {
       return NextResponse.json({ error: "الموظف غير موجود" }, { status: 404 });
     }
+
+    const denied = crossCompanyResponse(actor, existing.companyId);
+    if (denied) return denied;
 
     const nullable = (v: unknown, fallback: string | null | undefined) =>
       v === undefined ? fallback : v === "" || v === null ? null : String(v);
@@ -146,6 +153,9 @@ export async function DELETE(
     if (!existing) {
       return NextResponse.json({ error: "الموظف غير موجود" }, { status: 404 });
     }
+
+    const denied = crossCompanyResponse(actor, existing.companyId);
+    if (denied) return denied;
 
     await prisma.employee.delete({ where: { id } });
 

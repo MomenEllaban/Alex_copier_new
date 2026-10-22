@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
 import {
   createPenalty,
@@ -9,6 +10,12 @@ import {
 import { errorMessage } from "@/lib/prisma-errors";
 import { enumFilter } from "@/lib/enum-filter";
 import { ADVANCE_STATUSES } from "@/lib/hr/hr-statuses";
+import {
+  employeeNotInCompanyResponse,
+  findEmployeeInCompany,
+  resolveCompanyId,
+  scopedRecord,
+} from "@/lib/services/hr/company-scope";
 
 export async function GET(request: Request) {
   try {
@@ -22,10 +29,14 @@ export async function GET(request: Request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const companyId = actor.companyId || searchParams.get("companyId");
+    const companyId = resolveCompanyId(actor, searchParams.get("companyId"));
     if (!companyId) return NextResponse.json({ error: "companyId required" }, { status: 400 });
 
     const employeeId = searchParams.get("employeeId") || undefined;
+    if (employeeId) {
+      const emp = await findEmployeeInCompany(employeeId, companyId);
+      if (!emp) return employeeNotInCompanyResponse();
+    }
     const status = enumFilter(searchParams.get("status"), ADVANCE_STATUSES);
     const month = searchParams.get("month") ? parseInt(searchParams.get("month")!) : undefined;
     const year = searchParams.get("year") ? parseInt(searchParams.get("year")!) : undefined;
@@ -50,11 +61,14 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const companyId = actor.companyId || body.companyId;
+    const companyId = resolveCompanyId(actor, body.companyId);
 
     if (!companyId || !body.employeeId || !body.title || !body.targetMonth || !body.targetYear || !body.reason) {
       return NextResponse.json({ error: "Missing required penalty fields" }, { status: 400 });
     }
+
+    const employee = await findEmployeeInCompany(body.employeeId, companyId);
+    if (!employee) return employeeNotInCompanyResponse();
 
     const penalty = await createPenalty(
       {
@@ -93,6 +107,9 @@ export async function PATCH(request: Request) {
     const { id, action, reason } = body;
 
     if (!id || !action) return NextResponse.json({ error: "id and action required" }, { status: 400 });
+
+    const scoped = await scopedRecord(actor, "الجزاء", () => prisma.employeePenalty.findUnique({ where: { id } }));
+    if ("response" in scoped) return scoped.response;
 
     let result;
     if (action === "approve") {

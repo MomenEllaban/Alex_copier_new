@@ -1,16 +1,22 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@/generated/prisma/client";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
-import { errorMessage } from "@/lib/prisma-errors";
-import { enumFilter } from "@/lib/enum-filter";
-import { ADVANCE_STATUSES } from "@/lib/hr/hr-statuses";
 import {
   requestAdvance,
   approveAdvance,
   disburseAdvance,
   rejectAdvance,
 } from "@/lib/services/hr/loan-advance-service";
+import { errorMessage } from "@/lib/prisma-errors";
+import { Prisma } from "@/generated/prisma/client";
+import { enumFilter } from "@/lib/enum-filter";
+import { ADVANCE_STATUSES } from "@/lib/hr/hr-statuses";
+import {
+  employeeNotInCompanyResponse,
+  findEmployeeInCompany,
+  resolveCompanyId,
+  scopedRecord,
+} from "@/lib/services/hr/company-scope";
 
 export async function GET(request: Request) {
   try {
@@ -31,7 +37,13 @@ export async function GET(request: Request) {
 
     const where: Prisma.EmployeeAdvanceWhereInput = {};
     if (actor.companyId) where.companyId = actor.companyId;
-    if (employeeId) where.employeeId = employeeId;
+    if (employeeId) {
+      if (actor.companyId) {
+        const emp = await findEmployeeInCompany(employeeId, actor.companyId);
+        if (!emp) return employeeNotInCompanyResponse();
+      }
+      where.employeeId = employeeId;
+    }
     if (status) where.status = status;
     if (month) where.deductMonth = parseInt(month);
     if (year) where.deductYear = parseInt(year);
@@ -72,11 +84,14 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const companyId = actor.companyId || body.companyId;
+    const companyId = resolveCompanyId(actor, body.companyId);
 
     if (!companyId || !body.employeeId || !body.amount || !body.deductMonth || !body.deductYear) {
       return NextResponse.json({ error: "Missing required advance fields" }, { status: 400 });
     }
+
+    const employee = await findEmployeeInCompany(body.employeeId, companyId);
+    if (!employee) return employeeNotInCompanyResponse();
 
     const advance = await requestAdvance({
       companyId,
@@ -84,7 +99,7 @@ export async function POST(request: Request) {
       amount: parseFloat(body.amount),
       deductMonth: parseInt(body.deductMonth),
       deductYear: parseInt(body.deductYear),
-      reason: body.reason || "Ø·Ù„Ø¨ Ø³Ù„ÙØ© Ù…ÙˆØ¸Ù",
+      reason: body.reason || "طلب سلفة موظف",
     });
 
     return NextResponse.json(advance, { status: 201 });
@@ -111,6 +126,11 @@ export async function PATCH(request: Request) {
     if (!id || !action) {
       return NextResponse.json({ error: "id and action are required" }, { status: 400 });
     }
+
+    const scoped = await scopedRecord(actor, "السلفة", () =>
+      prisma.employeeAdvance.findUnique({ where: { id } })
+    );
+    if ("response" in scoped) return scoped.response;
 
     let result;
     if (action === "approve") {

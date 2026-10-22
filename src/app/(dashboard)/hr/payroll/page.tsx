@@ -61,6 +61,9 @@ interface PayrollRun {
   employeeCount: number;
   calculatedAt: string | null;
   createdAt: string;
+  totalPaid?: number;
+  disbursedAt?: string | null;
+  disbursementMethod?: string | null;
   Period: PayrollPeriod;
   _count: { Items: number };
 }
@@ -471,8 +474,9 @@ export default function ComprehensivePayrollPage() {
 
   const handleLockRun = async (runId: string) => {
     const ok = await confirmAction({
-      title: "قفل وصرف مسير الرواتب",
-      message: "سيتم قفل الكشف نهائياً، وتحديث السلف والأقساط كمدفوعة، وتوليد القيد المحاسبي المتوازن في شجرة الحسابات. هل تريد المتابعة؟",
+      title: "قفل مسير الرواتب",
+      message:
+        "سيتم قفل الكشف نهائياً (استحقاق)، وتحديث السلف والأقساط كمدفوعة، وتوليد القيد المحاسبي المتوازن في شجرة الحسابات. الصرف النقدي يتم بخطوة منفصلة بعد القفل. هل تريد المتابعة؟",
     });
     if (!ok) return;
 
@@ -485,7 +489,31 @@ export default function ComprehensivePayrollPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "فشل قفل الكشف");
 
-      toastSuccess("تم قفل وصرف كشف الرواتب وتوليد القيد المحاسبي بنجاح!");
+      toastSuccess("تم قفل كشف الرواتب وتوليد القيد المحاسبي بنجاح!");
+      fetchRuns();
+    } catch (err) {
+      toastError(errorMessage(err, "حدث خطأ غير متوقع"));
+    }
+  };
+
+  const handleDisburseRun = async (runId: string) => {
+    const ok = await confirmAction({
+      title: "صرف رواتب الكشف",
+      message:
+        "سيتم صرف صافي رواتب هذا الكشف من حساب الخزينة/البنك، وتوليد قيد نقدي (مدين مستحقات الرواتب - دائن الخزينة). هل تريد المتابعة؟",
+    });
+    if (!ok) return;
+
+    try {
+      const res = await fetch("/api/hr/payroll", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "disburse", runId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "فشل صرف الرواتب");
+
+      toastSuccess("تم صرف رواتب الكشف وتوليد القيد النقدي بنجاح");
       fetchRuns();
     } catch (err) {
       toastError(errorMessage(err, "حدث خطأ غير متوقع"));
@@ -955,7 +983,12 @@ export default function ComprehensivePayrollPage() {
                           {r.status === "LOCKED" && (
                             <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1 w-fit">
                               <Lock size={12} />
-                              مقفل ومصروف (Locked)
+                              مقفل (Locked)
+                            </span>
+                          )}
+                          {r.disbursedAt && (
+                            <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-sky-50 text-sky-700 border border-sky-200 mt-1 block w-fit">
+                              تم الصرف (Paid)
                             </span>
                           )}
                         </td>
@@ -983,7 +1016,17 @@ export default function ComprehensivePayrollPage() {
                                 className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-sm flex items-center gap-1 transition-colors"
                               >
                                 <Lock size={13} />
-                                قفل وصرف
+                                قفل
+                              </button>
+                            )}
+
+                            {r.status === "LOCKED" && !r.disbursedAt && (
+                              <button
+                                onClick={() => handleDisburseRun(r.id)}
+                                className="px-3 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-semibold shadow-sm flex items-center gap-1 transition-colors"
+                              >
+                                <Wallet size={13} />
+                                صرف الرواتب
                               </button>
                             )}
                           </div>

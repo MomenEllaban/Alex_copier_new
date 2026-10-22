@@ -5,6 +5,11 @@ import { notifyLeaveRequested, notifyLeaveReviewed } from "@/lib/hr/hr-notificat
 import { Prisma } from "@/generated/prisma/client";
 import { enumFilter } from "@/lib/enum-filter";
 import { LEAVE_STATUSES } from "@/lib/hr/hr-statuses";
+import {
+  crossCompanyResponse,
+  employeeNotInCompanyResponse,
+  findEmployeeInCompany,
+} from "@/lib/services/hr/company-scope";
 
 export async function GET(request: Request) {
   try {
@@ -65,6 +70,12 @@ export async function POST(request: Request) {
 
     if (!employeeId || !startStr || !endStr) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
+    }
+
+    // The employee must belong to the company the request works on.
+    if (actor.companyId) {
+      const employee = await findEmployeeInCompany(employeeId, actor.companyId);
+      if (!employee) return employeeNotInCompanyResponse();
     }
 
     const startDate = new Date(startStr);
@@ -140,13 +151,17 @@ export async function PATCH(request: Request) {
     const leaveRequest = await prisma.leaveRequest.findUnique({
       where: { id },
       include: {
-        Employee: { select: { id: true, userId: true, fullName: true, fullNameAr: true } },
+        Employee: { select: { id: true, userId: true, fullName: true, fullNameAr: true, companyId: true } },
       },
     });
 
     if (!leaveRequest || leaveRequest.status !== "PENDING") {
       return NextResponse.json({ error: "طلب الإجازة غير موجود أو تمت مراجعته بالفعل" }, { status: 400 });
     }
+
+    // The leave belongs to an employee of another company — refuse it.
+    const denied = crossCompanyResponse(actor, leaveRequest.Employee.companyId);
+    if (denied) return denied;
 
     const approved = action === "approve";
 

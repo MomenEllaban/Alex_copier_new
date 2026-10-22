@@ -89,6 +89,7 @@ interface ReportData {
     purchaseReturns: number;
     expenses: number;
     settlementsCollected: number;
+    payrollCost: number;
     netProfit: number;
   };
   cashPosition: {
@@ -99,6 +100,9 @@ interface ReportData {
     cashFromSales: number;
     expenses: number;
     cashForPurchases: number;
+    salariesPaid: number;
+    advancesDisbursed: number;
+    loansDisbursed: number;
   };
   customerDebt: {
     total: number;
@@ -108,6 +112,122 @@ interface ReportData {
       phone: string | null;
       balance: number;
     }>;
+  };
+  hr: {
+    headcount: number;
+    payrollCost: number;
+    totals: {
+      gross: number;
+      deductions: number;
+      net: number;
+      bonuses: number;
+      penalties: number;
+      advancesRecovered: number;
+      loansRecovered: number;
+      companyInsurance: number;
+      tax: number;
+      employerCost: number;
+    };
+    runs: Array<{
+      id: string;
+      month: number;
+      year: number;
+      status: string;
+      employeeCount: number;
+      totalGross: number;
+      totalDeductions: number;
+      totalNet: number;
+      totalCompanyInsurance: number;
+      totalBonuses: number;
+      totalPenalties: number;
+      totalAdvances: number;
+      totalLoanInstallments: number;
+      totalTax: number;
+      employerCost: number;
+      totalPaid: number;
+      disbursedAt: string | null;
+      disbursementMethod: string | null;
+    }>;
+    employees: Array<{
+      employeeId: string;
+      code: string;
+      name: string;
+      nameAr: string | null;
+      department: string | null;
+      jobTitle: string | null;
+      gross: number;
+      deductions: number;
+      net: number;
+      employerCost: number;
+      bonuses: number;
+      penalties: number;
+      advances: number;
+      loans: number;
+      runs: number;
+    }>;
+    advances: {
+      total: number;
+      pending: number;
+      disbursed: number;
+      count: number;
+      items: Array<{
+        id: string;
+        employeeId: string;
+        employeeName: string;
+        amount: number;
+        status: string;
+        requestDate: string;
+        disbursedAt: string | null;
+        reason: string;
+      }>;
+    };
+    loans: {
+      total: number;
+      outstanding: number;
+      disbursed: number;
+      count: number;
+      items: Array<{
+        id: string;
+        employeeId: string;
+        employeeName: string;
+        totalAmount: number;
+        monthlyAmount: number;
+        installmentCount: number;
+        status: string;
+        startDate: string;
+        disbursedAt: string | null;
+        reason: string;
+      }>;
+    };
+    bonuses: {
+      total: number;
+      count: number;
+      items: Array<{
+        id: string;
+        employeeId: string;
+        employeeName: string;
+        title: string;
+        amount: number;
+        status: string;
+        targetMonth: number;
+        targetYear: number;
+      }>;
+    };
+    penalties: {
+      total: number;
+      count: number;
+      items: Array<{
+        id: string;
+        employeeId: string;
+        employeeName: string;
+        title: string;
+        amount: number;
+        status: string;
+        targetMonth: number;
+        targetYear: number;
+        reason: string;
+      }>;
+    };
   };
   monthlyData: Array<{
     month: string;
@@ -149,6 +269,12 @@ const STATUS_BADGE: Record<string, string> = {
   INSTALLMENT: "bg-blue-100 text-blue-700",
   CASH: "bg-emerald-100 text-emerald-700",
   MIXED: "bg-orange-100 text-orange-700",
+  APPROVED: "bg-blue-100 text-blue-700",
+  DEDUCTING: "bg-purple-100 text-purple-700",
+  COMPLETED: "bg-green-100 text-green-700",
+  REJECTED: "bg-red-100 text-red-700",
+  LOCKED: "bg-indigo-100 text-indigo-700",
+  CALCULATED: "bg-sky-100 text-sky-700",
 };
 
 const statusBadge = (status: string) => {
@@ -168,6 +294,12 @@ const statusBadge = (status: string) => {
     INSTALLMENT: "أجل",
     CASH: "كاش",
     MIXED: "أجل",
+    APPROVED: "معتمد",
+    DEDUCTING: "جارٍ الخصم",
+    COMPLETED: "مكتمل",
+    REJECTED: "مرفوض",
+    LOCKED: "مقفل",
+    CALCULATED: "محسوب",
   };
   return (
     <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}>
@@ -203,7 +335,7 @@ export default function CompanyReportPage() {
   const [report, setReport] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
-  const [activeTab, setActiveTab] = useState<"ledger" | "details">("ledger");
+  const [activeTab, setActiveTab] = useState<"ledger" | "details" | "hr">("ledger");
 
   const toggleOrder = (orderId: string) => {
     setExpandedOrders((prev) => {
@@ -414,6 +546,7 @@ export default function CompanyReportPage() {
           {([
             { id: "ledger", label: t("reports.activityLedger") },
             { id: "details", label: t("reports.detailedReport") },
+            { id: "hr", label: t("reports.hr.title") },
           ] as const).map((tb) => (
             <button
               key={tb.id}
@@ -434,6 +567,8 @@ export default function CompanyReportPage() {
         ) : report ? (
           activeTab === "ledger" ? (
             <LedgerTable ledger={ledger} t={t} />
+          ) : activeTab === "hr" ? (
+            <HrSection report={report} t={t} />
           ) : (
           <>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -502,6 +637,12 @@ export default function CompanyReportPage() {
                       <td className="px-5 py-3 text-sm text-gray-600">المصروفات</td>
                       <td className="px-5 py-3 text-sm font-bold text-orange-700 text-end">{moneyFormatter.format(-report.incomeStatement.expenses)}</td>
                     </tr>
+                    {report.incomeStatement.payrollCost > 0 && (
+                      <tr className="border-b border-gray-100">
+                        <td className="px-5 py-3 text-sm text-gray-600">{t("reports.hr.payrollCost")}</td>
+                        <td className="px-5 py-3 text-sm font-bold text-purple-700 text-end">{moneyFormatter.format(-report.incomeStatement.payrollCost)}</td>
+                      </tr>
+                    )}
                     <tr className="border-t-2 border-slate-300 bg-slate-50 font-bold">
                       <td className="px-5 py-3 text-sm">صافي الربح / الخسارة</td>
                       <td className={`px-5 py-3 text-sm text-end ${report.incomeStatement.netProfit >= 0 ? "text-green-700" : "text-red-600"}`}>
@@ -544,6 +685,24 @@ export default function CompanyReportPage() {
                       <td className="px-5 py-2 text-sm text-gray-600">المشتريات النقدية (مستلمة)</td>
                       <td className="px-5 py-2 text-sm font-bold text-orange-700 text-end">{moneyFormatter.format(-report.cashPosition.cashForPurchases)}</td>
                     </tr>
+                    {report.cashPosition.salariesPaid > 0 && (
+                      <tr className="border-b border-gray-100">
+                        <td className="px-5 py-2 text-sm text-gray-600">{t("reports.hr.salariesPaid")}</td>
+                        <td className="px-5 py-2 text-sm font-bold text-orange-700 text-end">{moneyFormatter.format(-report.cashPosition.salariesPaid)}</td>
+                      </tr>
+                    )}
+                    {report.cashPosition.advancesDisbursed > 0 && (
+                      <tr className="border-b border-gray-100">
+                        <td className="px-5 py-2 text-sm text-gray-600">{t("reports.hr.advances")}</td>
+                        <td className="px-5 py-2 text-sm font-bold text-orange-700 text-end">{moneyFormatter.format(-report.cashPosition.advancesDisbursed)}</td>
+                      </tr>
+                    )}
+                    {report.cashPosition.loansDisbursed > 0 && (
+                      <tr className="border-b border-gray-100">
+                        <td className="px-5 py-2 text-sm text-gray-600">{t("reports.hr.loans")}</td>
+                        <td className="px-5 py-2 text-sm font-bold text-orange-700 text-end">{moneyFormatter.format(-report.cashPosition.loansDisbursed)}</td>
+                      </tr>
+                    )}
                     <tr className="border-b border-gray-100">
                       <td className="px-5 py-2 text-sm font-semibold text-gray-700">اجمالي الخارج</td>
                       <td className="px-5 py-2 text-sm font-bold text-orange-700 text-end">{moneyFormatter.format(-report.cashPosition.cashOut)}</td>
@@ -984,6 +1143,252 @@ function LedgerTable({ ledger, t }: { ledger: LedgerEntry[]; t: (key: string) =>
               </tfoot>
             )}
           </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The HR part of the company report: what the staff cost the company and what
+ * the payroll, advances, loans, bonuses and penalties did to the books.
+ */
+function HrSection({ report, t }: { report: ReportData; t: (key: string) => string }) {
+  const hr = report.hr;
+
+  if (!hr) {
+    return (
+      <div className="flex min-h-[200px] items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <p className="text-gray-400">{t("reports.hr.noData")}</p>
+      </div>
+    );
+  }
+
+  const cards: Array<{ label: string; value: number; tone: string }> = [
+    { label: t("reports.hr.headcount"), value: hr.headcount, tone: "text-slate-900" },
+    { label: t("reports.hr.gross"), value: hr.totals.gross, tone: "text-green-600" },
+    { label: t("reports.hr.deductions"), value: hr.totals.deductions, tone: "text-red-600" },
+    { label: t("reports.hr.net"), value: hr.totals.net, tone: "text-blue-600" },
+    { label: t("reports.hr.employerCost"), value: hr.totals.employerCost, tone: "text-purple-600" },
+    { label: t("reports.hr.salariesPaid"), value: report.cashPosition.salariesPaid, tone: "text-orange-600" },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-6">
+        {cards.map((card) => (
+          <div key={card.label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-xs font-medium text-gray-500">{card.label}</p>
+            <p className={`mt-1 text-xl font-bold ${card.tone}`}>
+              {card.label === t("reports.hr.headcount")
+                ? card.value.toLocaleString("ar-EG")
+                : moneyFormatter.format(card.value)}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 bg-slate-50 px-5 py-3">
+            <h2 className="text-lg font-bold text-slate-900">{t("reports.hr.payrollRuns")}</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px]">
+              <thead>
+                <tr className="bg-slate-50">
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.period")}</th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.employees")}</th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.gross")}</th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.net")}</th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.employerCost")}</th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.disbursed")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {hr.runs.map((run) => (
+                  <tr key={run.id} className="border-t border-gray-100 hover:bg-slate-50/60">
+                    <td className="px-4 py-3 text-sm font-medium whitespace-nowrap">
+                      {run.month}/{run.year}
+                    </td>
+                    <td className="px-4 py-3 text-sm">{run.employeeCount}</td>
+                    <td className="px-4 py-3 text-sm text-green-700">{moneyFormatter.format(run.totalGross)}</td>
+                    <td className="px-4 py-3 text-sm text-blue-700">{moneyFormatter.format(run.totalNet)}</td>
+                    <td className="px-4 py-3 text-sm font-bold text-purple-700">{moneyFormatter.format(run.employerCost)}</td>
+                    <td className="px-4 py-3 text-sm">
+                      {run.disbursedAt ? (
+                        <span className="text-orange-700">{moneyFormatter.format(run.totalPaid)}</span>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {hr.runs.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-gray-400">{t("reports.hr.noData")}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 bg-slate-50 px-5 py-3">
+            <h2 className="text-lg font-bold text-slate-900">{t("reports.hr.employeePayroll")}</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px]">
+              <thead>
+                <tr className="bg-slate-50">
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.employee")}</th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.department")}</th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.gross")}</th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.deductions")}</th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.net")}</th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.employerCost")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {hr.employees.map((emp) => (
+                  <tr key={emp.employeeId} className="border-t border-gray-100 hover:bg-slate-50/60">
+                    <td className="px-4 py-3 text-sm font-medium">
+                      {emp.nameAr || emp.name}
+                      <span className="block text-xs text-gray-400">{emp.code}</span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{emp.department || "—"}</td>
+                    <td className="px-4 py-3 text-sm text-green-700">{moneyFormatter.format(emp.gross)}</td>
+                    <td className="px-4 py-3 text-sm text-red-600">{moneyFormatter.format(emp.deductions)}</td>
+                    <td className="px-4 py-3 text-sm font-bold text-blue-700">{moneyFormatter.format(emp.net)}</td>
+                    <td className="px-4 py-3 text-sm font-bold text-purple-700">{moneyFormatter.format(emp.employerCost)}</td>
+                  </tr>
+                ))}
+                {hr.employees.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-8 text-center text-gray-400">{t("reports.hr.noData")}</td>
+                  </tr>
+                )}
+              </tbody>
+              {hr.employees.length > 0 && (
+                <tfoot>
+                  <SubtotalRow
+                    label={t("reports.hr.total")}
+                    value={hr.totals.employerCost}
+                    colSpan={5}
+                    color="text-purple-700"
+                  />
+                </tfoot>
+              )}
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-medium text-gray-500">{t("reports.hr.advances")}</p>
+          <p className="mt-1 text-xl font-bold text-amber-600">{moneyFormatter.format(hr.advances.total)}</p>
+          <p className="mt-1 text-xs text-gray-500">
+            {t("reports.hr.pending")}: {moneyFormatter.format(hr.advances.pending)} · {t("reports.hr.disbursed")}: {moneyFormatter.format(hr.advances.disbursed)}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-medium text-gray-500">{t("reports.hr.loans")}</p>
+          <p className="mt-1 text-xl font-bold text-amber-600">{moneyFormatter.format(hr.loans.total)}</p>
+          <p className="mt-1 text-xs text-gray-500">
+            {t("reports.hr.outstanding")}: {moneyFormatter.format(hr.loans.outstanding)} · {t("reports.hr.disbursed")}: {moneyFormatter.format(hr.loans.disbursed)}
+          </p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-medium text-gray-500">{t("reports.hr.bonuses")}</p>
+          <p className="mt-1 text-xl font-bold text-green-600">{moneyFormatter.format(hr.bonuses.total)}</p>
+          <p className="mt-1 text-xs text-gray-500">{t("reports.hr.count")}: {hr.bonuses.count}</p>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-medium text-gray-500">{t("reports.hr.penalties")}</p>
+          <p className="mt-1 text-xl font-bold text-red-600">{moneyFormatter.format(hr.penalties.total)}</p>
+          <p className="mt-1 text-xs text-gray-500">{t("reports.hr.count")}: {hr.penalties.count}</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 bg-slate-50 px-5 py-3">
+            <h2 className="text-lg font-bold text-slate-900">{t("reports.hr.advances")}</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[520px]">
+              <thead>
+                <tr className="bg-slate-50">
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.employee")}</th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.status")}</th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.disbursed")}</th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.total")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {hr.advances.items.map((row) => (
+                  <tr key={row.id} className="border-t border-gray-100 hover:bg-slate-50/60">
+                    <td className="px-4 py-3 text-sm font-medium">{row.employeeName}</td>
+                    <td className="px-4 py-3 text-sm">{statusBadge(row.status)}</td>
+                    <td className="px-4 py-3 text-sm">
+                      {row.disbursedAt ? (
+                        <DateTimeCell value={row.disbursedAt} />
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm font-bold text-amber-600">{moneyFormatter.format(row.amount)}</td>
+                  </tr>
+                ))}
+                {hr.advances.items.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-8 text-center text-gray-400">{t("reports.hr.noData")}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-200 bg-slate-50 px-5 py-3">
+            <h2 className="text-lg font-bold text-slate-900">{t("reports.hr.loans")}</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[520px]">
+              <thead>
+                <tr className="bg-slate-50">
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.employee")}</th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.status")}</th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.disbursed")}</th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.total")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {hr.loans.items.map((row) => (
+                  <tr key={row.id} className="border-t border-gray-100 hover:bg-slate-50/60">
+                    <td className="px-4 py-3 text-sm font-medium">{row.employeeName}</td>
+                    <td className="px-4 py-3 text-sm">{statusBadge(row.status)}</td>
+                    <td className="px-4 py-3 text-sm">
+                      {row.disbursedAt ? (
+                        <DateTimeCell value={row.disbursedAt} />
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-sm font-bold text-amber-600">{moneyFormatter.format(row.totalAmount)}</td>
+                  </tr>
+                ))}
+                {hr.loans.items.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="px-4 py-8 text-center text-gray-400">{t("reports.hr.noData")}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

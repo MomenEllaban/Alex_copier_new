@@ -46,6 +46,16 @@ export async function GET(
       return NextResponse.json({ error: "Company not found" }, { status: 404 });
     }
 
+    // A user tied to a company may only read that company's report. The report
+    // now exposes salaries, so reading another company's numbers is not a
+    // harmless mistake.
+    if (user.companyId && user.companyId !== id) {
+      return NextResponse.json(
+        { error: "هذا التقرير يخص شركة أخرى", code: "CROSS_COMPANY" },
+        { status: 403 }
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const fromParam = searchParams.get("from");
     const toParam = searchParams.get("to");
@@ -255,9 +265,225 @@ export async function GET(
     const totalSettlementsForProfit = totalSettlements - purchaseReturnSettlementTotal;
 
     // ─────────────────────────────────────────────────────────
+    // HR / PAYROLL
+    // The payroll cost that hits the income statement is the employer's real
+    // cost of the staff: gross pay + the employer's insurance share, minus the
+    // money the company recovers from the employees (penalties, absences and
+    // lateness are credited back against the payroll expense at lock time).
+    // Only LOCKED runs are counted — a draft or an approved-but-unlocked run
+    // has not been booked yet.
+    // ─────────────────────────────────────────────────────────
+    const periodDateFilter = from || to
+      ? {
+          endDate: {
+            ...(from ? { gte: from } : {}),
+            ...(to ? { lte: to } : {}),
+          },
+        }
+      : {};
+
+    const employeeSelect = {
+      id: true,
+      code: true,
+      fullName: true,
+      fullNameAr: true,
+      Department: { select: { name: true, nameAr: true } },
+      JobTitle: { select: { title: true, titleAr: true } },
+    } as const;
+
+    const [
+      payrollRuns,
+      employeeAdvances,
+      employeeLoans,
+      employeeBonuses,
+      employeePenalties,
+      headcount,
+    ] = await Promise.all([
+      prisma.payrollRun.findMany({
+        where: { companyId: id, Period: { companyId: id, ...periodDateFilter } },
+        include: {
+          Period: true,
+          Items: { include: { Employee: { select: employeeSelect } } },
+        },
+        orderBy: [{ Period: { year: "asc" } }, { Period: { month: "asc" } }],
+      }),
+      prisma.employeeAdvance.findMany({
+        where: { companyId: id, ...dateFilter },
+        include: { Employee: { select: { id: true, code: true, fullName: true, fullNameAr: true } } },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.employeeLoan.findMany({
+        where: { companyId: id, ...dateFilter },
+        include: { Employee: { select: { id: true, code: true, fullName: true, fullNameAr: true } } },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.employeeBonus.findMany({
+        where: { companyId: id, ...dateFilter },
+        include: { Employee: { select: { id: true, code: true, fullName: true, fullNameAr: true } } },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.employeePenalty.findMany({
+        where: { companyId: id, ...dateFilter },
+        include: { Employee: { select: { id: true, code: true, fullName: true, fullNameAr: true } } },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.employee.count({ where: { companyId: id } }),
+    ]);
+
+    const lockedRuns = payrollRuns.filter((r) => r.status === "LOCKED");
+
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+
+    const employerCostOfRun = (r: {
+      totalGross: number;
+      totalCompanyInsurance: number;
+      totalPenalties: number;
+      totalAbsenceDeductions: number;
+      totalLateDeductions: number;
+    }) =>
+      round2(
+        (r.totalGross || 0) +
+          (r.totalCompanyInsurance || 0) -
+          (r.totalPenalties || 0) -
+          (r.totalAbsenceDeductions || 0) -
+          (r.totalLateDeductions || 0),
+      );
+
+    const payrollCost = round2(lockedRuns.reduce((sum, r) => sum + employerCostOfRun(r), 0));
+
+    // Per-employee payroll roll-up across the locked runs in the range.
+    const payrollByEmployee = new Map<
+      string,
+      {
+        employeeId: string;
+        code: string;
+        name: string;
+        nameAr: string | null;
+        department: string | null;
+        jobTitle: string | null;
+        gross: number;
+        deductions: number;
+        net: number;
+        employerCost: number;
+        bonuses: number;
+        penalties: number;
+        advances: number;
+        loans: number;
+        runs: number;
+      }
+    >();
+
+    for (const run of lockedRuns) {
+      for (const item of run.Items) {
+        const emp = item.Employee;
+        const key = item.employeeId;
+        const row = payrollByEmployee.get(key) ?? {
+          employeeId: key,
+          code: emp?.code ?? "—",
+          name: emp?.fullName ?? "—",
+          nameAr: emp?.fullNameAr ?? null,
+          department: emp?.Department?.nameAr || emp?.Department?.name || null,
+          jobTitle: emp?.JobTitle?.titleAr || emp?.JobTitle?.title || null,
+          gross: 0,
+          deductions: 0,
+          net: 0,
+          employerCost: 0,
+          bonuses: 0,
+          penalties: 0,
+          advances: 0,
+          loans: 0,
+          runs: 0,
+        };
+        row.gross = round2(row.gross + (item.grossSalary || 0));
+        row.deductions = round2(row.deductions + (item.totalDeductions || 0));
+        row.net = round2(row.net + (item.netSalary || 0));
+        row.employerCost = round2(
+          row.employerCost +
+            (item.grossSalary || 0) +
+            (item.companyInsuranceAmount || 0) -
+            (item.penaltiesAmount || 0) -
+            (item.absenceAmount || 0) -
+            (item.lateAmount || 0),
+        );
+        row.bonuses = round2(row.bonuses + (item.bonusesAmount || 0));
+        row.penalties = round2(row.penalties + (item.penaltiesAmount || 0));
+        row.advances = round2(row.advances + (item.advancesAmount || 0));
+        row.loans = round2(row.loans + (item.loansAmount || 0));
+        row.runs += 1;
+        payrollByEmployee.set(key, row);
+      }
+    }
+
+    const payrollEmployees = [...payrollByEmployee.values()].sort(
+      (a, b) => b.employerCost - a.employerCost,
+    );
+
+    const payrollRunsSummary = payrollRuns.map((r) => ({
+      id: r.id,
+      month: r.Period.month,
+      year: r.Period.year,
+      status: r.status,
+      employeeCount: r.employeeCount,
+      totalGross: r.totalGross,
+      totalDeductions: r.totalDeductions,
+      totalNet: r.totalNet,
+      totalCompanyInsurance: r.totalCompanyInsurance,
+      totalBonuses: r.totalBonuses,
+      totalPenalties: r.totalPenalties,
+      totalAdvances: r.totalAdvances,
+      totalLoanInstallments: r.totalLoanInstallments,
+      totalTax: r.totalTax,
+      employerCost: employerCostOfRun(r),
+      totalPaid: r.totalPaid,
+      disbursedAt: r.disbursedAt,
+      disbursementMethod: r.disbursementMethod,
+    }));
+
+    const sumBy = <T extends Record<string, unknown>>(rows: T[], pick: (row: T) => number) =>
+      round2(rows.reduce((sum, row) => sum + (pick(row) || 0), 0));
+
+    const advancesTotal = sumBy(employeeAdvances, (a) => a.amount);
+    const advancesPending = sumBy(
+      employeeAdvances.filter((a) => a.status === "PENDING" || a.status === "APPROVED"),
+      (a) => a.amount,
+    );
+    const loansTotal = sumBy(employeeLoans, (l) => l.totalAmount);
+    const loansOutstanding = sumBy(
+      employeeLoans.filter((l) => l.status === "APPROVED" || l.status === "DEDUCTING"),
+      (l) => l.totalAmount,
+    );
+    const bonusesTotal = sumBy(employeeBonuses, (b) => b.amount);
+    const penaltiesTotal = sumBy(employeePenalties, (p) => p.amount);
+
+    // Money that actually left the company for staff, inside the range.
+    const disbursedOn = (value: Date | null) => {
+      if (!value) return false;
+      if (from && value < from) return false;
+      if (to && value > to) return false;
+      return true;
+    };
+
+    const salariesPaid = round2(
+      payrollRuns
+        .filter((r) => disbursedOn(r.disbursedAt))
+        .reduce((sum, r) => sum + (r.totalPaid || 0), 0),
+    );
+    const advancesDisbursed = round2(
+      employeeAdvances
+        .filter((a) => disbursedOn(a.disbursedAt))
+        .reduce((sum, a) => sum + (a.amount || 0), 0),
+    );
+    const loansDisbursed = round2(
+      employeeLoans
+        .filter((l) => disbursedOn(l.disbursedAt))
+        .reduce((sum, l) => sum + (l.totalAmount || 0), 0),
+    );
+
+    // ─────────────────────────────────────────────────────────
     // INCOME STATEMENT (قائمة الدخل)
     // revenue − cost of purchases − expenses − sales returns
     // + net settlements for profit (signed: ADDITION increases profit, SUBTRACTION reduces it)
+    // − payroll cost (the employer's real cost of the staff)
     //
     // Purchase returns are NOT added separately here: returning goods reduces the
     // purchase order total (which lowers purchases cost) and refunds cash via the
@@ -268,14 +494,16 @@ export async function GET(
       totalPurchases -
       totalExpenses -
       salesReturns +
-      totalSettlementsForProfit;
+      totalSettlementsForProfit -
+      payrollCost;
 
     // ─────────────────────────────────────────────────────────
     // CASH POSITION (الموقف النقدي)
     // in: verified settlements + cash from sales (+ any payment); out: expenses + cash purchases
+    // + the money that went out to the staff (salaries paid, advances and loans handed over)
     // ─────────────────────────────────────────────────────────
     const cashIn = totalSettlements + cashFromSales;
-    const cashOut = totalExpenses + cashForPurchases;
+    const cashOut = totalExpenses + cashForPurchases + salariesPaid + advancesDisbursed + loansDisbursed;
     const netCash = cashIn - cashOut;
 
     // ─────────────────────────────────────────────────────────
@@ -350,6 +578,7 @@ export async function GET(
         purchaseReturns,
         expenses: totalExpenses,
         settlementsCollected: totalSettlementsForProfit,
+        payrollCost,
         netProfit,
       },
       cashPosition: {
@@ -360,6 +589,90 @@ export async function GET(
         cashFromSales,
         expenses: totalExpenses,
         cashForPurchases,
+        salariesPaid,
+        advancesDisbursed,
+        loansDisbursed,
+      },
+      hr: {
+        headcount,
+        payrollCost,
+        totals: {
+          gross: round2(lockedRuns.reduce((sum, r) => sum + (r.totalGross || 0), 0)),
+          deductions: round2(lockedRuns.reduce((sum, r) => sum + (r.totalDeductions || 0), 0)),
+          net: round2(lockedRuns.reduce((sum, r) => sum + (r.totalNet || 0), 0)),
+          bonuses: round2(lockedRuns.reduce((sum, r) => sum + (r.totalBonuses || 0), 0)),
+          penalties: round2(lockedRuns.reduce((sum, r) => sum + (r.totalPenalties || 0), 0)),
+          advancesRecovered: round2(lockedRuns.reduce((sum, r) => sum + (r.totalAdvances || 0), 0)),
+          loansRecovered: round2(lockedRuns.reduce((sum, r) => sum + (r.totalLoanInstallments || 0), 0)),
+          companyInsurance: round2(lockedRuns.reduce((sum, r) => sum + (r.totalCompanyInsurance || 0), 0)),
+          tax: round2(lockedRuns.reduce((sum, r) => sum + (r.totalTax || 0), 0)),
+          employerCost: payrollCost,
+        },
+        runs: payrollRunsSummary,
+        employees: payrollEmployees,
+        advances: {
+          total: advancesTotal,
+          pending: advancesPending,
+          disbursed: advancesDisbursed,
+          count: employeeAdvances.length,
+          items: employeeAdvances.map((a) => ({
+            id: a.id,
+            employeeId: a.employeeId,
+            employeeName: a.Employee?.fullNameAr || a.Employee?.fullName || "—",
+            amount: a.amount,
+            status: a.status,
+            requestDate: a.requestDate,
+            disbursedAt: a.disbursedAt,
+            reason: a.reason,
+          })),
+        },
+        loans: {
+          total: loansTotal,
+          outstanding: loansOutstanding,
+          disbursed: loansDisbursed,
+          count: employeeLoans.length,
+          items: employeeLoans.map((l) => ({
+            id: l.id,
+            employeeId: l.employeeId,
+            employeeName: l.Employee?.fullNameAr || l.Employee?.fullName || "—",
+            totalAmount: l.totalAmount,
+            monthlyAmount: l.monthlyAmount,
+            installmentCount: l.installmentCount,
+            status: l.status,
+            startDate: l.startDate,
+            disbursedAt: l.disbursedAt,
+            reason: l.reason,
+          })),
+        },
+        bonuses: {
+          total: bonusesTotal,
+          count: employeeBonuses.length,
+          items: employeeBonuses.map((b) => ({
+            id: b.id,
+            employeeId: b.employeeId,
+            employeeName: b.Employee?.fullNameAr || b.Employee?.fullName || "—",
+            title: b.title,
+            amount: b.amount,
+            status: b.status,
+            targetMonth: b.targetMonth,
+            targetYear: b.targetYear,
+          })),
+        },
+        penalties: {
+          total: penaltiesTotal,
+          count: employeePenalties.length,
+          items: employeePenalties.map((p) => ({
+            id: p.id,
+            employeeId: p.employeeId,
+            employeeName: p.Employee?.fullNameAr || p.Employee?.fullName || "—",
+            title: p.title,
+            amount: p.amount,
+            status: p.status,
+            targetMonth: p.targetMonth,
+            targetYear: p.targetYear,
+            reason: p.reason,
+          })),
+        },
       },
       netProfit,
       monthlyData,

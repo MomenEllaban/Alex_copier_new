@@ -2,6 +2,10 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
 import { Prisma } from "@/generated/prisma/client";
+import {
+  employeeNotInCompanyResponse,
+  findEmployeeInCompany,
+} from "@/lib/services/hr/company-scope";
 
 export async function GET(request: Request) {
   try {
@@ -81,6 +85,13 @@ export async function POST(request: Request) {
 
     if (!employeeId || !dateStr) {
       return NextResponse.json({ error: "employeeId and date are required" }, { status: 400 });
+    }
+
+    // The attendance record belongs to an employee — it must be an employee of
+    // the company the request works on.
+    if (actor.companyId) {
+      const employee = await findEmployeeInCompany(employeeId, actor.companyId);
+      if (!employee) return employeeNotInCompanyResponse();
     }
 
     const date = new Date(dateStr);

@@ -8,6 +8,13 @@ const mocks = vi.hoisted(() => {
     expense: { findMany: vi.fn() },
     settlement: { findMany: vi.fn() },
     returnTransaction: { findMany: vi.fn() },
+    // The HR section of the report reads the payroll and the staff ledgers.
+    payrollRun: { findMany: vi.fn().mockResolvedValue([]) },
+    employeeAdvance: { findMany: vi.fn().mockResolvedValue([]) },
+    employeeLoan: { findMany: vi.fn().mockResolvedValue([]) },
+    employeeBonus: { findMany: vi.fn().mockResolvedValue([]) },
+    employeePenalty: { findMany: vi.fn().mockResolvedValue([]) },
+    employee: { count: vi.fn().mockResolvedValue(0) },
   };
   return { requireAuth: vi.fn(), db };
 });

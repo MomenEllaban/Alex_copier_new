@@ -2061,6 +2061,19 @@ model PayrollRun {
   lockedBy               String?
   lockedAt               DateTime?
   journalEntryId         String?
+  /// Cash disbursement of a locked run (صرف الرواتب).
+  ///
+  /// Locking posts the ACCRUAL: it debits the payroll expense and credits
+  /// Salaries Payable, which leaves the money owed to the employees on the
+  /// books. Paying them is a second, separate entry that debits that
+  /// liability and credits the treasury — without it the company report would
+  /// never see the salary money leave the bank.
+  totalPaid              Float        @default(0)
+  disbursedAt            DateTime?
+  disbursedBy            String?
+  disbursementMethod     String?
+  treasuryAccountId      String?
+  disbursementJournalEntryId String?
   notes                  String?
   createdAt              DateTime      @default(now())
   updatedAt              DateTime      @updatedAt

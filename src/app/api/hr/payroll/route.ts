@@ -6,9 +6,11 @@ import {
   calculatePayrollRun,
   approvePayrollRun,
   lockPayrollRun,
+  disbursePayrollRun,
 } from "@/lib/services/hr/payroll-service";
 import { errorMessage } from "@/lib/prisma-errors";
 import { Prisma } from "@/generated/prisma/client";
+import { scopedRecord } from "@/lib/services/hr/company-scope";
 
 export async function GET(request: Request) {
   try {
@@ -124,6 +126,8 @@ export async function POST(request: Request) {
     // ─── APPROVE ──────────────────────────────────
     if (action === "approve") {
       if (!runId) return NextResponse.json({ error: "runId required" }, { status: 400 });
+      const scoped = await scopedRecord(actor, "كشف الرواتب", () => prisma.payrollRun.findUnique({ where: { id: runId } }));
+      if ("response" in scoped) return scoped.response;
 
       const updated = await approvePayrollRun(runId, actorId);
       notifyPayrollApproved({ month: updated.Period.month, year: updated.Period.year, actorId }).catch(() => {});
@@ -134,8 +138,25 @@ export async function POST(request: Request) {
     // ─── LOCK ─────────────────────────────────────
     if (action === "lock") {
       if (!runId) return NextResponse.json({ error: "runId required" }, { status: 400 });
+      const scoped = await scopedRecord(actor, "كشف الرواتب", () => prisma.payrollRun.findUnique({ where: { id: runId } }));
+      if ("response" in scoped) return scoped.response;
 
       const result = await lockPayrollRun(runId, actorId);
+      return NextResponse.json(result);
+    }
+
+    // ─── DISBURSE ─────────────────────────────────
+    if (action === "disburse") {
+      if (!runId) return NextResponse.json({ error: "runId required" }, { status: 400 });
+      const scoped = await scopedRecord(actor, "كشف الرواتب", () => prisma.payrollRun.findUnique({ where: { id: runId } }));
+      if ("response" in scoped) return scoped.response;
+
+      const result = await disbursePayrollRun({
+        runId,
+        actorId,
+        treasuryAccountId: body.treasuryAccountId || undefined,
+        disbursementMethod: body.disbursementMethod || undefined,
+      });
       return NextResponse.json(result);
     }
 

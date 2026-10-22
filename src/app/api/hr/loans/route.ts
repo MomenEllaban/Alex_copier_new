@@ -15,6 +15,13 @@ import { errorMessage } from "@/lib/prisma-errors";
 import { Prisma } from "@/generated/prisma/client";
 import { enumFilter } from "@/lib/enum-filter";
 import { ADVANCE_STATUSES } from "@/lib/hr/hr-statuses";
+import {
+  crossCompanyResponse,
+  employeeNotInCompanyResponse,
+  findEmployeeInCompany,
+  resolveCompanyId,
+  scopedRecord,
+} from "@/lib/services/hr/company-scope";
 
 export async function GET(request: Request) {
   try {
@@ -33,13 +40,23 @@ export async function GET(request: Request) {
     const summaryOnly = searchParams.get("summaryOnly");
 
     if (employeeId && summaryOnly === "true") {
+      if (actor.companyId) {
+        const emp = await findEmployeeInCompany(employeeId, actor.companyId);
+        if (!emp) return employeeNotInCompanyResponse();
+      }
       const summary = await getEmployeeLoanSummary(employeeId);
       return NextResponse.json(summary);
     }
 
     const where: Prisma.EmployeeLoanWhereInput = {};
     if (actor.companyId) where.companyId = actor.companyId;
-    if (employeeId) where.employeeId = employeeId;
+    if (employeeId) {
+      if (actor.companyId) {
+        const emp = await findEmployeeInCompany(employeeId, actor.companyId);
+        if (!emp) return employeeNotInCompanyResponse();
+      }
+      where.employeeId = employeeId;
+    }
     if (status) where.status = status;
 
     const loans = await prisma.employeeLoan.findMany({
@@ -81,11 +98,14 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const companyId = actor.companyId || body.companyId;
+    const companyId = resolveCompanyId(actor, body.companyId);
 
     if (!companyId || !body.employeeId || !body.totalAmount || !body.installmentCount || !body.startDate) {
       return NextResponse.json({ error: "Missing required loan fields" }, { status: 400 });
     }
+
+    const employee = await findEmployeeInCompany(body.employeeId, companyId);
+    if (!employee) return employeeNotInCompanyResponse();
 
     const loan = await createLoan(
       {
@@ -119,17 +139,32 @@ export async function PATCH(request: Request) {
     const body = await request.json();
     const { action, id, installmentId, loanId, reason, disbursementMethod, treasuryAccountId } = body;
 
+    const targetLoanId = id || loanId;
+    if (targetLoanId) {
+      const scoped = await scopedRecord(actor, "القرض", () => prisma.employeeLoan.findUnique({ where: { id: targetLoanId } }));
+      if ("response" in scoped) return scoped.response;
+    }
+    if (installmentId) {
+      const inst = await prisma.loanInstallment.findUnique({
+        where: { id: installmentId },
+        include: { Loan: true },
+      });
+      if (!inst) return NextResponse.json({ error: "القسط غير موجود" }, { status: 404 });
+      const denied = crossCompanyResponse(actor, inst.Loan.companyId);
+      if (denied) return denied;
+    }
+
     let result;
 
     if (action === "approve") {
-      if (!id && !loanId) return NextResponse.json({ error: "loanId required" }, { status: 400 });
-      result = await approveLoan(id || loanId, actor.id);
+      if (!targetLoanId) return NextResponse.json({ error: "loanId required" }, { status: 400 });
+      result = await approveLoan(targetLoanId, actor.id);
     } else if (action === "disburse") {
-      if (!id && !loanId) return NextResponse.json({ error: "loanId required" }, { status: 400 });
-      result = await disburseLoan(id || loanId, actor.id, disbursementMethod, treasuryAccountId);
+      if (!targetLoanId) return NextResponse.json({ error: "loanId required" }, { status: 400 });
+      result = await disburseLoan(targetLoanId, actor.id, disbursementMethod, treasuryAccountId);
     } else if (action === "reject") {
-      if (!id && !loanId) return NextResponse.json({ error: "loanId required" }, { status: 400 });
-      result = await rejectLoan(id || loanId, actor.id, reason);
+      if (!targetLoanId) return NextResponse.json({ error: "loanId required" }, { status: 400 });
+      result = await rejectLoan(targetLoanId, actor.id, reason);
     } else if (action === "postponeInstallment") {
       if (!installmentId) return NextResponse.json({ error: "installmentId required" }, { status: 400 });
       result = await postponeInstallment(installmentId, actor.id, reason || "تأجيل بطلب الإدارة");
@@ -137,8 +172,8 @@ export async function PATCH(request: Request) {
       if (!installmentId) return NextResponse.json({ error: "installmentId required" }, { status: 400 });
       result = await earlyPayoffInstallment(installmentId, actor.id);
     } else if (action === "earlyPayoffLoan") {
-      if (!id && !loanId) return NextResponse.json({ error: "loanId required" }, { status: 400 });
-      result = await earlyPayoffLoan(id || loanId, actor.id);
+      if (!targetLoanId) return NextResponse.json({ error: "loanId required" }, { status: 400 });
+      result = await earlyPayoffLoan(targetLoanId, actor.id);
     } else {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }

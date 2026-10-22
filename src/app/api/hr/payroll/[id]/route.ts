@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
 import { errorMessage } from "@/lib/prisma-errors";
+import { scopedRecord } from "@/lib/services/hr/company-scope";
 
 export async function GET(
   _request: Request,
@@ -18,6 +19,12 @@ export async function GET(
     }
 
     const { id } = await params;
+
+    // The run must belong to the actor's company before it is read.
+    const scoped = await scopedRecord(actor, "كشف الرواتب", () =>
+      prisma.payrollRun.findUnique({ where: { id }, select: { id: true, companyId: true } }),
+    );
+    if ("response" in scoped) return scoped.response;
 
     const run = await prisma.payrollRun.findUnique({
       where: { id },
