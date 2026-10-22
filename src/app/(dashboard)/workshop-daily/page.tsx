@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSession } from "next-auth/react";
-import { ArrowDownCircle, ArrowUpCircle, Lock, Pencil, Plus, Trash2, Wallet, X } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Eye, Lock, Pencil, Plus, Tags, Trash2, Wallet, X } from "lucide-react";
 import { useI18n } from "@/i18n/context";
 import { apiErrorMessage } from "@/lib/api-client";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
@@ -15,6 +15,7 @@ import FormModal from "@/components/FormModal";
 import SubmitButton from "@/components/SubmitButton";
 import PrinterLoader from "@/components/PrinterLoader";
 import { useConfirm, useToast } from "@/components/UIProvider";
+import { usePermissions } from "@/components/PermissionsProvider";
 
 interface Tx {
   id: string;
@@ -53,19 +54,35 @@ interface Book {
   transactions: Tx[];
 }
 
-interface ClosedBook {
+/** A day in the history list: its totals, and whether it is still open. */
+interface DayRow {
   id: string;
   bookDate: string;
+  status: string;
   closedAt: string | null;
   handoverAmount: number | null;
   handoverTo: string | null;
   totals: Totals;
 }
 
+/** A day opened for reading: the entries booked on it. */
+interface DayDetail extends DayRow {
+  transactions: Tx[];
+}
+
+interface Category {
+  id: string;
+  name: string;
+}
+
 interface DailyData {
   company: { id: string; name: string };
   book: Book | null;
-  closedBooks: ClosedBook[];
+  days: DayRow[];
+  daysTotal: number;
+  daysPage: number;
+  daysPageSize: number;
+  categories: Category[];
 }
 
 const FINANCE_ROLES = ["ACCOUNTANT", "GENERAL_MANAGER", "COMPANY_MANAGER"];
@@ -76,15 +93,35 @@ const STATUS_STYLES: Record<string, string> = {
   REJECTED: "bg-red-100 text-red-800",
 };
 
+const PAGE_SIZE = 10;
+const DAYS_PAGE_SIZE = 15;
+
+/** `YYYY-MM-DD` in local time — the shape an `<input type="date">` uses. */
+const toDateKey = (value: string | Date) => {
+  const d = typeof value === "string" ? new Date(value) : value;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
 export default function WorkshopDailyPage() {
   const { t, locale, dir } = useI18n();
   const { data: session } = useSession();
   const confirmAction = useConfirm();
   const { success: toastSuccess, error: toastError, info: toastInfo } = useToast();
+  const { canAct } = usePermissions();
+
+  // The server refuses what the role does not hold, so the buttons that ask
+  // for it are only shown to the roles that may use them.
+  const canAdd = canAct("workshopDaily", "add");
+  const canEdit = canAct("workshopDaily", "edit");
+  const canDelete = canAct("workshopDaily", "delete");
+  const canClose = canAct("workshopDaily", "close");
+  const canManageCategories = canAdd || canEdit || canDelete;
 
   const role = (session?.user as { role?: string } | undefined)?.role ?? "";
   const currentUserId = session?.user?.id ?? "";
   const isFinance = FINANCE_ROLES.includes(role);
+
+  const todayKey = toDateKey(new Date());
 
   const [data, setData] = useState<DailyData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -92,7 +129,6 @@ export default function WorkshopDailyPage() {
   const [directionFilter, setDirectionFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
-  const PAGE_SIZE = 10;
 
   const [showForm, setShowForm] = useState(false);
   const [editingTx, setEditingTx] = useState<Tx | null>(null);
@@ -101,6 +137,8 @@ export default function WorkshopDailyPage() {
   const [reason, setReason] = useState("");
   const [revenueType, setRevenueType] = useState("");
   const [customerId, setCustomerId] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [txDate, setTxDate] = useState(todayKey);
   const [customers, setCustomers] = useState<{ id: string; name: string }[]>([]);
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -111,14 +149,32 @@ export default function WorkshopDailyPage() {
   const [rejecting, setRejecting] = useState(false);
 
   const [showClose, setShowClose] = useState(false);
+  const [closeBookId, setCloseBookId] = useState("");
   const [handoverTo, setHandoverTo] = useState("الخزينة الرئيسية");
   const [handoverNote, setHandoverNote] = useState("");
   const [closeError, setCloseError] = useState("");
   const [closing, setClosing] = useState(false);
 
+  const [showCategories, setShowCategories] = useState(false);
+  const [catName, setCatName] = useState("");
+  const [catError, setCatError] = useState("");
+  const [catSaving, setCatSaving] = useState(false);
+  const [editingCat, setEditingCat] = useState<Category | null>(null);
+
+  const [dayOpen, setDayOpen] = useState(false);
+  const [dayDetail, setDayDetail] = useState<DayDetail | null>(null);
+  const [dayLoading, setDayLoading] = useState(false);
+  const [dayError, setDayError] = useState("");
+
+  // The days list is paginated on the server, so the page it is on has to
+  // survive a refresh of the open book.
+  const daysPageRef = useRef(1);
+
   const fetchDaily = async () => {
     try {
-      const res = await fetch("/api/workshop-daily");
+      const res = await fetch(
+        `/api/workshop-daily?daysPage=${daysPageRef.current}&daysPageSize=${DAYS_PAGE_SIZE}`,
+      );
       const json = await res.json().catch(() => null);
       if (res.ok) setData(json);
     } finally {
@@ -160,13 +216,18 @@ export default function WorkshopDailyPage() {
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
+  const categories = data?.categories ?? [];
+  const days = data?.days ?? [];
+  const daysTotal = data?.daysTotal ?? 0;
+  const daysTotalPages = Math.max(1, Math.ceil(daysTotal / DAYS_PAGE_SIZE));
+  const safeDaysPage = Math.min(data?.daysPage ?? 1, daysTotalPages);
+
   const fmtMoney = (n: number) => `${n.toLocaleString(locale === "ar" ? "ar-EG" : "en-US")} ج.م`;
   const fmtTime = (iso: string) =>
     new Date(iso).toLocaleTimeString(locale === "ar" ? "ar-EG" : "en-GB", { hour: "2-digit", minute: "2-digit" });
   const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(locale === "ar" ? "ar-EG" : "en-GB");
 
   const canModify = (tx: Tx) => tx.status === "PENDING" && (isFinance || tx.createdBy === currentUserId);
-
   const openAddForm = () => {
     setEditingTx(null);
     setDirection("OUT");
@@ -174,6 +235,8 @@ export default function WorkshopDailyPage() {
     setReason("");
     setRevenueType("");
     setCustomerId("");
+    setCategoryId("");
+    setTxDate(todayKey);
     setFormError("");
     setShowForm(true);
   };
@@ -185,6 +248,8 @@ export default function WorkshopDailyPage() {
     setReason(tx.reason);
     setRevenueType(tx.revenueType ?? "");
     setCustomerId(tx.customerId ?? "");
+    setCategoryId(tx.category?.id ?? "");
+    setTxDate(todayKey);
     setFormError("");
     setShowForm(true);
   };
@@ -192,6 +257,35 @@ export default function WorkshopDailyPage() {
   const closeForm = () => {
     setShowForm(false);
     setEditingTx(null);
+  };
+
+  const fetchDay = async (bookId: string) => {
+    setDayLoading(true);
+    setDayError("");
+    try {
+      const res = await fetch(`/api/workshop-daily/books/${bookId}`);
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setDayError(apiErrorMessage(json, t));
+        return;
+      }
+      setDayDetail(json);
+    } catch {
+      setDayError(t("common.error"));
+    } finally {
+      setDayLoading(false);
+    }
+  };
+
+  const openDayDetails = (bookId: string) => {
+    setDayDetail(null);
+    setDayError("");
+    setDayOpen(true);
+    void fetchDay(bookId);
+  };
+
+  const reloadDay = () => {
+    if (dayDetail) void fetchDay(dayDetail.id);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -224,8 +318,9 @@ export default function WorkshopDailyPage() {
           direction,
           amount: value,
           reason: reason.trim(),
-          ...(direction === "IN" ? { revenueType } : {}),
+          ...(direction === "IN" ? { revenueType } : { categoryId }),
           ...(revenueType === "CASH_COLLECTION" ? { customerId } : {}),
+          ...(editing ? {} : { bookDate: txDate }),
         }),
       });
       const json = await res.json().catch(() => null);
@@ -235,9 +330,16 @@ export default function WorkshopDailyPage() {
       }
       closeForm();
       refresh();
+      reloadDay();
       notifyDataChanged(["workshop"]);
       toastSuccess(t("common.success"));
-      toastInfo(t(editing ? "workshopDaily.editedNext" : "workshopDaily.addedNext"));
+      if (!editing && json?.reopened) {
+        toastInfo(t("workshopDaily.dayReopened"));
+      } else if (!editing && json?.bookDate && toDateKey(json.bookDate) !== todayKey) {
+        toastInfo(t("workshopDaily.addedBackdatedNext"));
+      } else {
+        toastInfo(t(editing ? "workshopDaily.editedNext" : "workshopDaily.addedNext"));
+      }
     } finally {
       setSaving(false);
     }
@@ -253,6 +355,7 @@ export default function WorkshopDailyPage() {
         return;
       }
       refresh();
+      reloadDay();
       notifyDataChanged(["workshop"]);
       toastSuccess(t("common.success"));
     } catch {
@@ -270,6 +373,7 @@ export default function WorkshopDailyPage() {
         return;
       }
       refresh();
+      reloadDay();
       notifyDataChanged(["workshop", "expenses"]);
       toastSuccess(t("common.success"));
       toastInfo(t(json.postedToBooks ? "workshopDaily.confirmedOutNext" : "workshopDaily.confirmedInNext"));
@@ -301,12 +405,19 @@ export default function WorkshopDailyPage() {
       setRejectTarget(null);
       setRejectReason("");
       refresh();
+      reloadDay();
       notifyDataChanged(["workshop"]);
       toastSuccess(t("common.success"));
       toastInfo(t("workshopDaily.rejectedNext"));
     } finally {
       setRejecting(false);
     }
+  };
+
+  const openCloseForm = (bookId = "") => {
+    setCloseBookId(bookId);
+    setCloseError("");
+    setShowClose(true);
   };
 
   const handleClose = async (e: React.FormEvent) => {
@@ -321,7 +432,11 @@ export default function WorkshopDailyPage() {
       const res = await fetch("/api/workshop-daily/close", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ handoverTo: handoverTo.trim(), handoverNote: handoverNote.trim() || undefined }),
+        body: JSON.stringify({
+          handoverTo: handoverTo.trim(),
+          handoverNote: handoverNote.trim() || undefined,
+          ...(closeBookId ? { bookId: closeBookId } : {}),
+        }),
       });
       const json = await res.json().catch(() => null);
       if (!res.ok) {
@@ -331,8 +446,10 @@ export default function WorkshopDailyPage() {
         return;
       }
       setShowClose(false);
+      setCloseBookId("");
       setHandoverNote("");
       refresh();
+      reloadDay();
       notifyDataChanged(["workshop"]);
       toastSuccess(t("common.success"));
       toastInfo(t("workshopDaily.closedNext"));
@@ -341,7 +458,121 @@ export default function WorkshopDailyPage() {
     }
   };
 
+  // ── التصنيفات ────────────────────────────────────────────────────────────
+  const handleCategoryCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCatError("");
+    const name = catName.trim();
+    if (!name) {
+      setCatError(t("errors.CATEGORY_NAME_REQUIRED"));
+      return;
+    }
+    setCatSaving(true);
+    try {
+      const res = await fetch("/api/workshop-daily/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setCatError(apiErrorMessage(json, t));
+        return;
+      }
+      setCatName("");
+      refresh();
+      notifyDataChanged(["expenses"]);
+      toastSuccess(t("common.success"));
+    } finally {
+      setCatSaving(false);
+    }
+  };
+
+  const handleCategoryRename = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCat) return;
+    setCatError("");
+    const name = editingCat.name.trim();
+    if (!name) {
+      setCatError(t("errors.CATEGORY_NAME_REQUIRED"));
+      return;
+    }
+    setCatSaving(true);
+    try {
+      const res = await fetch(`/api/workshop-daily/categories/${editingCat.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setCatError(apiErrorMessage(json, t));
+        return;
+      }
+      setEditingCat(null);
+      refresh();
+      notifyDataChanged(["expenses"]);
+      toastSuccess(t("common.success"));
+    } finally {
+      setCatSaving(false);
+    }
+  };
+
+  const handleCategoryDelete = async (category: Category) => {
+    if (!(await confirmAction({ message: t("workshopDaily.deleteCategoryConfirm") }))) return;
+    try {
+      const res = await fetch(`/api/workshop-daily/categories/${category.id}`, { method: "DELETE" });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        toastError(apiErrorMessage(json, t));
+        return;
+      }
+      refresh();
+      notifyDataChanged(["expenses"]);
+      toastSuccess(t("common.success"));
+    } catch {
+      toastError(t("common.error"));
+    }
+  };
+
+  const goToDaysPage = (next: number) => {
+    daysPageRef.current = next;
+    fetchDaily();
+  };
+
   const totals = data?.book?.totals;
+  const closeTotals = closeBookId && dayDetail?.id === closeBookId ? dayDetail.totals : totals;
+
+  const renderTxActions = (tx: Tx) => {
+    const showConfirm = isFinance && tx.status === "PENDING";
+    const showEdit = canEdit && canModify(tx);
+    const showDelete = canDelete && canModify(tx);
+    if (!showConfirm && !showEdit && !showDelete) return <span className="text-xs text-gray-400">—</span>;
+    return (
+      <div className="flex flex-wrap items-center gap-1">
+        {showConfirm && (
+          <>
+            <button onClick={() => handleConfirm(tx)} className="rounded-lg border border-green-200 bg-green-50 px-2.5 py-1.5 text-xs font-medium text-green-700 transition hover:bg-green-100">
+              {t("workshopDaily.confirm")}
+            </button>
+            <button onClick={() => { setRejectTarget(tx); setRejectReason(""); setRejectError(""); }} className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-100">
+              {t("workshopDaily.reject")}
+            </button>
+          </>
+        )}
+        {showEdit && (
+          <button onClick={() => openEditForm(tx)} className="rounded-lg p-1.5 text-gray-400 transition hover:bg-blue-50 hover:text-blue-600" title={t("common.edit")} aria-label={t("common.edit")}>
+            <Pencil size={16} className="shrink-0" />
+          </button>
+        )}
+        {showDelete && (
+          <button onClick={() => handleDelete(tx)} className="rounded-lg p-1.5 text-gray-400 transition hover:bg-red-50 hover:text-red-600" title={t("common.delete")} aria-label={t("common.delete")}>
+            <Trash2 size={16} className="shrink-0" />
+          </button>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div dir={dir} className="space-y-4">
@@ -350,21 +581,32 @@ export default function WorkshopDailyPage() {
           <h1 className="text-xl font-bold text-slate-900">{t("workshopDaily.title")}</h1>
           <p className="text-sm text-gray-500">{t("workshopDaily.subtitle")}</p>
         </div>
-        <div className="ms-auto flex gap-2">
-          <button
-            onClick={openAddForm}
-            disabled={!!data?.book?.isOldDay}
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50"
-          >
-            <Plus size={16} className="shrink-0" />{t("workshopDaily.addTransaction")}
-          </button>
-          <button
-            onClick={() => { setCloseError(""); setShowClose(true); }}
-            disabled={!data?.book}
-            className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50"
-          >
-            <Lock size={16} className="shrink-0" />{t("workshopDaily.closeDay")}
-          </button>
+        <div className="ms-auto flex flex-wrap gap-2">
+          {canManageCategories && (
+            <button
+              onClick={() => { setCatError(""); setShowCategories(true); }}
+              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              <Tags size={16} className="shrink-0" />{t("workshopDaily.manageCategories")}
+            </button>
+          )}
+          {canAdd && (
+            <button
+              onClick={openAddForm}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
+            >
+              <Plus size={16} className="shrink-0" />{t("workshopDaily.addTransaction")}
+            </button>
+          )}
+          {canClose && (
+            <button
+              onClick={() => openCloseForm()}
+              disabled={!data?.book}
+              className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50"
+            >
+              <Lock size={16} className="shrink-0" />{t("workshopDaily.closeDay")}
+            </button>
+          )}
         </div>
       </div>
 
@@ -446,7 +688,7 @@ export default function WorkshopDailyPage() {
                     rows: filtered.map((tx) => [
                       fmtTime(tx.createdAt),
                       tx.direction === "IN" ? t("workshopDaily.in") : t("workshopDaily.out"),
-                      tx.category?.name || "",
+                      tx.category?.name || t("workshopDaily.noCategory"),
                       tx.reason,
                       String(tx.amount),
                       tx.status === "PENDING" ? t("workshopDaily.pending") : tx.status === "CONFIRMED" ? t("workshopDaily.confirmed") : t("workshopDaily.rejected"),
@@ -475,78 +717,46 @@ export default function WorkshopDailyPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {paged.map((tx) => {
-                      const showConfirm = isFinance && tx.status === "PENDING";
-                      const showModify = canModify(tx);
-                      const hasActions = showConfirm || showModify;
-                      return (
-                        <tr key={tx.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 text-sm whitespace-nowrap text-slate-600">{fmtTime(tx.createdAt)}</td>
-                          <td className="px-4 py-3 text-sm">
-                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold whitespace-nowrap ${tx.direction === "IN" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                              {tx.direction === "IN" ? <ArrowUpCircle size={12} className="shrink-0" /> : <ArrowDownCircle size={12} className="shrink-0" />}
-                              {tx.direction === "IN" ? t("workshopDaily.in") : t("workshopDaily.out")}
+                    {paged.map((tx) => (
+                      <tr key={tx.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-sm whitespace-nowrap text-slate-600">{fmtTime(tx.createdAt)}</td>
+                        <td className="px-4 py-3 text-sm">
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold whitespace-nowrap ${tx.direction === "IN" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                            {tx.direction === "IN" ? <ArrowUpCircle size={12} className="shrink-0" /> : <ArrowDownCircle size={12} className="shrink-0" />}
+                            {tx.direction === "IN" ? t("workshopDaily.in") : t("workshopDaily.out")}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm">
+                          <span className="font-medium text-slate-700">{tx.category?.name || t("workshopDaily.noCategory")}</span>
+                          {tx.direction === "IN" && tx.revenueType && (
+                            <span className={`ms-1.5 inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold whitespace-nowrap ${
+                              tx.revenueType === "SERVICE_REVENUE" ? "bg-blue-50 text-blue-700" :
+                              tx.revenueType === "CASH_COLLECTION" ? "bg-amber-50 text-amber-700" : "bg-teal-50 text-teal-700"
+                            }`}>
+                              {tx.revenueType === "SERVICE_REVENUE" ? t("workshopDaily.serviceRevenue") :
+                               tx.revenueType === "CASH_COLLECTION" ? t("workshopDaily.cashCollection") : t("workshopDaily.otherIncome")}
                             </span>
-                          </td>
-                          <td className="px-4 py-3 text-sm">
-                            <span className="font-medium text-slate-700">{tx.category?.name || "—"}</span>
-                            {tx.direction === "IN" && tx.revenueType && (
-                              <span className={`ms-1.5 inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold whitespace-nowrap ${
-                                tx.revenueType === "SERVICE_REVENUE" ? "bg-blue-50 text-blue-700" :
-                                tx.revenueType === "CASH_COLLECTION" ? "bg-amber-50 text-amber-700" : "bg-teal-50 text-teal-700"
-                              }`}>
-                                {tx.revenueType === "SERVICE_REVENUE" ? t("workshopDaily.serviceRevenue") :
-                                 tx.revenueType === "CASH_COLLECTION" ? t("workshopDaily.cashCollection") : t("workshopDaily.otherIncome")}
-                              </span>
-                            )}
-                            {tx.direction === "IN" && tx.customerName && (
-                              <span className="mt-0.5 block text-xs text-slate-500">👤 {tx.customerName}</span>
-                            )}
-                          </td>
-                          <td className="max-w-[260px] truncate px-4 py-3 text-sm text-slate-800" title={tx.rejectReason || tx.reason}>
-                            {tx.reason}
-                            {tx.status === "REJECTED" && tx.rejectReason && (
-                              <span className="block truncate text-xs text-red-500">{tx.rejectReason}</span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-sm font-bold whitespace-nowrap text-slate-900"><span dir="ltr">{fmtMoney(tx.amount)}</span></td>
-                          <td className="px-4 py-3 text-sm">
-                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-bold whitespace-nowrap ${STATUS_STYLES[tx.status]}`}>
-                              {tx.status === "PENDING" ? t("workshopDaily.pending") : tx.status === "CONFIRMED" ? t("workshopDaily.confirmed") : t("workshopDaily.rejected")}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 text-sm text-slate-600">{tx.createdByName || "—"}</td>
-                          <td className="px-4 py-3">
-                            {hasActions ? (
-                              <div className="flex flex-wrap items-center gap-1">
-                                {showConfirm && (
-                                  <>
-                                    <button onClick={() => handleConfirm(tx)} className="rounded-lg border border-green-200 bg-green-50 px-2.5 py-1.5 text-xs font-medium text-green-700 transition hover:bg-green-100">
-                                      {t("workshopDaily.confirm")}
-                                    </button>
-                                    <button onClick={() => { setRejectTarget(tx); setRejectReason(""); setRejectError(""); }} className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-100">
-                                      {t("workshopDaily.reject")}
-                                    </button>
-                                  </>
-                                )}
-                                {showModify && (
-                                  <>
-                                    <button onClick={() => openEditForm(tx)} className="rounded-lg p-1.5 text-gray-400 transition hover:bg-blue-50 hover:text-blue-600" title={t("common.edit")} aria-label={t("common.edit")}>
-                                      <Pencil size={16} className="shrink-0" />
-                                    </button>
-                                    <button onClick={() => handleDelete(tx)} className="rounded-lg p-1.5 text-gray-400 transition hover:bg-red-50 hover:text-red-600" title={t("common.delete")} aria-label={t("common.delete")}>
-                                      <Trash2 size={16} className="shrink-0" />
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-xs text-gray-400">—</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
+                          )}
+                          {tx.direction === "IN" && tx.customerName && (
+                            <span className="mt-0.5 block text-xs text-slate-500">👤 {tx.customerName}</span>
+                          )}
+                        </td>
+                        <td className="max-w-[260px] truncate px-4 py-3 text-sm text-slate-800" title={tx.rejectReason || tx.reason}>
+                          {tx.reason}
+                          {tx.status === "REJECTED" && tx.rejectReason && (
+                            <span className="block truncate text-xs text-red-500">{tx.rejectReason}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-sm font-bold whitespace-nowrap text-slate-900"><span dir="ltr">{fmtMoney(tx.amount)}</span></td>
+                        <td className="px-4 py-3 text-sm">
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-bold whitespace-nowrap ${STATUS_STYLES[tx.status]}`}>
+                            {tx.status === "PENDING" ? t("workshopDaily.pending") : tx.status === "CONFIRMED" ? t("workshopDaily.confirmed") : t("workshopDaily.rejected")}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-slate-600">{tx.createdByName || "—"}</td>
+                        <td className="px-4 py-3">{renderTxActions(tx)}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -554,40 +764,68 @@ export default function WorkshopDailyPage() {
             <Pagination currentPage={safePage} totalPages={totalPages} onPageChange={setPage} totalItems={filtered.length} pageSize={PAGE_SIZE} />
           </div>
 
+          {/* ── سجل الأيام: اضغط على أي يوم لعرض حركاته ───────────────────── */}
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <h2 className="mb-3 text-sm font-bold text-slate-900">{t("workshopDaily.closedHistory")}</h2>
-            {!data || data.closedBooks.length === 0 ? (
-              <p className="py-4 text-center text-sm text-gray-400">{t("workshopDaily.noClosedDays")}</p>
+            <div className="mb-3 flex items-center gap-2">
+              <h2 className="text-sm font-bold text-slate-900">{t("workshopDaily.daysHistory")}</h2>
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{daysTotal}</span>
+            </div>
+            {days.length === 0 ? (
+              <p className="py-4 text-center text-sm text-gray-400">{t("workshopDaily.noDays")}</p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[720px]">
+                <table className="w-full min-w-[860px]">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-4 py-2 text-start text-sm font-medium text-gray-500">{t("workshopDaily.openDay")}</th>
+                      <th className="px-4 py-2 text-start text-sm font-medium text-gray-500">{t("workshopDaily.status")}</th>
                       <th className="px-4 py-2 text-start text-sm font-medium text-gray-500">{t("workshopDaily.totalIn")}</th>
                       <th className="px-4 py-2 text-start text-sm font-medium text-gray-500">{t("workshopDaily.totalOut")}</th>
                       <th className="px-4 py-2 text-start text-sm font-medium text-gray-500">{t("workshopDaily.handoverAmount")}</th>
                       <th className="px-4 py-2 text-start text-sm font-medium text-gray-500">{t("workshopDaily.handoverTo")}</th>
+                      <th className="px-4 py-2 text-start text-sm font-medium text-gray-500">{t("common.actions")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
-                    {data.closedBooks.map((b) => (
-                      <tr key={b.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 text-sm whitespace-nowrap text-slate-700">{fmtDate(b.bookDate)}</td>
+                    {days.map((b) => (
+                      <tr
+                        key={b.id}
+                        onClick={() => openDayDetails(b.id)}
+                        className="cursor-pointer hover:bg-blue-50/60"
+                      >
+                        <td className="px-4 py-2 text-sm whitespace-nowrap font-medium text-slate-700">{fmtDate(b.bookDate)}</td>
+                        <td className="px-4 py-2 text-sm">
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-bold whitespace-nowrap ${b.status === "OPEN" ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-600"}`}>
+                            {b.status === "OPEN" ? t("workshopDaily.openBadge") : t("workshopDaily.closedBadge")}
+                          </span>
+                        </td>
                         <td className="px-4 py-2 text-sm font-semibold text-green-700"><span dir="ltr">{fmtMoney(b.totals.inTotal)}</span></td>
                         <td className="px-4 py-2 text-sm font-semibold text-red-700"><span dir="ltr">{fmtMoney(b.totals.outTotal)}</span></td>
                         <td className="px-4 py-2 text-sm font-bold text-slate-900"><span dir="ltr">{b.handoverAmount != null ? fmtMoney(b.handoverAmount) : "—"}</span></td>
                         <td className="px-4 py-2 text-sm text-slate-600">{b.handoverTo || "—"}</td>
+                        <td className="px-4 py-2 text-sm">
+                          <span className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-medium text-blue-700">
+                            <Eye size={14} className="shrink-0" />{t("workshopDaily.viewDay")}
+                          </span>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
             )}
+            <Pagination
+              currentPage={safeDaysPage}
+              totalPages={daysTotalPages}
+              onPageChange={goToDaysPage}
+              totalItems={daysTotal}
+              pageSize={DAYS_PAGE_SIZE}
+            />
           </div>
         </>
       )}
 
+      {/* ── إضافة / تعديل حركة ─────────────────────────────────────────────── */}
       <FormModal open={showForm} onClose={closeForm} title={editingTx ? t("workshopDaily.editTransaction") : t("workshopDaily.addTransaction")}>
         <form onSubmit={handleSubmit} className="space-y-3">
           {formError && (
@@ -610,6 +848,19 @@ export default function WorkshopDailyPage() {
               </button>
             ))}
           </div>
+          {!editingTx && (
+            <div className="space-y-1.5">
+              <label className="mb-1 block text-sm font-medium">{t("workshopDaily.transactionDate")}</label>
+              <input
+                type="date"
+                value={txDate}
+                max={todayKey}
+                onChange={(e) => setTxDate(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+              <p className="text-xs text-gray-500">{t("workshopDaily.dateHint")}</p>
+            </div>
+          )}
           {direction === "IN" && (
             <div className="space-y-1.5">
               <label className="mb-1 block text-sm font-medium">{t("workshopDaily.revenueType")} <span className="text-red-500">*</span></label>
@@ -632,6 +883,20 @@ export default function WorkshopDailyPage() {
               </select>
             </div>
           )}
+          {direction === "OUT" && (
+            <div className="space-y-1.5">
+              <label className="mb-1 block text-sm font-medium">{t("workshopDaily.category")}</label>
+              <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                <option value="">{t("workshopDaily.noCategory")}</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+              {categories.length === 0 && (
+                <p className="text-xs text-amber-600">{t("workshopDaily.noCategoriesHint")}</p>
+              )}
+            </div>
+          )}
           <div className="space-y-1.5">
             <label className="mb-1 block text-sm font-medium">{t("workshopDaily.amount")} (ج.م)</label>
             <input type="number" min="0" step="any" value={amount} onChange={(e) => setAmount(e.target.value)} dir="ltr" placeholder="200" className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none" />
@@ -645,6 +910,177 @@ export default function WorkshopDailyPage() {
             <SubmitButton loading={saving} label={t("common.save")} loadingLabel={t("common.saving")} className="bg-blue-600 text-white hover:bg-blue-700" />
           </div>
         </form>
+      </FormModal>
+
+      {/* ── تفاصيل اليوم ───────────────────────────────────────────────────── */}
+      <FormModal open={dayOpen} onClose={() => setDayOpen(false)} title={t("workshopDaily.dayDetails")} xl>
+        {dayLoading ? (
+          <div className="flex min-h-[220px] items-center justify-center">
+            <PrinterLoader size="sm" label={t("common.loading")} />
+          </div>
+        ) : dayError ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{dayError}</div>
+        ) : dayDetail ? (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <h3 className="text-base font-bold text-slate-900">{fmtDate(dayDetail.bookDate)}</h3>
+              <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-bold ${dayDetail.status === "OPEN" ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-600"}`}>
+                {dayDetail.status === "OPEN" ? t("workshopDaily.openBadge") : t("workshopDaily.closedBadge")}
+              </span>
+              {dayDetail.status === "OPEN" && canClose && (
+                <button
+                  onClick={() => openCloseForm(dayDetail.id)}
+                  className="ms-auto inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
+                >
+                  <Lock size={14} className="shrink-0" />{t("workshopDaily.closeThisDay")}
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+              <div className="rounded-xl border border-green-200 bg-green-50 p-3">
+                <p className="text-xs font-medium text-green-700">{t("workshopDaily.totalIn")}</p>
+                <p className="mt-1 text-lg font-bold text-green-800" dir="ltr">{fmtMoney(dayDetail.totals.inTotal)}</p>
+              </div>
+              <div className="rounded-xl border border-red-200 bg-red-50 p-3">
+                <p className="text-xs font-medium text-red-700">{t("workshopDaily.totalOut")}</p>
+                <p className="mt-1 text-lg font-bold text-red-800" dir="ltr">{fmtMoney(dayDetail.totals.outTotal)}</p>
+              </div>
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                <p className="text-xs font-medium text-emerald-700">{t("workshopDaily.cashboxBalance")}</p>
+                <p className="mt-1 text-lg font-bold text-emerald-800" dir="ltr">{fmtMoney(dayDetail.totals.remaining)}</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-medium text-slate-600">{t("workshopDaily.handoverTo")}</p>
+                <p className="mt-1 truncate text-sm font-semibold text-slate-800">{dayDetail.handoverTo || "—"}</p>
+              </div>
+            </div>
+
+            {dayDetail.transactions.length === 0 ? (
+              <p className="py-6 text-center text-sm text-gray-400">{t("common.noData")}</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[820px]">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-2 text-start text-sm font-medium text-gray-500">{t("workshopDaily.time")}</th>
+                      <th className="px-4 py-2 text-start text-sm font-medium text-gray-500">{t("workshopDaily.direction")}</th>
+                      <th className="px-4 py-2 text-start text-sm font-medium text-gray-500">{t("workshopDaily.category")}</th>
+                      <th className="px-4 py-2 text-start text-sm font-medium text-gray-500">{t("workshopDaily.reason")}</th>
+                      <th className="px-4 py-2 text-start text-sm font-medium text-gray-500">{t("workshopDaily.amount")}</th>
+                      <th className="px-4 py-2 text-start text-sm font-medium text-gray-500">{t("workshopDaily.status")}</th>
+                      <th className="px-4 py-2 text-start text-sm font-medium text-gray-500">{t("workshopDaily.createdBy")}</th>
+                      <th className="px-4 py-2 text-start text-sm font-medium text-gray-500">{t("common.actions")}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {dayDetail.transactions.map((tx) => (
+                      <tr key={tx.id} className="hover:bg-gray-50">
+                        <td className="px-4 py-2 text-sm whitespace-nowrap text-slate-600">{fmtTime(tx.createdAt)}</td>
+                        <td className="px-4 py-2 text-sm">
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold whitespace-nowrap ${tx.direction === "IN" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                            {tx.direction === "IN" ? <ArrowUpCircle size={12} className="shrink-0" /> : <ArrowDownCircle size={12} className="shrink-0" />}
+                            {tx.direction === "IN" ? t("workshopDaily.in") : t("workshopDaily.out")}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2 text-sm">
+                          <span className="font-medium text-slate-700">{tx.category?.name || t("workshopDaily.noCategory")}</span>
+                          {tx.direction === "IN" && tx.revenueType && (
+                            <span className="ms-1.5 inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold whitespace-nowrap bg-blue-50 text-blue-700">
+                              {tx.revenueType === "SERVICE_REVENUE" ? t("workshopDaily.serviceRevenue") :
+                               tx.revenueType === "CASH_COLLECTION" ? t("workshopDaily.cashCollection") : t("workshopDaily.otherIncome")}
+                            </span>
+                          )}
+                          {tx.direction === "IN" && tx.customerName && (
+                            <span className="mt-0.5 block text-xs text-slate-500">👤 {tx.customerName}</span>
+                          )}
+                        </td>
+                        <td className="max-w-[260px] truncate px-4 py-2 text-sm text-slate-800" title={tx.rejectReason || tx.reason}>
+                          {tx.reason}
+                          {tx.status === "REJECTED" && tx.rejectReason && (
+                            <span className="block truncate text-xs text-red-500">{tx.rejectReason}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-2 text-sm font-bold whitespace-nowrap text-slate-900"><span dir="ltr">{fmtMoney(tx.amount)}</span></td>
+                        <td className="px-4 py-2 text-sm">
+                          <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-bold whitespace-nowrap ${STATUS_STYLES[tx.status]}`}>
+                            {tx.status === "PENDING" ? t("workshopDaily.pending") : tx.status === "CONFIRMED" ? t("workshopDaily.confirmed") : t("workshopDaily.rejected")}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2 text-sm text-slate-600">{tx.createdByName || "—"}</td>
+                        <td className="px-4 py-2">{renderTxActions(tx)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        ) : null}
+      </FormModal>
+
+      {/* ── إدارة التصنيفات ─────────────────────────────────────────────────── */}
+      <FormModal open={showCategories} onClose={() => setShowCategories(false)} title={t("workshopDaily.manageCategories")}>
+        <div className="space-y-4">
+          {catError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{catError}</div>
+          )}
+
+          {canAdd && (
+            <form onSubmit={handleCategoryCreate} className="flex items-end gap-2">
+              <div className="flex-1 space-y-1.5">
+                <label className="mb-1 block text-sm font-medium">{t("workshopDaily.categoryName")}</label>
+                <input
+                  value={catName}
+                  onChange={(e) => setCatName(e.target.value)}
+                  placeholder={t("workshopDaily.categoryNamePlaceholder")}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+              <SubmitButton loading={catSaving} label={t("workshopDaily.addCategory")} loadingLabel={t("common.saving")} className="bg-blue-600 text-white hover:bg-blue-700" />
+            </form>
+          )}
+
+          {categories.length === 0 ? (
+            <p className="py-4 text-center text-sm text-gray-400">{t("workshopDaily.categoriesEmpty")}</p>
+          ) : (
+            <ul className="divide-y divide-gray-200 rounded-xl border border-slate-200">
+              {categories.map((c) => (
+                <li key={c.id} className="flex items-center gap-2 px-3 py-2">
+                  {editingCat?.id === c.id ? (
+                    <form onSubmit={handleCategoryRename} className="flex flex-1 items-center gap-2">
+                      <input
+                        value={editingCat.name}
+                        onChange={(e) => setEditingCat({ ...editingCat, name: e.target.value })}
+                        className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                      />
+                      <button type="submit" disabled={catSaving} className="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:opacity-50">
+                        {t("common.save")}
+                      </button>
+                      <button type="button" onClick={() => setEditingCat(null)} className="rounded-lg border border-gray-300 px-3 py-2 text-xs font-medium text-gray-700 transition hover:bg-gray-50">
+                        {t("common.cancel")}
+                      </button>
+                    </form>
+                  ) : (
+                    <>
+                      <span className="flex-1 truncate text-sm font-medium text-slate-700">{c.name}</span>
+                      {canEdit && (
+                        <button onClick={() => setEditingCat(c)} className="rounded-lg p-1.5 text-gray-400 transition hover:bg-blue-50 hover:text-blue-600" title={t("common.edit")} aria-label={t("common.edit")}>
+                          <Pencil size={16} className="shrink-0" />
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button onClick={() => handleCategoryDelete(c)} className="rounded-lg p-1.5 text-gray-400 transition hover:bg-red-50 hover:text-red-600" title={t("common.delete")} aria-label={t("common.delete")}>
+                          <Trash2 size={16} className="shrink-0" />
+                        </button>
+                      )}
+                    </>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </FormModal>
 
       <FormModal open={!!rejectTarget} onClose={() => setRejectTarget(null)} title={t("workshopDaily.reject")}>
@@ -669,9 +1105,9 @@ export default function WorkshopDailyPage() {
             <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{closeError}</div>
           )}
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm">
-            <div className="flex justify-between py-1"><span className="text-gray-500">{t("workshopDaily.totalIn")}</span><span className="font-bold text-green-700" dir="ltr">{totals ? fmtMoney(totals.inTotal) : "—"}</span></div>
-            <div className="flex justify-between py-1"><span className="text-gray-500">{t("workshopDaily.totalOut")}</span><span className="font-bold text-red-700" dir="ltr">{totals ? fmtMoney(totals.outTotal) : "—"}</span></div>
-            <div className="flex justify-between border-t border-slate-200 py-1 pt-2"><span className="font-medium text-slate-700">{t("workshopDaily.handoverAmount")}</span><span className="font-bold text-slate-900" dir="ltr">{totals ? fmtMoney(totals.remaining) : "—"}</span></div>
+            <div className="flex justify-between py-1"><span className="text-gray-500">{t("workshopDaily.totalIn")}</span><span className="font-bold text-green-700" dir="ltr">{closeTotals ? fmtMoney(closeTotals.inTotal) : "—"}</span></div>
+            <div className="flex justify-between py-1"><span className="text-gray-500">{t("workshopDaily.totalOut")}</span><span className="font-bold text-red-700" dir="ltr">{closeTotals ? fmtMoney(closeTotals.outTotal) : "—"}</span></div>
+            <div className="flex justify-between border-t border-slate-200 py-1 pt-2"><span className="font-medium text-slate-700">{t("workshopDaily.handoverAmount")}</span><span className="font-bold text-slate-900" dir="ltr">{closeTotals ? fmtMoney(closeTotals.remaining) : "—"}</span></div>
             <p className="pt-1 text-xs text-gray-500">{t("workshopDaily.closeDayHint")}</p>
           </div>
           <div className="space-y-1.5">

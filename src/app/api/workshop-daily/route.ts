@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, requireAction, requirePageAccess, type ActionKey } from "@/lib/auth-helpers";
-import { calcTotals, dayKey, getWorkshopCompany, startOfDay } from "@/lib/workshop-daily";
-
-const WORKSHOP_CATEGORY_NAME = "يومية الورشة";
+import { requireAuth, requireAction, type ActionKey } from "@/lib/auth-helpers";
+import {
+  calcTotals,
+  dayKey,
+  decorateTransactions,
+  endOfDay,
+  getWorkshopCompany,
+  parseDayInput,
+  startOfDay,
+} from "@/lib/workshop-daily";
 
 // `createdBy`/`confirmedBy` are scalar user-id columns, not relations, so they
 // cannot appear here — include only accepts relation fields. The caller maps
@@ -12,6 +18,9 @@ const TX_INCLUDE = {
   category: { select: { id: true, name: true } },
   customer: { select: { id: true, name: true } },
 } as const;
+
+const DAYS_PAGE_SIZE = 15;
+const MAX_DAYS_PAGE_SIZE = 50;
 
 /** GET passes "view" and POST passes "add", so the verb's action is a parameter. */
 async function guard(action: ActionKey) {
@@ -27,7 +36,7 @@ async function guard(action: ActionKey) {
   };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const { actor, response } = await guard("view");
     if (!actor && response) return response;
@@ -37,9 +46,15 @@ export async function GET() {
       return NextResponse.json({ error: "شركة القطاعى غير موجودة", code: "WORKSHOP_COMPANY_NOT_FOUND" }, { status: 500 });
     }
 
+    const today = startOfDay(new Date());
+
+    // The open day the page works on: today's book when it exists, otherwise
+    // the most recent open book from before today (the "you forgot to close
+    // yesterday" case, which the page warns about).
     const book = await prisma.workshopDailyBook.findFirst({
-      where: { companyId: company.id, status: "OPEN" },
+      where: { companyId: company.id, status: "OPEN", bookDate: { lte: today } },
       include: { transactions: { include: TX_INCLUDE, orderBy: { createdAt: "desc" } } },
+      orderBy: { bookDate: "desc" },
     });
 
     const userIds = new Set<string>();
@@ -55,12 +70,36 @@ export async function GET() {
       : [];
     const userName = new Map(users.map((u) => [u.id, u.name]));
 
-    const closedBooks = await prisma.workshopDailyBook.findMany({
-      where: { companyId: company.id, status: "CLOSED" },
-      include: { transactions: { select: { direction: true, amount: true, status: true } } },
-      orderBy: { bookDate: "desc" },
-      take: 10,
-    });
+    // Every other day — closed ones and the open ones that were reopened by a
+    // back-dated entry — with its totals. The day the page is working on is
+    // already in the table above, so it is left out of this list.
+    const daysWhere = {
+      companyId: company.id,
+      ...(book ? { id: { not: book.id } } : {}),
+    };
+
+    const params = new URL(request.url).searchParams;
+    const daysPage = Math.max(1, Number(params.get("daysPage")) || 1);
+    const daysPageSize = Math.min(
+      MAX_DAYS_PAGE_SIZE,
+      Math.max(1, Number(params.get("daysPageSize")) || DAYS_PAGE_SIZE),
+    );
+
+    const [daysTotal, days, categories] = await Promise.all([
+      prisma.workshopDailyBook.count({ where: daysWhere }),
+      prisma.workshopDailyBook.findMany({
+        where: daysWhere,
+        include: { transactions: { select: { direction: true, amount: true, status: true } } },
+        orderBy: { bookDate: "desc" },
+        skip: (daysPage - 1) * daysPageSize,
+        take: daysPageSize,
+      }),
+      prisma.expenseCategory.findMany({
+        where: { companyId: company.id },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      }),
+    ]);
 
     return NextResponse.json({
       company,
@@ -68,24 +107,24 @@ export async function GET() {
         ? {
             ...book,
             openedByName: userName.get(book.openedBy) ?? null,
-            isOldDay: dayKey(book.bookDate) !== dayKey(new Date()),
+            isOldDay: dayKey(book.bookDate) !== dayKey(today),
             totals: calcTotals(book.transactions),
-            transactions: book.transactions.map((t) => ({
-              ...t,
-              createdByName: userName.get(t.createdBy) ?? null,
-              confirmedByName: t.confirmedBy ? (userName.get(t.confirmedBy) ?? null) : null,
-              customerName: t.customer?.name ?? null,
-            })),
+            transactions: decorateTransactions(book.transactions, userName),
           }
         : null,
-      closedBooks: closedBooks.map((b) => ({
+      days: days.map((b) => ({
         id: b.id,
         bookDate: b.bookDate,
+        status: b.status,
         closedAt: b.closedAt,
         handoverAmount: b.handoverAmount,
         handoverTo: b.handoverTo,
         totals: calcTotals(b.transactions),
       })),
+      daysTotal,
+      daysPage,
+      daysPageSize,
+      categories,
     });
   } catch {
     return NextResponse.json({ error: "Failed to fetch workshop daily book" }, { status: 500 });
@@ -153,30 +192,83 @@ export async function POST(request: Request) {
       );
     }
 
-    // The workshop daily form no longer asks for an expense category.
-    // OUT entries are auto-assigned to the workshop's own category so the
-    // accountant can confirm without extra input.
-    let category = direction === "OUT" ? await prisma.expenseCategory.findFirst({
-      where: { companyId: company.id, name: WORKSHOP_CATEGORY_NAME },
-    }) : null;
-    if (direction === "OUT" && !category) {
-      category = await prisma.expenseCategory.create({
-        data: { name: WORKSHOP_CATEGORY_NAME, companyId: company.id },
+    // ═══════════════════════════════════════════════════════════
+    // تصنيف الحركة (صادر فقط) — اختياري
+    // A movement may be filed under one of the workshop's own categories
+    // (transfers, electricity, water…). Nothing is filed under a placeholder:
+    // an entry with no category stays uncategorised until the user files it.
+    // ═══════════════════════════════════════════════════════════
+    const rawCategoryId = typeof body.categoryId === "string" ? body.categoryId.trim() : "";
+    if (rawCategoryId && direction !== "OUT") {
+      return NextResponse.json(
+        { error: "التصنيف يُحدد فقط لحركات الصادر", code: "CATEGORY_NOT_ALLOWED_ON_IN" },
+        { status: 400 },
+      );
+    }
+    let categoryId: string | null = null;
+    if (rawCategoryId) {
+      const category = await prisma.expenseCategory.findFirst({
+        where: { id: rawCategoryId, companyId: company.id },
+        select: { id: true },
       });
+      if (!category) {
+        return NextResponse.json(
+          { error: "التصنيف غير موجود أو لا يخص شركة القطاعى", code: "CATEGORY_INVALID" },
+          { status: 400 },
+        );
+      }
+      categoryId = category.id;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // تاريخ الحركة — افتراضياً اليوم، ويمكن تعديله لإضافة حركة في يوم سابق
+    // A movement can be booked on a past day: the book of that day is reopened
+    // so the day can be closed again with the right totals.
+    // ═══════════════════════════════════════════════════════════
+    const today = startOfDay(new Date());
+    let targetDate = today;
+    if (body.bookDate !== undefined && body.bookDate !== null && body.bookDate !== "") {
+      const parsed = parseDayInput(body.bookDate);
+      if (!parsed) {
+        return NextResponse.json({ error: "تاريخ الحركة غير صالح", code: "DATE_INVALID" }, { status: 400 });
+      }
+      if (parsed.getTime() > today.getTime()) {
+        return NextResponse.json(
+          { error: "لا يمكن إضافة حركة بتاريخ مستقبلي", code: "FUTURE_DATE_NOT_ALLOWED" },
+          { status: 400 },
+        );
+      }
+      targetDate = parsed;
     }
 
     let book = await prisma.workshopDailyBook.findFirst({
-      where: { companyId: company.id, status: "OPEN" },
+      where: { companyId: company.id, bookDate: { gte: targetDate, lt: endOfDay(targetDate) } },
+      orderBy: { createdAt: "desc" },
     });
-    if (book && dayKey(book.bookDate) !== dayKey(new Date())) {
-      return NextResponse.json(
-        { error: "يوجد يوم مفتوح بتاريخ سابق — اقفل اليوم السابق أولاً", code: "PREVIOUS_DAY_OPEN" },
-        { status: 409 },
-      );
+    let reopened = false;
+    if (book && book.status === "CLOSED") {
+      // The day was closed before this entry existed: reopen it so the entry can
+      // be confirmed and the day closed again with the right numbers.
+      book = await prisma.workshopDailyBook.update({
+        where: { id: book.id },
+        data: {
+          status: "OPEN",
+          closedAt: null,
+          closedBy: null,
+          handoverAmount: null,
+          handoverTo: null,
+          handoverNote: null,
+          actualBalance: null,
+          variance: 0,
+          varianceType: null,
+          varianceNote: null,
+        },
+      });
+      reopened = true;
     }
     if (!book) {
       book = await prisma.workshopDailyBook.create({
-        data: { companyId: company.id, bookDate: startOfDay(new Date()), openedBy: actorId },
+        data: { companyId: company.id, bookDate: targetDate, openedBy: actorId },
       });
     }
 
@@ -188,7 +280,7 @@ export async function POST(request: Request) {
         amount,
         revenueType,
         customerId,
-        categoryId: category?.id ?? null,
+        categoryId,
         reason,
         createdBy: actorId,
       },
@@ -196,7 +288,7 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(
-      { ...tx, bookDate: book.bookDate, pendingHint: true },
+      { ...tx, bookDate: book.bookDate, pendingHint: true, reopened },
       { status: 201 },
     );
   } catch {

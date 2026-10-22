@@ -10,10 +10,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mocks = vi.hoisted(() => ({
   prisma: {
     company: { findFirst: vi.fn() },
-    workshopDailyBook: { findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn() },
+    workshopDailyBook: { findFirst: vi.fn(), findMany: vi.fn(), count: vi.fn(), create: vi.fn() },
     workshopTransaction: { create: vi.fn() },
     user: { findMany: vi.fn() },
-    expenseCategory: { findFirst: vi.fn() },
+    expenseCategory: { findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn() },
   },
   requireAuth: vi.fn(),
   requirePageAccess: vi.fn(),
@@ -58,6 +58,8 @@ describe("workshop-daily include shape", () => {
     mocks.prisma.company.findFirst.mockResolvedValue({ id: "company3", name: "شركة القطاعي" });
     mocks.prisma.user.findMany.mockResolvedValue([]);
     mocks.prisma.workshopDailyBook.findMany.mockResolvedValue([]);
+    mocks.prisma.workshopDailyBook.count.mockResolvedValue(0);
+    mocks.prisma.expenseCategory.findMany.mockResolvedValue([]);
   });
 
   it("GET names no scalar field in the transaction include", async () => {
@@ -71,7 +73,7 @@ describe("workshop-daily include shape", () => {
       transactions: [tx],
     });
 
-    const res = await getDailyBook();
+    const res = await getDailyBook(new Request("http://localhost/api/workshop-daily"));
     expect(res.status).toBe(200);
 
     const arg = mocks.prisma.workshopDailyBook.findFirst.mock.calls[0][0] as {
@@ -98,7 +100,7 @@ describe("workshop-daily include shape", () => {
       bookDate: new Date(),
       openedBy: "gm_1",
     });
-    mocks.prisma.expenseCategory.findFirst.mockResolvedValue({ id: "cat1", name: "يومية الورشة" });
+    mocks.prisma.expenseCategory.findFirst.mockResolvedValue(null);
     mocks.prisma.workshopTransaction.create.mockResolvedValue({ id: "t1", createdBy: "gm_1" });
 
     const req = new Request("http://localhost/api/workshop-daily", {
@@ -112,8 +114,14 @@ describe("workshop-daily include shape", () => {
 
     const arg = mocks.prisma.workshopTransaction.create.mock.calls[0][0] as {
       include: Record<string, unknown>;
+      data: { categoryId: unknown };
     };
     expect(() => assertOnlyRelations(arg.include, SCALARS, "WorkshopTransaction")).not.toThrow();
     expect(Object.keys(arg.include).sort()).toEqual(["category", "customer"]);
+
+    // No category picked → the entry stays uncategorised; no placeholder category
+    // is created behind the user's back.
+    expect(arg.data.categoryId).toBeNull();
+    expect(mocks.prisma.expenseCategory.create).not.toHaveBeenCalled();
   });
 });

@@ -3,10 +3,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mocks = vi.hoisted(() => ({
   prisma: {
     company: { findFirst: vi.fn() },
-    workshopDailyBook: { findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn(), update: vi.fn() },
+    workshopDailyBook: { findFirst: vi.fn(), findMany: vi.fn(), count: vi.fn(), create: vi.fn(), update: vi.fn() },
     $transaction: vi.fn(),
     workshopTransaction: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn(), deleteMany: vi.fn() },
-    expenseCategory: { findFirst: vi.fn(), create: vi.fn() },
+    expenseCategory: { findFirst: vi.fn(), findMany: vi.fn(), create: vi.fn() },
     expense: { create: vi.fn(), findMany: vi.fn() },
     settlement: { create: vi.fn() },
     user: { findMany: vi.fn() },
@@ -45,6 +45,8 @@ const jsonRequest = (body: unknown) =>
     body: JSON.stringify(body),
   });
 
+const getRequest = () => new Request("http://localhost/api/workshop-daily");
+
 const methodRequest = (method: string, body?: unknown) =>
   new Request("http://localhost/api/workshop-daily", {
     method,
@@ -59,6 +61,7 @@ const pendingTx = (overrides: Record<string, unknown> = {}) => ({
   companyId: "company3",
   createdBy: "u_workshop",
   status: "PENDING",
+  categoryId: null,
   book: { status: "OPEN" },
   ...overrides,
 });
@@ -88,14 +91,26 @@ describe("workshop daily API", () => {
     mocks.requirePageAccess.mockResolvedValue(staff);
     mocks.requireRole.mockResolvedValue(null);
     mocks.prisma.company.findFirst.mockResolvedValue(company);
+    mocks.prisma.workshopDailyBook.count.mockResolvedValue(0);
+    mocks.prisma.workshopDailyBook.findMany.mockResolvedValue([]);
+    mocks.prisma.expenseCategory.findMany.mockResolvedValue([]);
+    mocks.prisma.user.findMany.mockResolvedValue([]);
   });
 
   it("GET returns 500 when the Sectory company is missing", async () => {
     mocks.prisma.company.findFirst.mockResolvedValue(null);
-    const res = await getDaily();
+    const res = await getDaily(getRequest());
     expect(res.status).toBe(500);
     const body = await res.json();
     expect(body.code).toBe("WORKSHOP_COMPANY_NOT_FOUND");
+  });
+
+  it("GET returns the categories the workshop files its entries under", async () => {
+    mocks.prisma.expenseCategory.findMany.mockResolvedValue([{ id: "cat_1", name: "كهرباء" }]);
+    const res = await getDaily(getRequest());
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.categories).toEqual([{ id: "cat_1", name: "كهرباء" }]);
   });
 
   it("POST validates amount and reason", async () => {
@@ -106,39 +121,48 @@ describe("workshop daily API", () => {
     expect(mocks.prisma.workshopTransaction.create).not.toHaveBeenCalled();
   });
 
-  it("POST auto-assigns the workshop expense category (no category needed in the form)", async () => {
+  it("POST files the entry under the category the user picked", async () => {
     mocks.prisma.workshopDailyBook.findFirst.mockResolvedValue(null);
     mocks.prisma.workshopDailyBook.create.mockResolvedValue({ id: "book_1", bookDate: new Date() });
-    mocks.prisma.expenseCategory.findFirst.mockResolvedValue({ id: "cat_ws", companyId: "company3", name: "يومية الورشة" });
+    mocks.prisma.expenseCategory.findFirst.mockResolvedValue({ id: "cat_elec", companyId: "company3", name: "كهرباء" });
     mocks.prisma.workshopTransaction.create.mockResolvedValue({ id: "tx_1", status: "PENDING" });
-    const res = await addTx(jsonRequest({ direction: "OUT", amount: 200, reason: "شراء مستلزمات للورشة" }));
+    const res = await addTx(
+      jsonRequest({ direction: "OUT", amount: 200, reason: "فاتورة كهرباء", categoryId: "cat_elec" }),
+    );
     expect(res.status).toBe(201);
     const arg = mocks.prisma.workshopTransaction.create.mock.calls[0][0];
-    expect(arg.data.categoryId).toBe("cat_ws");
-    expect(arg.data.amount).toBe(200);
-    // The workshop category must belong to the Sectory company
+    expect(arg.data.categoryId).toBe("cat_elec");
+    // The category must belong to the Sectory company
     const catArg = mocks.prisma.expenseCategory.findFirst.mock.calls[0][0];
-    expect(catArg.where).toEqual({ companyId: "company3", name: "يومية الورشة" });
+    expect(catArg.where).toEqual({ id: "cat_elec", companyId: "company3" });
   });
 
-  it("POST creates the workshop category on first use", async () => {
-    mocks.prisma.workshopDailyBook.findFirst.mockResolvedValue({ id: "book_1", bookDate: new Date() });
-    mocks.prisma.expenseCategory.findFirst.mockResolvedValue(null);
-    mocks.prisma.expenseCategory.create.mockResolvedValue({ id: "cat_new", companyId: "company3", name: "يومية الورشة" });
+  it("POST leaves an entry without a category uncategorised — no placeholder category", async () => {
+    mocks.prisma.workshopDailyBook.findFirst.mockResolvedValue(null);
+    mocks.prisma.workshopDailyBook.create.mockResolvedValue({ id: "book_1", bookDate: new Date() });
     mocks.prisma.workshopTransaction.create.mockResolvedValue({ id: "tx_1", status: "PENDING" });
     const res = await addTx(jsonRequest({ direction: "OUT", amount: 50, reason: "لمبة" }));
     expect(res.status).toBe(201);
-    const catArg = mocks.prisma.expenseCategory.create.mock.calls[0][0];
-    expect(catArg.data.name).toBe("يومية الورشة");
-    expect(catArg.data.companyId).toBe("company3");
     const txArg = mocks.prisma.workshopTransaction.create.mock.calls[0][0];
-    expect(txArg.data.categoryId).toBe("cat_new");
+    expect(txArg.data.categoryId).toBeNull();
+    expect(mocks.prisma.expenseCategory.create).not.toHaveBeenCalled();
+  });
+
+  it("POST rejects a category that does not belong to the workshop company", async () => {
+    mocks.prisma.workshopDailyBook.findFirst.mockResolvedValue(null);
+    mocks.prisma.expenseCategory.findFirst.mockResolvedValue(null);
+    const res = await addTx(
+      jsonRequest({ direction: "OUT", amount: 50, reason: "لمبة", categoryId: "cat_other" }),
+    );
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe("CATEGORY_INVALID");
+    expect(mocks.prisma.workshopTransaction.create).not.toHaveBeenCalled();
   });
 
   it("POST creates a pending entry and auto-opens the day", async () => {
     mocks.prisma.workshopDailyBook.findFirst.mockResolvedValue(null);
     mocks.prisma.workshopDailyBook.create.mockResolvedValue({ id: "book_1", bookDate: new Date() });
-    mocks.prisma.expenseCategory.findFirst.mockResolvedValue({ id: "cat_ws", companyId: "company3", name: "يومية الورشة" });
     mocks.prisma.workshopTransaction.create.mockResolvedValue({ id: "tx_1", status: "PENDING" });
     const res = await addTx(
       jsonRequest({ direction: "OUT", amount: 200, reason: "شراء مستلزمات للورشة" }),
@@ -150,20 +174,59 @@ describe("workshop daily API", () => {
     expect(arg.data.amount).toBe(200);
   });
 
-  it("POST blocks new entries when a previous day is still open", async () => {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    mocks.prisma.workshopDailyBook.findFirst.mockResolvedValue({ id: "book_old", bookDate: yesterday });
-    mocks.prisma.expenseCategory.findFirst.mockResolvedValue({ id: "cat_ws", companyId: "company3", name: "يومية الورشة" });
+  it("POST books the entry on the day the user picked", async () => {
+    mocks.prisma.workshopDailyBook.findFirst.mockResolvedValue(null);
+    mocks.prisma.workshopDailyBook.create.mockResolvedValue({ id: "book_old", bookDate: new Date(2025, 0, 5) });
+    mocks.prisma.workshopTransaction.create.mockResolvedValue({ id: "tx_1", status: "PENDING" });
     const res = await addTx(
-      jsonRequest({ direction: "OUT", amount: 200, reason: "x" }),
+      jsonRequest({ direction: "OUT", amount: 200, reason: "نسيت أضيفها", bookDate: "2025-01-05" }),
     );
-    expect(res.status).toBe(409);
-    const body = await res.json();
-    expect(body.code).toBe("PREVIOUS_DAY_OPEN");
+    expect(res.status).toBe(201);
+    const arg = mocks.prisma.workshopDailyBook.create.mock.calls[0][0];
+    expect(arg.data.bookDate).toEqual(new Date(2025, 0, 5));
   });
 
-  it("confirm posts OUT as a company expense under the workshop category", async () => {
+  it("POST reopens a closed day so a back-dated entry can be confirmed", async () => {
+    mocks.prisma.workshopDailyBook.findFirst.mockResolvedValue({
+      id: "book_old",
+      status: "CLOSED",
+      bookDate: new Date(2025, 0, 5),
+    });
+    mocks.prisma.workshopDailyBook.update.mockResolvedValue({
+      id: "book_old",
+      status: "OPEN",
+      bookDate: new Date(2025, 0, 5),
+    });
+    mocks.prisma.workshopTransaction.create.mockResolvedValue({ id: "tx_1", status: "PENDING" });
+    const res = await addTx(
+      jsonRequest({ direction: "OUT", amount: 200, reason: "نسيت أضيفها", bookDate: "2025-01-05" }),
+    );
+    expect(res.status).toBe(201);
+    const updateArg = mocks.prisma.workshopDailyBook.update.mock.calls[0][0];
+    expect(updateArg.data.status).toBe("OPEN");
+    const body = await res.json();
+    expect(body.reopened).toBe(true);
+  });
+
+  it("POST refuses a future date", async () => {
+    const future = new Date();
+    future.setDate(future.getDate() + 3);
+    const key = `${future.getFullYear()}-${String(future.getMonth() + 1).padStart(2, "0")}-${String(future.getDate()).padStart(2, "0")}`;
+    const res = await addTx(jsonRequest({ direction: "OUT", amount: 200, reason: "x", bookDate: key }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe("FUTURE_DATE_NOT_ALLOWED");
+  });
+
+  it("POST rejects an unparseable date", async () => {
+    const res = await addTx(jsonRequest({ direction: "OUT", amount: 200, reason: "x", bookDate: "05/01/2025" }));
+    expect(res.status).toBe(400);
+    const body = await res.json();
+    expect(body.code).toBe("DATE_INVALID");
+    expect(mocks.prisma.workshopTransaction.create).not.toHaveBeenCalled();
+  });
+
+  it("confirm posts OUT as a company expense under the chosen category", async () => {
     mocks.requireRole.mockResolvedValue(accountant);
     mocks.prisma.workshopTransaction.findUnique.mockResolvedValue({
       id: "tx_1",
@@ -187,12 +250,13 @@ describe("workshop daily API", () => {
     expect(expArg.data.companyId).toBe("company3");
     expect(expArg.data.amount).toBe(200);
     expect(expArg.data.category).toBe("مستلزمات");
+    expect(expArg.data.categoryId).toBe("cat_1");
     const updArg = mocks.prisma.workshopTransaction.update.mock.calls[0][0];
     expect(updArg.data.status).toBe("CONFIRMED");
     expect(updArg.data.expenseId).toBe("exp_1");
   });
 
-  it("confirm creates the workshop category for legacy OUT entries missing one", async () => {
+  it("confirm posts an uncategorised OUT entry without inventing a placeholder category", async () => {
     mocks.requireRole.mockResolvedValue(accountant);
     mocks.prisma.workshopTransaction.findUnique.mockResolvedValue({
       id: "tx_legacy",
@@ -206,7 +270,6 @@ describe("workshop daily API", () => {
       category: null,
       book: { id: "book_1", status: "OPEN" },
     });
-    mocks.prisma.expenseCategory.findFirst.mockResolvedValue({ id: "cat_ws", companyId: "company3", name: "يومية الورشة" });
     mocks.prisma.expense.create.mockResolvedValue({ id: "exp_2" });
     mocks.prisma.workshopTransaction.update.mockResolvedValue({ id: "tx_legacy", status: "CONFIRMED" });
     const res = await confirmTx(new Request("http://localhost/x", { method: "POST" }), {
@@ -214,9 +277,10 @@ describe("workshop daily API", () => {
     });
     expect(res.status).toBe(200);
     const expArg = mocks.prisma.expense.create.mock.calls[0][0];
-    expect(expArg.data.categoryId).toBe("cat_ws");
-    expect(expArg.data.category).toBe("يومية الورشة");
+    expect(expArg.data.categoryId).toBeNull();
+    expect(expArg.data.category).toBe("غير مصنف");
     expect(expArg.data.companyId).toBe("company3");
+    expect(mocks.prisma.expenseCategory.create).not.toHaveBeenCalled();
   });
 
   it("confirm posts IN only to the cashbox (no expense, no settlement)", async () => {
@@ -322,12 +386,27 @@ describe("workshop daily API", () => {
     expect(arg.data.handoverTo).toBe("الخزينة الرئيسية");
   });
 
+  it("close can be aimed at one day from the day list", async () => {
+    mocks.prisma.workshopDailyBook.findFirst.mockResolvedValue({
+      id: "book_2",
+      transactions: [{ direction: "IN", amount: 500, status: "CONFIRMED" }],
+    });
+    mocks.prisma.workshopDailyBook.update.mockResolvedValue({ id: "book_2", status: "CLOSED" });
+    const res = await closeDay(jsonRequest({ handoverTo: "الخزينة الرئيسية", bookId: "book_2" }));
+    expect(res.status).toBe(200);
+    const findArg = mocks.prisma.workshopDailyBook.findFirst.mock.calls[0][0];
+    expect(findArg.where).toMatchObject({ id: "book_2", status: "OPEN" });
+    const arg = mocks.prisma.workshopDailyBook.update.mock.calls[0][0];
+    expect(arg.where).toEqual({ id: "book_2" });
+    expect(arg.data.handoverAmount).toBe(500);
+  });
+
   describe("edit and delete pending entries", () => {
-    it("PUT edits a pending entry and re-resolves the OUT category", async () => {
+    it("PUT edits a pending entry and files it under the chosen category", async () => {
       mocks.prisma.workshopTransaction.findUnique.mockResolvedValue(pendingTx());
-      mocks.prisma.expenseCategory.findFirst.mockResolvedValue({ id: "cat_ws", companyId: "company3", name: "يومية الورشة" });
+      mocks.prisma.expenseCategory.findFirst.mockResolvedValue({ id: "cat_elec", companyId: "company3", name: "كهرباء" });
       const res = await editTx(
-        methodRequest("PUT", { direction: "OUT", amount: 350, reason: "مستلزمات محدثة" }),
+        methodRequest("PUT", { direction: "OUT", amount: 350, reason: "مستلزمات محدثة", categoryId: "cat_elec" }),
         txParams("tx_1"),
       );
       expect(res.status).toBe(200);
@@ -337,15 +416,55 @@ describe("workshop daily API", () => {
           direction: "OUT",
           amount: 350,
           reason: "مستلزمات محدثة",
-          categoryId: "cat_ws",
+          categoryId: "cat_elec",
           revenueType: null,
           customerId: null,
         },
       });
     });
 
-    it("PUT clears the category when switching an entry to IN", async () => {
+    it("PUT clears the category when the user removes it", async () => {
+      mocks.prisma.workshopTransaction.findUnique.mockResolvedValue(pendingTx({ categoryId: "cat_old" }));
+      const res = await editTx(
+        methodRequest("PUT", { direction: "OUT", amount: 350, reason: "تصحيح", categoryId: "" }),
+        txParams("tx_1"),
+      );
+      expect(res.status).toBe(200);
+      expect(mocks.prisma.workshopTransaction.updateMany).toHaveBeenCalledWith({
+        where: { id: "tx_1", status: "PENDING", book: { status: "OPEN" } },
+        data: expect.objectContaining({ categoryId: null }),
+      });
+    });
+
+    it("PUT keeps the category when the payload does not mention one", async () => {
+      mocks.prisma.workshopTransaction.findUnique.mockResolvedValue(pendingTx({ categoryId: "cat_old" }));
+      const res = await editTx(
+        methodRequest("PUT", { direction: "OUT", amount: 350, reason: "تصحيح" }),
+        txParams("tx_1"),
+      );
+      expect(res.status).toBe(200);
+      expect(mocks.prisma.expenseCategory.findFirst).not.toHaveBeenCalled();
+      expect(mocks.prisma.workshopTransaction.updateMany).toHaveBeenCalledWith({
+        where: { id: "tx_1", status: "PENDING", book: { status: "OPEN" } },
+        data: expect.objectContaining({ categoryId: "cat_old" }),
+      });
+    });
+
+    it("PUT rejects a category that does not belong to the workshop company", async () => {
       mocks.prisma.workshopTransaction.findUnique.mockResolvedValue(pendingTx());
+      mocks.prisma.expenseCategory.findFirst.mockResolvedValue(null);
+      const res = await editTx(
+        methodRequest("PUT", { direction: "OUT", amount: 350, reason: "تصحيح", categoryId: "cat_other" }),
+        txParams("tx_1"),
+      );
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.code).toBe("CATEGORY_INVALID");
+      expect(mocks.prisma.workshopTransaction.updateMany).not.toHaveBeenCalled();
+    });
+
+    it("PUT clears the category when switching an entry to IN", async () => {
+      mocks.prisma.workshopTransaction.findUnique.mockResolvedValue(pendingTx({ categoryId: "cat_old" }));
       const res = await editTx(
         methodRequest("PUT", { direction: "IN", amount: 100, reason: "تمويل", revenueType: "SERVICE_REVENUE" }),
         txParams("tx_1"),
@@ -447,9 +566,9 @@ describe("workshop daily API", () => {
     it("PUT lets a finance user edit any pending entry", async () => {
       mocks.requirePageAccess.mockResolvedValue(accountant);
       mocks.prisma.workshopTransaction.findUnique.mockResolvedValue(pendingTx({ createdBy: "u_other" }));
-      mocks.prisma.expenseCategory.findFirst.mockResolvedValue({ id: "cat_ws", companyId: "company3", name: "يومية الورشة" });
+      mocks.prisma.expenseCategory.findFirst.mockResolvedValue({ id: "cat_elec", companyId: "company3", name: "كهرباء" });
       const res = await editTx(
-        methodRequest("PUT", { direction: "OUT", amount: 10, reason: "تصحيح" }),
+        methodRequest("PUT", { direction: "OUT", amount: 10, reason: "تصحيح", categoryId: "cat_elec" }),
         txParams("tx_1"),
       );
       expect(res.status).toBe(200);
@@ -458,7 +577,6 @@ describe("workshop daily API", () => {
 
     it("PUT reports a conflict when the entry is claimed before the write", async () => {
       mocks.prisma.workshopTransaction.findUnique.mockResolvedValue(pendingTx());
-      mocks.prisma.expenseCategory.findFirst.mockResolvedValue({ id: "cat_ws", companyId: "company3", name: "يومية الورشة" });
       mocks.prisma.workshopTransaction.updateMany.mockResolvedValue({ count: 0 });
       const res = await editTx(
         methodRequest("PUT", { direction: "OUT", amount: 10, reason: "x" }),
@@ -501,7 +619,8 @@ describe("workshop daily API", () => {
       mocks.prisma.workshopTransaction.findUnique.mockResolvedValue(null);
       const res = await deleteTx(methodRequest("DELETE"), txParams("tx_missing"));
       expect(res.status).toBe(404);
-      expect(mocks.prisma.workshopTransaction.deleteMany).not.toHaveBeenCalled();
+      const body = await res.json();
+      expect(body.code).toBe("WORKSHOP_TX_NOT_FOUND");
     });
   });
 });

@@ -4,8 +4,6 @@ import { requireAuth, requireAction, type ActionKey } from "@/lib/auth-helpers";
 
 const FINANCE_ROLES = ["ACCOUNTANT", "GENERAL_MANAGER", "COMPANY_MANAGER"] as const;
 
-const WORKSHOP_CATEGORY_NAME = "يومية الورشة";
-
 const TX_INCLUDE = {
   category: { select: { id: true, name: true } },
 } as const;
@@ -30,17 +28,19 @@ async function authorize(
 /**
  * Validates that a transaction can still be modified: it must be PENDING, belong
  * to an OPEN book, and the caller must own it or hold a finance role. Returns a
- * ready-to-send error response, or the transaction's company id when editable.
+ * ready-to-send error response, or the transaction's company and category when
+ * editable.
  */
 async function loadEditable(
   id: string,
   actorId: string,
   isFinance: boolean,
-): Promise<NextResponse | { companyId: string }> {
+): Promise<NextResponse | { companyId: string; categoryId: string | null }> {
   const tx = await prisma.workshopTransaction.findUnique({
     where: { id },
     select: {
       companyId: true,
+      categoryId: true,
       createdBy: true,
       status: true,
       book: { select: { status: true } },
@@ -67,22 +67,41 @@ async function loadEditable(
       { status: 403 },
     );
   }
-  return { companyId: tx.companyId };
+  return { companyId: tx.companyId, categoryId: tx.categoryId };
 }
 
-/** Resolves the auto-assigned workshop category for OUT entries; IN entries have none. */
-async function resolveCategoryId(companyId: string, direction: "IN" | "OUT") {
-  if (direction === "IN") return null;
-  const existing = await prisma.expenseCategory.findFirst({
-    where: { companyId, name: WORKSHOP_CATEGORY_NAME },
+/**
+ * Resolves the category an outgoing entry is filed under. An empty value clears
+ * it; a missing value keeps the one the entry already has. Nothing is ever
+ * filed under a placeholder category — an uncategorised entry stays that way
+ * until the user files it under a category of their own.
+ */
+async function resolveCategoryId(
+  companyId: string,
+  direction: "IN" | "OUT",
+  payload: Record<string, unknown>,
+  currentCategoryId: string | null,
+): Promise<NextResponse | { categoryId: string | null }> {
+  if (direction !== "OUT") return { categoryId: null };
+
+  if (!("categoryId" in payload)) {
+    return { categoryId: currentCategoryId };
+  }
+
+  const raw = typeof payload.categoryId === "string" ? payload.categoryId.trim() : "";
+  if (!raw) return { categoryId: null };
+
+  const category = await prisma.expenseCategory.findFirst({
+    where: { id: raw, companyId },
     select: { id: true },
   });
-  if (existing) return existing.id;
-  const created = await prisma.expenseCategory.create({
-    data: { name: WORKSHOP_CATEGORY_NAME, companyId },
-    select: { id: true },
-  });
-  return created.id;
+  if (!category) {
+    return NextResponse.json(
+      { error: "التصنيف غير موجود أو لا يخص شركة القطاعى", code: "CATEGORY_INVALID" },
+      { status: 400 },
+    );
+  }
+  return { categoryId: category.id };
 }
 
 export async function PUT(
@@ -94,7 +113,7 @@ export async function PUT(
     if (auth instanceof NextResponse) return auth;
     const { id } = await params;
 
-    const body = await request.json().catch(() => ({}));
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
     const direction = body.direction === "IN" ? "IN" : body.direction === "OUT" ? "OUT" : null;
     const amount = Number(body.amount);
     const reason = typeof body.reason === "string" ? body.reason.trim() : "";
@@ -141,13 +160,21 @@ export async function PUT(
     const target = await loadEditable(id, auth.actorId, auth.isFinance);
     if (target instanceof NextResponse) return target;
 
-    const categoryId = await resolveCategoryId(target.companyId, direction);
+    const resolved = await resolveCategoryId(target.companyId, direction, body, target.categoryId);
+    if (resolved instanceof NextResponse) return resolved;
 
     // Guard the write with the same conditions checked above so a concurrent
     // confirm/reject cannot be overwritten between the read and the update.
     const changed = await prisma.workshopTransaction.updateMany({
       where: { id, status: "PENDING", book: { status: "OPEN" } },
-      data: { direction, amount, revenueType, customerId, categoryId, reason },
+      data: {
+        direction,
+        amount,
+        revenueType,
+        customerId,
+        categoryId: resolved.categoryId,
+        reason,
+      },
     });
     if (changed.count !== 1) {
       return NextResponse.json(

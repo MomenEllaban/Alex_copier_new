@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireAction } from "@/lib/auth-helpers";
-import { calcTotals, getWorkshopCompany } from "@/lib/workshop-daily";
+import { calcTotals, getWorkshopCompany, startOfDay } from "@/lib/workshop-daily";
 
 export async function POST(request: Request) {
   try {
@@ -20,10 +20,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "شركة القطاعى غير موجودة", code: "WORKSHOP_COMPANY_NOT_FOUND" }, { status: 500 });
     }
 
-    const book = await prisma.workshopDailyBook.findFirst({
-      where: { companyId: company.id, status: "OPEN" },
-      include: { transactions: true },
-    });
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    const handoverTo = typeof body.handoverTo === "string" ? body.handoverTo.trim() : "";
+    const handoverNote = typeof body.handoverNote === "string" ? body.handoverNote.trim() : "";
+    const bookId = typeof body.bookId === "string" ? body.bookId.trim() : "";
+
+    // A day can be closed from the day list, so the book to close is named
+    // explicitly. Without it the open day of today is closed.
+    const book = bookId
+      ? await prisma.workshopDailyBook.findFirst({
+          where: { id: bookId, companyId: company.id, status: "OPEN" },
+          include: { transactions: true },
+        })
+      : await prisma.workshopDailyBook.findFirst({
+          where: { companyId: company.id, status: "OPEN", bookDate: { lte: startOfDay(new Date()) } },
+          include: { transactions: true },
+          orderBy: { bookDate: "desc" },
+        });
     if (!book) {
       return NextResponse.json({ error: "لا يوجد يوم مفتوح", code: "NO_OPEN_DAY" }, { status: 404 });
     }
@@ -36,9 +49,6 @@ export async function POST(request: Request) {
       );
     }
 
-    const body = await request.json().catch(() => ({}));
-    const handoverTo = typeof body.handoverTo === "string" ? body.handoverTo.trim() : "";
-    const handoverNote = typeof body.handoverNote === "string" ? body.handoverNote.trim() : "";
     if (!handoverTo) {
       return NextResponse.json({ error: "جهة التسليم مطلوبة", code: "HANDOVER_TO_REQUIRED" }, { status: 400 });
     }

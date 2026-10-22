@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireRole } from "@/lib/auth-helpers";
+import { WORKSHOP_SOURCE_LABEL, WORKSHOP_UNCATEGORIZED } from "@/lib/workshop-daily";
 
 const FINANCE_ROLES = ["ACCOUNTANT", "GENERAL_MANAGER", "COMPANY_MANAGER"] as const;
 
@@ -47,24 +48,16 @@ export async function POST(
       // IN stays in the workshop cashbox; its source does not automatically imply revenue.
       let expenseId: string | null = null;
       if (tx.direction === "OUT") {
-        let category = tx.category;
-        if (!category || category.companyId !== tx.companyId) {
-          category = await db.expenseCategory.findFirst({
-            where: { companyId: tx.companyId, name: "يومية الورشة" },
-          });
-          if (!category) {
-            category = await db.expenseCategory.create({
-              data: { name: "يومية الورشة", companyId: tx.companyId },
-            });
-          }
-          await db.workshopTransaction.update({ where: { id }, data: { categoryId: category.id } });
-        }
+        // The category the entry was filed under, if it still belongs to this
+        // company. An entry with no category posts as "uncategorised" — no
+        // placeholder category is created for it.
+        const category = tx.category && tx.category.companyId === tx.companyId ? tx.category : null;
         const expense = await db.expense.create({
           data: {
             companyId: tx.companyId,
-            categoryId: category.id,
-            category: category.name,
-            description: `[يومية الورشة] ${tx.reason}`,
+            categoryId: category?.id ?? null,
+            category: category?.name ?? WORKSHOP_UNCATEGORIZED,
+            description: `[${WORKSHOP_SOURCE_LABEL}] ${tx.reason}`,
             amount: tx.amount,
             paidBy: tx.createdBy,
             date: tx.book.bookDate,
