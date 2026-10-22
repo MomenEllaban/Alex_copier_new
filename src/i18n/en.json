@@ -826,7 +826,10 @@
     "closeThisDay": "Close this day",
     "dayReopened": "The day was reopened to take the entry — confirm it, then close the day again",
     "addedBackdatedNext": "Added to a past day — confirm it, then close that day again",
-    "reasonRequired": "Description is required"
+    "reasonRequired": "Description is required",
+    "leftOpenDays": "Days left open",
+    "week": "Week",
+    "thisWeek": "This week"
   },
   "workshop": {
     "title": "Workshop",

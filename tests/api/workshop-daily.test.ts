@@ -32,7 +32,7 @@ import { PUT as editTx, DELETE as deleteTx } from "@/app/api/workshop-daily/[id]
 import { POST as confirmTx } from "@/app/api/workshop-daily/[id]/confirm/route";
 import { POST as rejectTx } from "@/app/api/workshop-daily/[id]/reject/route";
 import { POST as closeDay } from "@/app/api/workshop-daily/close/route";
-import { calcTotals } from "@/lib/workshop-daily";
+import { addDays, calcTotals, startOfDay, weekStart } from "@/lib/workshop-daily";
 
 const staff = { id: "u_workshop", role: "WORKSHOP_MANAGER" };
 const accountant = { id: "u_acc", role: "ACCOUNTANT" };
@@ -111,6 +111,68 @@ describe("workshop daily API", () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.categories).toEqual([{ id: "cat_1", name: "كهرباء" }]);
+  });
+
+  describe("the day log pages by the workshop week", () => {
+    const today = startOfDay(new Date());
+    const currentWeekStart = weekStart(today);
+
+    const book = (id: string, bookDate: Date, status: string) => ({
+      id,
+      bookDate,
+      status,
+      closedAt: status === "CLOSED" ? bookDate : null,
+      handoverAmount: status === "CLOSED" ? 100 : null,
+      handoverTo: status === "CLOSED" ? "الخزينة الرئيسية" : null,
+      transactions: [{ direction: "IN", amount: 100, status: "CONFIRMED" }],
+    });
+
+    const thisWeek = book("book_this", currentWeekStart, "CLOSED");
+    const lastWeekOpen = book("book_open", addDays(currentWeekStart, -7), "OPEN");
+    const olderWeek = book("book_old", addDays(currentWeekStart, -14), "CLOSED");
+
+    beforeEach(() => {
+      mocks.prisma.workshopDailyBook.findFirst.mockResolvedValue(null);
+      mocks.prisma.workshopDailyBook.findMany.mockImplementation(
+        async (args: { select?: unknown; where?: { status?: string } }) => {
+          // The list of every day's date, used to count the weeks.
+          if (args?.select) return [thisWeek, lastWeekOpen, olderWeek].map((b) => ({ bookDate: b.bookDate }));
+          // The days that are still open.
+          if (args?.where?.status === "OPEN") return [lastWeekOpen];
+          // The days of the requested week.
+          return [thisWeek];
+        },
+      );
+    });
+
+    it("returns the days of the requested week", async () => {
+      const res = await getDaily(new Request("http://localhost/api/workshop-daily?weekIndex=1"));
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.days.map((d: { id: string }) => d.id)).toEqual(["book_this"]);
+      expect(body.weekIndex).toBe(1);
+      expect(body.weeksTotal).toBe(3);
+      expect(body.weekStart).toBe(currentWeekStart.toISOString());
+    });
+
+    it("keeps the day that was left open visible even in another week", async () => {
+      const res = await getDaily(new Request("http://localhost/api/workshop-daily?weekIndex=1"));
+      const body = await res.json();
+      expect(body.openDays.map((d: { id: string }) => d.id)).toEqual(["book_open"]);
+    });
+
+    it("counts the weeks the log holds", async () => {
+      const res = await getDaily(new Request("http://localhost/api/workshop-daily?weekIndex=1"));
+      const body = await res.json();
+      expect(body.daysTotal).toBe(3);
+      expect(body.weeksTotal).toBe(3);
+    });
+
+    it("never asks for a week past the last one that holds days", async () => {
+      const res = await getDaily(new Request("http://localhost/api/workshop-daily?weekIndex=99"));
+      const body = await res.json();
+      expect(body.weekIndex).toBe(3);
+    });
   });
 
   it("POST validates amount and reason", async () => {

@@ -81,8 +81,14 @@ interface DailyData {
   book: Book | null;
   days: DayRow[];
   daysTotal: number;
-  daysPage: number;
-  daysPageSize: number;
+  /** 1 = the week of today, 2 = the week before it, and so on. */
+  weekIndex: number;
+  weeksTotal: number;
+  /** The Saturday the week opens with, and the Thursday it closes with. */
+  weekStart: string;
+  weekEnd: string;
+  /** Every day that is still open, including the one the page works on. */
+  openDays: DayRow[];
   categories: Category[];
 }
 
@@ -95,7 +101,6 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 const PAGE_SIZE = 10;
-const DAYS_PAGE_SIZE = 15;
 /** `YYYY-MM-DD` in Egypt time — the shape an `<input type="date">` uses. */
 const toDateKey = (value: string | Date) => formatEgyptDateISO(value);
 
@@ -147,6 +152,7 @@ export default function WorkshopDailyPage() {
 
   const [showClose, setShowClose] = useState(false);
   const [closeBookId, setCloseBookId] = useState("");
+  const [closeTotalsOverride, setCloseTotalsOverride] = useState<Totals | null>(null);
   const [handoverTo, setHandoverTo] = useState("الخزينة الرئيسية");
   const [handoverNote, setHandoverNote] = useState("");
   const [closeError, setCloseError] = useState("");
@@ -163,15 +169,13 @@ export default function WorkshopDailyPage() {
   const [dayLoading, setDayLoading] = useState(false);
   const [dayError, setDayError] = useState("");
 
-  // The days list is paginated on the server, so the page it is on has to
-  // survive a refresh of the open book.
-  const daysPageRef = useRef(1);
+  // The day log is paginated by week on the server, so the week it is on has
+  // to survive a refresh of the open book.
+  const weekIndexRef = useRef(1);
 
   const fetchDaily = async () => {
     try {
-      const res = await fetch(
-        `/api/workshop-daily?daysPage=${daysPageRef.current}&daysPageSize=${DAYS_PAGE_SIZE}`,
-      );
+      const res = await fetch(`/api/workshop-daily?weekIndex=${weekIndexRef.current}`);
       const json = await res.json().catch(() => null);
       if (res.ok) setData(json);
     } finally {
@@ -216,13 +220,28 @@ export default function WorkshopDailyPage() {
   const categories = data?.categories ?? [];
   const days = data?.days ?? [];
   const daysTotal = data?.daysTotal ?? 0;
-  const daysTotalPages = Math.max(1, Math.ceil(daysTotal / DAYS_PAGE_SIZE));
-  const safeDaysPage = Math.min(data?.daysPage ?? 1, daysTotalPages);
+  const openDays = data?.openDays ?? [];
+  const weeksTotal = Math.max(1, data?.weeksTotal ?? 1);
+  const safeWeekIndex = Math.min(data?.weekIndex ?? 1, weeksTotal);
+  // The days left open behind the day the page works on: the "you forgot to
+  // close the previous day" case.
+  const leftOpenDays = openDays.filter((d) => d.id !== data?.book?.id);
 
   const fmtMoney = (n: number) => `${n.toLocaleString(locale === "ar" ? "ar-EG" : "en-US")} ج.م`;
   const fmtTime = (iso: string) =>
     new Date(iso).toLocaleTimeString(locale === "ar" ? "ar-EG" : "en-GB", { hour: "2-digit", minute: "2-digit" });
   const fmtDate = (iso: string) => new Date(iso).toLocaleDateString(locale === "ar" ? "ar-EG" : "en-GB");
+  /**
+   * The name of the day — "الاثنين". The timezone is fixed so the server and
+   * the browser name the same day.
+   */
+  const fmtDayName = (iso: string) =>
+    new Date(iso).toLocaleDateString(locale === "ar" ? "ar-EG" : "en-GB", {
+      weekday: "long",
+      timeZone: "Africa/Cairo",
+    });
+  /** The day with its name next to it — "الاثنين 05/10/2026". */
+  const fmtDayLabel = (iso: string) => `${fmtDayName(iso)} ${fmtDate(iso)}`;
 
   const canModify = (tx: Tx) => tx.status === "PENDING" && (isFinance || tx.createdBy === currentUserId);
   const openAddForm = () => {
@@ -411,8 +430,14 @@ export default function WorkshopDailyPage() {
     }
   };
 
-  const openCloseForm = (bookId = "") => {
+  /**
+   * Opens the handover form for one day. The totals of that day are passed in
+   * so the form shows the numbers of the day being closed, not the numbers of
+   * the day the page happens to be working on.
+   */
+  const openCloseForm = (bookId = "", bookTotals: Totals | null = null) => {
     setCloseBookId(bookId);
+    setCloseTotalsOverride(bookTotals);
     setCloseError("");
     setShowClose(true);
   };
@@ -444,6 +469,7 @@ export default function WorkshopDailyPage() {
       }
       setShowClose(false);
       setCloseBookId("");
+      setCloseTotalsOverride(null);
       setHandoverNote("");
       refresh();
       reloadDay();
@@ -532,13 +558,13 @@ export default function WorkshopDailyPage() {
     }
   };
 
-  const goToDaysPage = (next: number) => {
-    daysPageRef.current = next;
+  const goToWeek = (next: number) => {
+    weekIndexRef.current = Math.max(1, next);
     fetchDaily();
   };
 
   const totals = data?.book?.totals;
-  const closeTotals = closeBookId && dayDetail?.id === closeBookId ? dayDetail.totals : totals;
+  const closeTotals = closeTotalsOverride ?? totals;
 
   const renderTxActions = (tx: Tx) => {
     const showConfirm = isFinance && tx.status === "PENDING";
@@ -597,7 +623,7 @@ export default function WorkshopDailyPage() {
           )}
           {canClose && (
             <button
-              onClick={() => openCloseForm()}
+              onClick={() => openCloseForm(data?.book?.id ?? "", data?.book?.totals ?? null)}
               disabled={!data?.book}
               className="inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2.5 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 disabled:opacity-50"
             >
@@ -614,8 +640,19 @@ export default function WorkshopDailyPage() {
       ) : (
         <>
           {data?.book?.isOldDay && (
-            <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
-              <X size={16} className="shrink-0" />{t("workshopDaily.oldDayWarning")} ({data.book ? fmtDate(data.book.bookDate) : ""})
+            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-800">
+              <X size={16} className="shrink-0" />
+              <span>
+                {t("workshopDaily.oldDayWarning")} ({data.book ? fmtDayLabel(data.book.bookDate) : ""})
+              </span>
+              {canClose && (
+                <button
+                  onClick={() => openCloseForm(data.book!.id, data.book!.totals)}
+                  className="ms-auto inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
+                >
+                  <Lock size={14} className="shrink-0" />{t("workshopDaily.closeThisDay")}
+                </button>
+              )}
             </div>
           )}
           {!data?.book && (
@@ -624,11 +661,38 @@ export default function WorkshopDailyPage() {
             </div>
           )}
 
+          {/* ── أيام مفتوحة خلف اليوم الحالي: أقفلها من هنا ───────────────── */}
+          {leftOpenDays.length > 0 && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+              <p className="flex items-center gap-2 text-sm font-bold text-red-800">
+                <Lock size={16} className="shrink-0" />{t("workshopDaily.leftOpenDays")}
+              </p>
+              <ul className="mt-2 space-y-2">
+                {leftOpenDays.map((d) => (
+                  <li key={d.id} className="flex flex-wrap items-center gap-2 text-sm text-red-700">
+                    <span className="font-semibold">{fmtDayLabel(d.bookDate)}</span>
+                    <span className="text-xs text-red-600">
+                      {t("workshopDaily.cashboxBalance")}: <span dir="ltr">{fmtMoney(d.totals.remaining)}</span>
+                    </span>
+                    {canClose && (
+                      <button
+                        onClick={() => openCloseForm(d.id, d.totals)}
+                        className="ms-auto inline-flex items-center gap-1.5 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-100"
+                      >
+                        <Lock size={14} className="shrink-0" />{t("workshopDaily.closeThisDay")}
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
               <p className="flex items-center gap-1.5 text-xs font-medium text-emerald-700"><Wallet size={14} className="shrink-0" />{t("workshopDaily.cashboxBalance")}</p>
               <p className="mt-1 text-2xl font-bold text-emerald-800" dir="ltr">{totals ? fmtMoney(totals.remaining) : "—"}</p>
-              <p className="mt-1 text-xs text-emerald-600">{data?.book ? `${t("workshopDaily.openDay")}: ${fmtDate(data.book.bookDate)}` : t("workshopDaily.noOpenDay")}</p>
+              <p className="mt-1 text-xs text-emerald-600">{data?.book ? `${t("workshopDaily.openDay")}: ${fmtDayLabel(data.book.bookDate)}` : t("workshopDaily.noOpenDay")}</p>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white p-4">
               <p className="flex items-center gap-1.5 text-xs font-medium text-gray-500"><ArrowUpCircle size={14} className="shrink-0 text-green-600" />{t("workshopDaily.totalIn")}</p>
@@ -761,11 +825,24 @@ export default function WorkshopDailyPage() {
             <Pagination currentPage={safePage} totalPages={totalPages} onPageChange={setPage} totalItems={filtered.length} pageSize={PAGE_SIZE} />
           </div>
 
-          {/* ── سجل الأيام: اضغط على أي يوم لعرض حركاته ───────────────────── */}
+          {/* ── سجل الأيام: باجينيشن بالأسبوع (السبت → الخميس) ─────────────── */}
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-center gap-2">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
               <h2 className="text-sm font-bold text-slate-900">{t("workshopDaily.daysHistory")}</h2>
               <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{daysTotal}</span>
+              <span className="ms-auto flex flex-wrap items-center gap-2 text-xs font-medium text-slate-600">
+                <span className="rounded-full bg-blue-50 px-2.5 py-1 text-blue-700">
+                  {t("workshopDaily.week")}: {data?.weekStart ? fmtDate(data.weekStart) : ""} — {data?.weekEnd ? fmtDate(data.weekEnd) : ""}
+                </span>
+                {safeWeekIndex > 1 && (
+                  <button
+                    onClick={() => goToWeek(1)}
+                    className="rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    {t("workshopDaily.thisWeek")}
+                  </button>
+                )}
+              </span>
             </div>
             {days.length === 0 ? (
               <p className="py-4 text-center text-sm text-gray-400">{t("workshopDaily.noDays")}</p>
@@ -790,7 +867,10 @@ export default function WorkshopDailyPage() {
                         onClick={() => openDayDetails(b.id)}
                         className="cursor-pointer hover:bg-blue-50/60"
                       >
-                        <td className="px-4 py-2 text-sm whitespace-nowrap font-medium text-slate-700">{fmtDate(b.bookDate)}</td>
+                        <td className="px-4 py-2 text-sm whitespace-nowrap font-medium text-slate-700">
+                          <span className="font-semibold text-slate-800">{fmtDayName(b.bookDate)}</span>{" "}
+                          <span className="text-slate-500">{fmtDate(b.bookDate)}</span>
+                        </td>
                         <td className="px-4 py-2 text-sm">
                           <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-bold whitespace-nowrap ${b.status === "OPEN" ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-600"}`}>
                             {b.status === "OPEN" ? t("workshopDaily.openBadge") : t("workshopDaily.closedBadge")}
@@ -801,9 +881,22 @@ export default function WorkshopDailyPage() {
                         <td className="px-4 py-2 text-sm font-bold text-slate-900"><span dir="ltr">{b.handoverAmount != null ? fmtMoney(b.handoverAmount) : "—"}</span></td>
                         <td className="px-4 py-2 text-sm text-slate-600">{b.handoverTo || "—"}</td>
                         <td className="px-4 py-2 text-sm">
-                          <span className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-medium text-blue-700">
-                            <Eye size={14} className="shrink-0" />{t("workshopDaily.viewDay")}
-                          </span>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-medium text-blue-700">
+                              <Eye size={14} className="shrink-0" />{t("workshopDaily.viewDay")}
+                            </span>
+                            {b.status === "OPEN" && canClose && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openCloseForm(b.id, b.totals);
+                                }}
+                                className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
+                              >
+                                <Lock size={14} className="shrink-0" />{t("workshopDaily.closeThisDay")}
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -812,11 +905,9 @@ export default function WorkshopDailyPage() {
               </div>
             )}
             <Pagination
-              currentPage={safeDaysPage}
-              totalPages={daysTotalPages}
-              onPageChange={goToDaysPage}
-              totalItems={daysTotal}
-              pageSize={DAYS_PAGE_SIZE}
+              currentPage={safeWeekIndex}
+              totalPages={weeksTotal}
+              onPageChange={goToWeek}
             />
           </div>
         </>
@@ -920,13 +1011,13 @@ export default function WorkshopDailyPage() {
         ) : dayDetail ? (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3">
-              <h3 className="text-base font-bold text-slate-900">{fmtDate(dayDetail.bookDate)}</h3>
+              <h3 className="text-base font-bold text-slate-900">{fmtDayLabel(dayDetail.bookDate)}</h3>
               <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-bold ${dayDetail.status === "OPEN" ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-600"}`}>
                 {dayDetail.status === "OPEN" ? t("workshopDaily.openBadge") : t("workshopDaily.closedBadge")}
               </span>
               {dayDetail.status === "OPEN" && canClose && (
                 <button
-                  onClick={() => openCloseForm(dayDetail.id)}
+                  onClick={() => openCloseForm(dayDetail.id, dayDetail.totals)}
                   className="ms-auto inline-flex items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
                 >
                   <Lock size={14} className="shrink-0" />{t("workshopDaily.closeThisDay")}

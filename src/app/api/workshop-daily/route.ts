@@ -9,6 +9,10 @@ import {
   getWorkshopCompany,
   parseDayInput,
   startOfDay,
+  addDays,
+  weekIndexOf,
+  weekStart,
+  WEEK_DAYS,
 } from "@/lib/workshop-daily";
 
 // `createdBy`/`confirmedBy` are scalar user-id columns, not relations, so they
@@ -19,8 +23,26 @@ const TX_INCLUDE = {
   customer: { select: { id: true, name: true } },
 } as const;
 
-const DAYS_PAGE_SIZE = 15;
-const MAX_DAYS_PAGE_SIZE = 50;
+/** A day in the log: its totals, and whether it is still open. */
+function dayRow(book: {
+  id: string;
+  bookDate: Date;
+  status: string;
+  closedAt: Date | null;
+  handoverAmount: number | null;
+  handoverTo: string | null;
+  transactions: Array<{ direction: "IN" | "OUT"; amount: number; status: string }>;
+}) {
+  return {
+    id: book.id,
+    bookDate: book.bookDate,
+    status: book.status,
+    closedAt: book.closedAt,
+    handoverAmount: book.handoverAmount,
+    handoverTo: book.handoverTo,
+    totals: calcTotals(book.transactions),
+  };
+}
 
 /** GET passes "view" and POST passes "add", so the verb's action is a parameter. */
 async function guard(action: ActionKey) {
@@ -70,29 +92,40 @@ export async function GET(request: Request) {
       : [];
     const userName = new Map(users.map((u) => [u.id, u.name]));
 
-    // Every other day — closed ones and the open ones that were reopened by a
-    // back-dated entry — with its totals. The day the page is working on is
-    // already in the table above, so it is left out of this list.
-    const daysWhere = {
-      companyId: company.id,
-      ...(book ? { id: { not: book.id } } : {}),
-    };
-
+    // ── سجل الأيام: باجينيشن بالأسبوع (السبت → الخميس) ────────────────────
+    // The log pages by the workshop week, not by a fixed number of days: week
+    // 1 is the week of today and every older week follows it.
+    const currentWeekStart = weekStart(today);
     const params = new URL(request.url).searchParams;
-    const daysPage = Math.max(1, Number(params.get("daysPage")) || 1);
-    const daysPageSize = Math.min(
-      MAX_DAYS_PAGE_SIZE,
-      Math.max(1, Number(params.get("daysPageSize")) || DAYS_PAGE_SIZE),
-    );
+    const askedWeek = Math.max(1, Number(params.get("weekIndex")) || 1);
 
-    const [daysTotal, days, categories] = await Promise.all([
-      prisma.workshopDailyBook.count({ where: daysWhere }),
+    const allBookDates = await prisma.workshopDailyBook.findMany({
+      where: { companyId: company.id },
+      select: { bookDate: true },
+    });
+    const weeksTotal = allBookDates.reduce(
+      (max, b) => Math.max(max, weekIndexOf(b.bookDate, currentWeekStart)),
+      1,
+    );
+    const weekIndex = Math.min(askedWeek, weeksTotal);
+    const targetWeekStart = addDays(currentWeekStart, -(weekIndex - 1) * WEEK_DAYS);
+    // The week block runs to the Friday that closes it; the label stops at the
+    // Thursday, the last working day of the week.
+    const targetWeekEnd = addDays(targetWeekStart, WEEK_DAYS);
+    const weekLabelEnd = addDays(targetWeekStart, WEEK_DAYS - 2);
+
+    const [weekDays, openDays, categories] = await Promise.all([
       prisma.workshopDailyBook.findMany({
-        where: daysWhere,
+        where: { companyId: company.id, bookDate: { gte: targetWeekStart, lt: targetWeekEnd } },
         include: { transactions: { select: { direction: true, amount: true, status: true } } },
         orderBy: { bookDate: "desc" },
-        skip: (daysPage - 1) * daysPageSize,
-        take: daysPageSize,
+      }),
+      // Every day that is still open, so a day left behind by a forgotten close
+      // can be closed from the page instead of hiding in the log.
+      prisma.workshopDailyBook.findMany({
+        where: { companyId: company.id, status: "OPEN" },
+        include: { transactions: { select: { direction: true, amount: true, status: true } } },
+        orderBy: { bookDate: "desc" },
       }),
       prisma.expenseCategory.findMany({
         where: { companyId: company.id },
@@ -112,18 +145,13 @@ export async function GET(request: Request) {
             transactions: decorateTransactions(book.transactions, userName),
           }
         : null,
-      days: days.map((b) => ({
-        id: b.id,
-        bookDate: b.bookDate,
-        status: b.status,
-        closedAt: b.closedAt,
-        handoverAmount: b.handoverAmount,
-        handoverTo: b.handoverTo,
-        totals: calcTotals(b.transactions),
-      })),
-      daysTotal,
-      daysPage,
-      daysPageSize,
+      days: weekDays.map(dayRow),
+      daysTotal: allBookDates.length,
+      weekIndex,
+      weeksTotal,
+      weekStart: targetWeekStart.toISOString(),
+      weekEnd: weekLabelEnd.toISOString(),
+      openDays: openDays.map(dayRow),
       categories,
     });
   } catch {

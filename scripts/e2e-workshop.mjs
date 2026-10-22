@@ -142,6 +142,22 @@ async function main() {
   const detail = await req("GET", `/api/workshop-daily/books/${closedDay.id}`);
   check("day details readable", detail.status === 200 && detail.json.transactions.length >= 1, `status=${detail.status}`);
 
+  // ── the day log pages by the workshop week (Saturday → Thursday) ─────────
+  check("week 1 is the current week", g2.json.weekIndex === 1 && g2.json.weeksTotal >= 1, JSON.stringify({ w: g2.json.weekIndex, t: g2.json.weeksTotal }));
+  check("the week carries its own range", typeof g2.json.weekStart === "string" && typeof g2.json.weekEnd === "string", JSON.stringify({ s: g2.json.weekStart, e: g2.json.weekEnd }));
+  const week2 = await req("GET", "/api/workshop-daily?weekIndex=2");
+  check(
+    "the previous week is reachable",
+    week2.status === 200 &&
+      (g2.json.weeksTotal >= 2
+        ? week2.json.weekIndex === 2 && week2.json.weekStart !== g2.json.weekStart
+        : week2.json.weekIndex === 1),
+    JSON.stringify({ w: week2.json.weekIndex, s: week2.json.weekStart, t: g2.json.weeksTotal }),
+  );
+  const weekFar = await req("GET", "/api/workshop-daily?weekIndex=99");
+  check("a week past the last one is clamped", weekFar.status === 200 && weekFar.json.weekIndex === weekFar.json.weeksTotal, JSON.stringify({ w: weekFar.json.weekIndex, t: weekFar.json.weeksTotal }));
+  check("the days left open are listed", Array.isArray(g2.json.openDays), JSON.stringify(g2.json.openDays));
+
   // a back-dated entry reopens that day
   const back = await req("POST", "/api/workshop-daily", { direction: "OUT", amount: 30, reason: "E2E متأخر", bookDate: yesterdayKey() });
   check("back-dated entry accepted", back.status === 201, `status=${back.status}`);

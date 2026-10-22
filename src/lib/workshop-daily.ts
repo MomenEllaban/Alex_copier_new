@@ -47,6 +47,44 @@ export function dayKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
+/** Days in a week — the step the day log pages by. */
+export const WEEK_DAYS = 7;
+
+/**
+ * The Saturday that opens the week the day belongs to.
+ *
+ * The workshop week runs Saturday → Thursday, so the log pages by that week
+ * and not by the calendar one. Friday is the day off, so it closes the block
+ * that opened on the Saturday before it.
+ */
+export function weekStart(date: Date): Date {
+  const d = startOfDay(date);
+  // getDay(): 0 = Sunday … 6 = Saturday. Counting back from the Saturday of
+  // the same block puts Sunday on the previous week and Saturday on its own.
+  const back = (d.getDay() + 1) % 7;
+  d.setDate(d.getDate() - back);
+  return d;
+}
+
+/** A date shifted by whole days, keeping the time of day. */
+export function addDays(date: Date, days: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+/**
+ * Which week the day belongs to, counted back from the current week:
+ * 1 is the week of today, 2 the one before it, and so on.
+ *
+ * The difference is measured in days rather than milliseconds so a daylight
+ * saving change cannot shift a day into the neighbouring week.
+ */
+export function weekIndexOf(date: Date, currentWeekStart: Date): number {
+  const days = Math.round((currentWeekStart.getTime() - weekStart(date).getTime()) / 86_400_000);
+  return Math.floor(days / WEEK_DAYS) + 1;
+}
+
 export function startOfDay(date: Date): Date {
   const d = new Date(date);
   d.setHours(0, 0, 0, 0);

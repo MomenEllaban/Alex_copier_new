@@ -50,6 +50,12 @@ interface ActionProfile {
   readOnly?: Pageish[];
   /** Actions never granted, whatever the page. */
   never?: ActionKey[];
+  /**
+   * Extra actions on one page only — for a role that owns a single workflow
+   * there. The accountant confirms the workshop entries and hands the day's
+   * cash over by closing the day, so the close is theirs on that page alone.
+   */
+  alsoOn?: Partial<Record<Pageish, ActionKey[]>>;
 }
 
 type Pageish = (typeof ROLE_PERMISSIONS)[Role][number];
@@ -69,6 +75,9 @@ const ACTION_PROFILES: Record<Role, ActionProfile> = {
   // Accounting: full financial paperwork, but no deletions.
   ACCOUNTANT: {
     anywhere: ["view", "add", "edit", "export", "print", "approve", "import"],
+    // Closing the workshop day is the handover of the cashbox, so the
+    // accountant may close it — on that page only.
+    alsoOn: { workshopDaily: ["close"] },
     never: ["delete", "scrap", "reset", "assign"],
   },
 
@@ -121,8 +130,12 @@ function actionsForRolePage(role: Role, page: Pageish, pageActions: ActionKey[])
   }
 
   const never = new Set<ActionKey>(profile.never ?? []);
+  // The page-specific extras join the actions of the profile.
+  const extra = profile.alsoOn?.[page] ?? [];
   // A granted action is only real if the page actually offers it.
-  return pageActions.filter((a) => allowed.includes(a) && !never.has(a));
+  return pageActions.filter(
+    (a) => (allowed.includes(a) || extra.includes(a)) && !never.has(a),
+  );
 }
 
 interface PageRow {
