@@ -16,6 +16,7 @@ import SubmitButton from "@/components/SubmitButton";
 import PrinterLoader from "@/components/PrinterLoader";
 import { useConfirm, useToast } from "@/components/UIProvider";
 import { usePermissions } from "@/components/PermissionsProvider";
+import SelectWithAdd from "@/components/SelectWithAdd";
 import { formatEgyptDateISO } from "@/lib/datetime";
 
 interface Tx {
@@ -961,29 +962,47 @@ export default function WorkshopDailyPage() {
             </div>
           )}
           {direction === "IN" && revenueType === "CASH_COLLECTION" && (
-            <div className="space-y-1.5">
-              <label className="mb-1 block text-sm font-medium">{t("workshopDaily.customer")} <span className="text-red-500">*</span></label>
-              <select value={customerId} onChange={(e) => setCustomerId(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                <option value="">{t("workshopDaily.selectCustomer")}</option>
-                {customers.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
+            <SelectWithAdd
+              label={t("workshopDaily.customer")}
+              required
+              value={customerId}
+              onChange={setCustomerId}
+              options={customers.map((c) => ({ value: c.id, label: c.name }))}
+              placeholder={t("workshopDaily.selectCustomer")}
+              quickAddTitle="إضافة عميل جديد"
+              quickAddFields={[
+                { key: "name", label: "اسم العميل", required: true, colSpan: 2 },
+                { key: "phone", label: "الهاتف", placeholder: "01xxxxxxxxx", colSpan: 1 },
+                { key: "email", label: "البريد الإلكتروني", type: "email", colSpan: 1 },
+                { key: "address", label: "العنوان", colSpan: 2 },
+              ]}
+              quickAddEndpoint="/api/customers"
+              notifyEntities={["customers"]}
+              onQuickAddSuccess={(item) => {
+                setCustomers((prev) => (prev.some((c) => c.id === item.id) ? prev : [...prev, item]));
+                setCustomerId(item.id);
+                toastSuccess("تمت إضافة العميل بنجاح");
+              }}
+            />
           )}
           {direction === "OUT" && (
-            <div className="space-y-1.5">
-              <label className="mb-1 block text-sm font-medium">{t("workshopDaily.category")}</label>
-              <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                <option value="">{t("workshopDaily.noCategory")}</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-              {categories.length === 0 && (
-                <p className="text-xs text-amber-600">{t("workshopDaily.noCategoriesHint")}</p>
-              )}
-            </div>
+            <SelectWithAdd
+              label={t("workshopDaily.category")}
+              value={categoryId}
+              onChange={setCategoryId}
+              options={categories.map((c) => ({ value: c.id, label: c.name }))}
+              placeholder={t("workshopDaily.noCategory")}
+              quickAddTitle="إضافة تصنيف مصروفات جديد"
+              quickAddFields={[
+                { key: "name", label: "اسم التصنيف", required: true, colSpan: 2 },
+              ]}
+              quickAddEndpoint="/api/workshop-daily/categories"
+              onQuickAddSuccess={(item) => {
+                setData((prev) => (prev ? { ...prev, categories: [...(prev.categories ?? []), item] } : prev));
+                setCategoryId(item.id);
+                toastSuccess("تمت إضافة التصنيف بنجاح");
+              }}
+            />
           )}
           <div className="space-y-1.5">
             <label className="mb-1 block text-sm font-medium">{t("workshopDaily.amount")} (ج.م)</label>

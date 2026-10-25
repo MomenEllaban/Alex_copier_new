@@ -535,8 +535,63 @@ export default function PurchasesPage() {
                   <div key={idx} className="rounded-lg border border-gray-200 bg-white p-4">
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_110px_140px_140px_auto]">
                       <div>
-                        <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("sales.product")}</label>
-                        <SearchableSelect value={row.productId} onChange={(v) => updateRow(idx, "productId", v)} options={products.map((p) => ({ value: p.id, label: p.name }))} placeholder={t("purchases.selectProduct")} disabled={editingLocked} />
+                        <SelectWithAdd
+                          label={t("sales.product")}
+                          value={row.productId}
+                          onChange={(v) => updateRow(idx, "productId", v)}
+                          options={products.map((p) => ({ value: p.id, label: p.name }))}
+                          placeholder={t("purchases.selectProduct")}
+                          disabled={editingLocked}
+                          quickAddTitle="إضافة منتج جديد"
+                          quickAddFields={[
+                            {
+                              key: "companyId",
+                              label: "الشركة",
+                              type: "select",
+                              required: true,
+                              options: companies.map((c) => ({ value: c.id, label: c.name })),
+                              colSpan: 2,
+                            },
+                            { key: "name", label: "اسم المنتج", required: true, colSpan: 2 },
+                            {
+                              key: "productType",
+                              label: "نوع المنتج",
+                              type: "select",
+                              required: true,
+                              options: [
+                                { value: "SPARE_PART", label: "قطعة غيار" },
+                                { value: "MACHINE", label: "ماكينة / آلة" },
+                              ],
+                              colSpan: 1,
+                            },
+                            { key: "sku", label: "كود الصنف / SKU", colSpan: 1 },
+                            { key: "purchasePrice", label: "سعر الشراء", type: "number", placeholder: "0.00", colSpan: 1 },
+                            { key: "wholesalePrice", label: "سعر الجملة", type: "number", placeholder: "0.00", colSpan: 1 },
+                            { key: "retailPrice", label: "سعر القطاعي", type: "number", placeholder: "0.00", colSpan: 1 },
+                          ]}
+                          quickAddDefaults={{
+                            companyId: form.companyId || (companies[0]?.id ?? ""),
+                            productType: "SPARE_PART",
+                          }}
+                          quickAddEndpoint="/api/products"
+                          notifyEntities={["products", "inventory"]}
+                          onQuickAddSuccess={(item) => {
+                            setProducts((prev) => (prev.some((p) => p.id === item.id) ? prev : [...prev, item]));
+                            const updated = [...itemRows];
+                            const purchasePriceNum = item.purchasePrice != null ? Number(item.purchasePrice) : null;
+                            updated[idx] = {
+                              ...updated[idx],
+                              productId: item.id,
+                              unitPrice:
+                                purchasePriceNum != null && !Number.isNaN(purchasePriceNum) && purchasePriceNum > 0
+                                  ? String(purchasePriceNum)
+                                  : updated[idx].unitPrice,
+                            };
+                            setItemRows(updated);
+                            if (item.id) loadPriceHistory([item.id], form.companyId);
+                            toastSuccess("تمت إضافة المنتج واختياره بنجاح");
+                          }}
+                        />
                       </div>
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("purchases.quantity")}</label>
@@ -906,10 +961,38 @@ export default function PurchasesPage() {
                   {companies.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
                 </select>
               </div>
-              <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-slate-700">{t("sales.customer")}</label>
-                <SearchableSelect value={interForm.customerId} onChange={(v) => setInterForm({ ...interForm, customerId: v })} options={customers.map((c) => ({ value: c.id, label: c.name }))} placeholder={t("sales.customer")} required />
-              </div>
+              <SelectWithAdd
+                label={t("sales.customer")}
+                value={interForm.customerId}
+                onChange={(v) => setInterForm({ ...interForm, customerId: v })}
+                options={customers.map((c) => ({ value: c.id, label: c.name }))}
+                placeholder={t("sales.customer")}
+                required
+                quickAddTitle="إضافة عميل جديد"
+                quickAddFields={[
+                  { key: "name", label: "اسم العميل", required: true, colSpan: 2 },
+                  { key: "phone", label: "الهاتف", placeholder: "01xxxxxxxxx", colSpan: 1 },
+                  { key: "email", label: "البريد الإلكتروني", type: "email", colSpan: 1 },
+                  { key: "address", label: "العنوان", colSpan: 2 },
+                  {
+                    key: "customerType",
+                    label: "نوع العميل",
+                    type: "select",
+                    options: [
+                      { value: "INDIVIDUAL", label: "فرد" },
+                      { value: "COMPANY", label: "شركة" },
+                    ],
+                    colSpan: 1,
+                  },
+                ]}
+                quickAddEndpoint="/api/customers"
+                notifyEntities={["customers"]}
+                onQuickAddSuccess={(item) => {
+                  setCustomers((prev) => (prev.some((c) => c.id === item.id) ? prev : [...prev, item]));
+                  setInterForm((f) => ({ ...f, customerId: item.id }));
+                  toastSuccess("تمت إضافة العميل بنجاح");
+                }}
+              />
               <div className="space-y-1.5">
                 <label className="block text-sm font-medium text-slate-700">المهندس (اختياري)</label>
                 <SearchableSelect value={interForm.engineerId} onChange={(v) => setInterForm({ ...interForm, engineerId: v })} options={engineers.map((en) => ({ value: en.id, label: en.name }))} placeholder="المهندس (اختياري)" />
@@ -968,8 +1051,51 @@ export default function PurchasesPage() {
                   <div key={idx} className="rounded-lg border border-gray-200 bg-white p-4">
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.3fr_100px_140px_140px_140px_auto]">
                       <div>
-                        <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("sales.product")}</label>
-                        <SearchableSelect value={row.productId} onChange={(v) => updateInterRow(idx, "productId", v)} options={products.map((p) => ({ value: p.id, label: p.name }))} placeholder={t("purchases.selectProduct")} />
+                        <SelectWithAdd
+                          label={t("sales.product")}
+                          value={row.productId}
+                          onChange={(v) => updateInterRow(idx, "productId", v)}
+                          options={products.map((p) => ({ value: p.id, label: p.name }))}
+                          placeholder={t("purchases.selectProduct")}
+                          quickAddTitle="إضافة منتج جديد"
+                          quickAddFields={[
+                            {
+                              key: "companyId",
+                              label: "الشركة",
+                              type: "select",
+                              required: true,
+                              options: companies.map((c) => ({ value: c.id, label: c.name })),
+                              colSpan: 2,
+                            },
+                            { key: "name", label: "اسم المنتج", required: true, colSpan: 2 },
+                            {
+                              key: "productType",
+                              label: "نوع المنتج",
+                              type: "select",
+                              required: true,
+                              options: [
+                                { value: "SPARE_PART", label: "قطعة غيار" },
+                                { value: "MACHINE", label: "ماكينة / آلة" },
+                              ],
+                              colSpan: 1,
+                            },
+                            { key: "sku", label: "كود الصنف / SKU", colSpan: 1 },
+                            { key: "purchasePrice", label: "سعر الشراء", type: "number", placeholder: "0.00", colSpan: 1 },
+                            { key: "wholesalePrice", label: "سعر الجملة", type: "number", placeholder: "0.00", colSpan: 1 },
+                            { key: "retailPrice", label: "سعر القطاعي", type: "number", placeholder: "0.00", colSpan: 1 },
+                          ]}
+                          quickAddDefaults={{
+                            companyId: interForm.toCompanyId || interForm.fromCompanyId || (companies[0]?.id ?? ""),
+                            productType: "SPARE_PART",
+                          }}
+                          quickAddEndpoint="/api/products"
+                          notifyEntities={["products", "inventory"]}
+                          onQuickAddSuccess={(item) => {
+                            setProducts((prev) => (prev.some((p) => p.id === item.id) ? prev : [...prev, item]));
+                            updateInterRow(idx, "productId", item.id);
+                            toastSuccess("تمت إضافة المنتج واختياره بنجاح");
+                          }}
+                        />
                       </div>
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("purchases.quantity")}</label>

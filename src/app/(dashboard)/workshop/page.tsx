@@ -18,6 +18,7 @@ import { notifyDataChanged } from "@/lib/data-events";
 import { useConfirm, useToast } from "@/components/UIProvider";
 import { apiErrorMessage } from "@/lib/api-client";
 import SearchableSelect from "@/components/SearchableSelect";
+import SelectWithAdd from "@/components/SelectWithAdd";
 import { getEgyptDateTimeLocal, formatEgyptDateTime } from "@/lib/datetime";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -690,18 +691,40 @@ export default function WorkshopPage() {
                   placeholder={t("workshop.movements.selectEngineer")}
                 />
               </div>
-              <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-slate-700">{t("workshop.movements.customer")}</label>
-                <SearchableSelect
-                  value={form.customerId}
-                  onChange={(v) => {
-                    const cust = customers.find((c) => c.id === v);
-                    setForm((prev) => ({ ...prev, customerId: v, customerName: cust?.name || "" }));
-                  }}
-                  options={customers.map((c) => ({ value: c.id, label: c.name }))}
-                  placeholder={t("workshop.movements.selectCustomer")}
-                />
-              </div>
+              <SelectWithAdd
+                label={t("workshop.movements.customer")}
+                value={form.customerId}
+                onChange={(v) => {
+                  const cust = customers.find((c) => c.id === v);
+                  setForm((prev) => ({ ...prev, customerId: v, customerName: cust?.name || "" }));
+                }}
+                options={customers.map((c) => ({ value: c.id, label: c.name }))}
+                placeholder={t("workshop.movements.selectCustomer")}
+                quickAddTitle="إضافة عميل جديد"
+                quickAddFields={[
+                  { key: "name", label: "اسم العميل", required: true, colSpan: 2 },
+                  { key: "phone", label: "الهاتف", placeholder: "01xxxxxxxxx", colSpan: 1 },
+                  { key: "email", label: "البريد الإلكتروني", type: "email", colSpan: 1 },
+                  { key: "address", label: "العنوان", colSpan: 2 },
+                  {
+                    key: "customerType",
+                    label: "نوع العميل",
+                    type: "select",
+                    options: [
+                      { value: "INDIVIDUAL", label: "فرد" },
+                      { value: "COMPANY", label: "شركة" },
+                    ],
+                    colSpan: 1,
+                  },
+                ]}
+                quickAddEndpoint="/api/customers"
+                notifyEntities={["customers"]}
+                onQuickAddSuccess={(item) => {
+                  setCustomers((prev) => (prev.some((c) => c.id === item.id) ? prev : [...prev, item]));
+                  setForm((prev) => ({ ...prev, customerId: item.id, customerName: item.name || "" }));
+                  toastSuccess("تمت إضافة العميل بنجاح");
+                }}
+              />
               <div className="md:col-span-2 lg:col-span-3 space-y-1.5">
                 <label className="block text-sm font-medium text-slate-700">{t("workshop.movements.description")} *</label>
                 <textarea

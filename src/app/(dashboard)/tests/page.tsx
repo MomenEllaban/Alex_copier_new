@@ -20,6 +20,7 @@ import SearchInput from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
 import DateRangeFilter from "@/components/DateRangeFilter";
 import SearchableSelect from "@/components/SearchableSelect";
+import SelectWithAdd from "@/components/SelectWithAdd";
 import ExportButton from "@/components/ExportButton";
 import RefreshButton from "@/components/RefreshButton";
 import Pagination from "@/components/Pagination";
@@ -791,12 +792,38 @@ export default function CopierTestsPage() {
                 className="w-full rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-600"
               />
             ) : (
-              <SearchableSelect
+              <SelectWithAdd
+                hideLabel
                 value={formCustomerId}
                 onChange={(v) => { setFormCustomerId(v); setFormMachineId(""); setCustomerMachines([]); }}
                 options={customerOptions}
                 placeholder={t("copierTests.selectCustomer")}
-                searchPlaceholder={t("common.search")}
+                quickAddTitle="إضافة عميل جديد"
+                quickAddFields={[
+                  { key: "name", label: "اسم العميل", required: true, colSpan: 2 },
+                  { key: "phone", label: "الهاتف", placeholder: "01xxxxxxxxx", colSpan: 1 },
+                  { key: "email", label: "البريد الإلكتروني", type: "email", colSpan: 1 },
+                  { key: "address", label: "العنوان", colSpan: 2 },
+                  {
+                    key: "customerType",
+                    label: "نوع العميل",
+                    type: "select",
+                    options: [
+                      { value: "INDIVIDUAL", label: "فرد" },
+                      { value: "COMPANY", label: "شركة" },
+                    ],
+                    colSpan: 1,
+                  },
+                ]}
+                quickAddEndpoint="/api/customers"
+                notifyEntities={["customers"]}
+                onQuickAddSuccess={(item) => {
+                  setCustomers((prev) => (prev.some((c) => c.id === item.id) ? prev : [...prev, item]));
+                  setFormCustomerId(item.id);
+                  setFormMachineId("");
+                  setCustomerMachines([]);
+                  toastSuccess("تمت إضافة العميل بنجاح");
+                }}
               />
             )}
           </div>

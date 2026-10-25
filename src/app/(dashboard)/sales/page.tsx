@@ -769,7 +769,36 @@ export default function SalesPage() {
             })()}
             <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">المهندس (اختياري)</label><SearchableSelect value={form.engineerId} onChange={(v) => setForm({ ...form, engineerId: v })} options={engineers.map((engineer) => ({ value: engineer.id, label: engineer.name }))} placeholder="المهندس (اختياري)" /></div>
             <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">نوع الطلب</label><select value={form.orderType} onChange={(e) => setForm({ ...form, orderType: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="MACHINE_SALE">{ORDER_TYPE_LABELS.MACHINE_SALE}</option><option value="SPARE_PART_SALE">{ORDER_TYPE_LABELS.SPARE_PART_SALE}</option></select></div>
-            <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">{t("sales.category")}</label><select value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="">{t("sales.noCategory")}</option>{salesCategories.filter((c) => !form.companyId || c.companyId === form.companyId).map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}</select></div>
+            <SelectWithAdd
+              label={t("sales.category")}
+              value={form.categoryId}
+              onChange={(v) => setForm({ ...form, categoryId: v })}
+              options={salesCategories
+                .filter((c) => !form.companyId || c.companyId === form.companyId)
+                .map((c) => ({ value: c.id, label: c.name }))}
+              placeholder={t("sales.noCategory")}
+              quickAddTitle="إضافة تصنيف مبيعات جديد"
+              quickAddFields={[
+                {
+                  key: "companyId",
+                  label: "الشركة",
+                  type: "select",
+                  required: true,
+                  options: companies.map((c) => ({ value: c.id, label: c.name })),
+                  colSpan: 2,
+                },
+                { key: "name", label: "اسم التصنيف", required: true, colSpan: 2 },
+              ]}
+              quickAddDefaults={{
+                companyId: form.companyId || (companies[0]?.id ?? ""),
+              }}
+              quickAddEndpoint="/api/sales-categories"
+              onQuickAddSuccess={(cat) => {
+                setSalesCategories((prev) => (prev.some((c) => c.id === cat.id) ? prev : [...prev, cat]));
+                setForm((f) => ({ ...f, categoryId: cat.id }));
+                toastSuccess("تمت إضافة تصنيف المبيعات بنجاح");
+              }}
+            />
             <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">طريقة الدفع</label><select value={form.paymentMethod === "CREDIT" ? "CREDIT" : form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="CASH">{PAYMENT_METHOD_LABELS.CASH}</option><option value="CREDIT">{PAYMENT_METHOD_LABELS.CREDIT}</option></select></div>
             {form.paymentMethod !== "CASH" && (
               <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">المبلغ المدفوع نقداً (ج.م) <span className="text-xs font-normal text-gray-400">— يُخصم رصيد تحت الحساب تلقائياً أولاً</span></label><input type="number" min="0" step="0.01" placeholder="0.00" value={form.paidAmount} onChange={(e) => setForm({ ...form, paidAmount: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
@@ -828,8 +857,52 @@ export default function SalesPage() {
                   <div className="rounded-lg border border-gray-200 bg-white p-4">
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr_1fr_1fr_auto]">
                       <div>
-                        <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("sales.product")}</label>
-                        <SearchableSelect value={row.productId} onChange={(v) => updateItemRow(index, { productId: v, priceTier: row.priceTier || "newCustomer" })} options={companyProducts(form.companyId).map((product) => ({ value: product.id, label: product.name }))} placeholder={t("purchases.selectProduct")} required />
+                        <SelectWithAdd
+                          label={t("sales.product")}
+                          value={row.productId}
+                          onChange={(v) => updateItemRow(index, { productId: v, priceTier: row.priceTier || "newCustomer" })}
+                          options={companyProducts(form.companyId).map((product) => ({ value: product.id, label: product.name }))}
+                          placeholder={t("purchases.selectProduct")}
+                          required
+                          quickAddTitle="إضافة منتج جديد"
+                          quickAddFields={[
+                            {
+                              key: "companyId",
+                              label: "الشركة",
+                              type: "select",
+                              required: true,
+                              options: companies.map((c) => ({ value: c.id, label: c.name })),
+                              colSpan: 2,
+                            },
+                            { key: "name", label: "اسم المنتج", required: true, colSpan: 2 },
+                            {
+                              key: "productType",
+                              label: "نوع المنتج",
+                              type: "select",
+                              required: true,
+                              options: [
+                                { value: "SPARE_PART", label: "قطعة غيار" },
+                                { value: "MACHINE", label: "ماكينة / آلة" },
+                              ],
+                              colSpan: 1,
+                            },
+                            { key: "sku", label: "كود الصنف / SKU", colSpan: 1 },
+                            { key: "retailPrice", label: "سعر القطاعي", type: "number", placeholder: "0.00", colSpan: 1 },
+                            { key: "wholesalePrice", label: "سعر الجملة", type: "number", placeholder: "0.00", colSpan: 1 },
+                            { key: "purchasePrice", label: "سعر الشراء", type: "number", placeholder: "0.00", colSpan: 1 },
+                          ]}
+                          quickAddDefaults={{
+                            companyId: form.companyId || (companies[0]?.id ?? ""),
+                            productType: "SPARE_PART",
+                          }}
+                          quickAddEndpoint="/api/products"
+                          notifyEntities={["products", "inventory"]}
+                          onQuickAddSuccess={(item) => {
+                            setProducts((prev) => (prev.some((p) => p.id === item.id) ? prev : [...prev, item]));
+                            updateItemRow(index, { productId: item.id, priceTier: row.priceTier || "newCustomer" });
+                            toastSuccess("تمت إضافة المنتج واختياره بنجاح");
+                          }}
+                        />
                         {selectedProduct && (
                           <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-slate-500">
                             <span>المتاح: <span className={`font-semibold ${!form.companyId ? "text-amber-600" : availableQty > 0 ? "text-emerald-700" : "text-rose-600"}`}>{!form.companyId ? "اختر الشركة أولاً" : availableQty}</span></span>
@@ -1028,8 +1101,52 @@ export default function SalesPage() {
                 return (
                   <div key={index} className="grid gap-2 rounded-lg border border-gray-200 bg-white p-3 sm:grid-cols-[1.2fr_90px_130px_130px_110px_auto]">
                     <div>
-                      <label className="mb-1 block text-[11px] font-medium text-gray-500">{t("sales.product")}</label>
-                      <SearchableSelect value={row.productId} onChange={(v) => updateInterRow(index, { productId: v })} options={companyProducts(interForm.fromCompanyId).map((product) => ({ value: product.id, label: product.name }))} placeholder={t("purchases.selectProduct")} required />
+                      <SelectWithAdd
+                        label={t("sales.product")}
+                        value={row.productId}
+                        onChange={(v) => updateInterRow(index, { productId: v })}
+                        options={companyProducts(interForm.fromCompanyId).map((product) => ({ value: product.id, label: product.name }))}
+                        placeholder={t("purchases.selectProduct")}
+                        required
+                        quickAddTitle="إضافة منتج جديد"
+                        quickAddFields={[
+                          {
+                            key: "companyId",
+                            label: "الشركة",
+                            type: "select",
+                            required: true,
+                            options: companies.map((c) => ({ value: c.id, label: c.name })),
+                            colSpan: 2,
+                          },
+                          { key: "name", label: "اسم المنتج", required: true, colSpan: 2 },
+                          {
+                            key: "productType",
+                            label: "نوع المنتج",
+                            type: "select",
+                            required: true,
+                            options: [
+                              { value: "SPARE_PART", label: "قطعة غيار" },
+                              { value: "MACHINE", label: "ماكينة / آلة" },
+                            ],
+                            colSpan: 1,
+                          },
+                          { key: "sku", label: "كود الصنف / SKU", colSpan: 1 },
+                          { key: "retailPrice", label: "سعر القطاعي", type: "number", placeholder: "0.00", colSpan: 1 },
+                          { key: "wholesalePrice", label: "سعر الجملة", type: "number", placeholder: "0.00", colSpan: 1 },
+                          { key: "purchasePrice", label: "سعر الشراء", type: "number", placeholder: "0.00", colSpan: 1 },
+                        ]}
+                        quickAddDefaults={{
+                          companyId: interForm.fromCompanyId || interForm.toCompanyId || (companies[0]?.id ?? ""),
+                          productType: "SPARE_PART",
+                        }}
+                        quickAddEndpoint="/api/products"
+                        notifyEntities={["products", "inventory"]}
+                        onQuickAddSuccess={(item) => {
+                          setProducts((prev) => (prev.some((p) => p.id === item.id) ? prev : [...prev, item]));
+                          updateInterRow(index, { productId: item.id });
+                          toastSuccess("تمت إضافة المنتج واختياره بنجاح");
+                        }}
+                      />
                       {selectedProduct && (
                         <div className="mt-1 text-[11px] text-slate-500">
                           المتاح في الشركة المختارة: <span className={`font-semibold ${!interForm.fromCompanyId ? "text-amber-600" : availableQty > 0 ? "text-emerald-700" : "text-rose-600"}`}>{!interForm.fromCompanyId ? "اختر الشركة أولاً" : availableQty}</span>

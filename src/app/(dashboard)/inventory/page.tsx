@@ -14,6 +14,7 @@ import { apiErrorMessage } from "@/lib/api-client";
 import { AlertTriangle, Boxes, Package, Save, TrendingDown, Warehouse } from "lucide-react";
 import SubmitButton from "@/components/SubmitButton";
 import SearchableSelect from "@/components/SearchableSelect";
+import SelectWithAdd from "@/components/SelectWithAdd";
 import RefreshButton from "@/components/RefreshButton";
 import StatsCards from "@/components/StatsCards";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
@@ -245,16 +246,54 @@ export default function InventoryPage() {
                 required
               ><option value="">{t("common.selectOption")}</option>{warehouses.map(warehouse => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}</select>
             </div>
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-slate-700">{t("inventory.product")}</label>
-              <SearchableSelect
-                value={form.productId}
-                onChange={(v) => setForm({ ...form, productId: v })}
-                options={products.map(product => ({ value: product.id, label: `${product.name}${product.sku ? ` · ${product.sku}` : ""}` }))}
-                placeholder={t("common.selectOption")}
-                required
-              />
-            </div>
+            <SelectWithAdd
+              label={t("inventory.product")}
+              value={form.productId}
+              onChange={(v) => setForm({ ...form, productId: v })}
+              options={products.map((product) => ({ value: product.id, label: `${product.name}${product.sku ? ` · ${product.sku}` : ""}` }))}
+              placeholder={t("common.selectOption")}
+              required
+              quickAddTitle="إضافة منتج جديد"
+              quickAddFields={[
+                {
+                  key: "companyId",
+                  label: "الشركة",
+                  type: "select",
+                  required: true,
+                  options: companies.map((c) => ({ value: c.id, label: c.name })),
+                  colSpan: 2,
+                },
+                { key: "name", label: "اسم المنتج", required: true, colSpan: 2 },
+                {
+                  key: "productType",
+                  label: "نوع المنتج",
+                  type: "select",
+                  required: true,
+                  options: [
+                    { value: "SPARE_PART", label: "قطعة غيار" },
+                    { value: "MACHINE", label: "ماكينة / آلة" },
+                  ],
+                  colSpan: 1,
+                },
+                { key: "sku", label: "كود الصنف / SKU", colSpan: 1 },
+                { key: "purchasePrice", label: "سعر الشراء", type: "number", placeholder: "0.00", colSpan: 1 },
+                { key: "retailPrice", label: "سعر القطاعي", type: "number", placeholder: "0.00", colSpan: 1 },
+              ]}
+              quickAddDefaults={{
+                companyId: (() => {
+                  const selectedWh = warehouses.find((w) => w.id === form.warehouseId);
+                  return selectedWh?.companyId || (companies[0]?.id ?? "");
+                })(),
+                productType: "SPARE_PART",
+              }}
+              quickAddEndpoint="/api/products"
+              notifyEntities={["products", "inventory"]}
+              onQuickAddSuccess={(item) => {
+                setProducts((prev) => (prev.some((p) => p.id === item.id) ? prev : [...prev, item]));
+                setForm((f) => ({ ...f, productId: item.id }));
+                toastSuccess("تمت إضافة المنتج بنجاح");
+              }}
+            />
             <div className="space-y-1.5">
               <label className="block text-sm font-medium text-slate-700">{t("inventory.quantity")}</label>
               <input

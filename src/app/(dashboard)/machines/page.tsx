@@ -12,6 +12,7 @@ import ExportButton from "@/components/ExportButton";
 import FormModal from "@/components/FormModal";
 import StatsCards from "@/components/StatsCards";
 import SearchableSelect from "@/components/SearchableSelect";
+import SelectWithAdd from "@/components/SelectWithAdd";
 import ImportDialog from "@/components/ImportDialog";
 import PrinterLoader from "@/components/PrinterLoader";
 import { DateTimeCell } from "@/components/DateTimeCell";
@@ -309,10 +310,37 @@ export default function MachinesPage() {
             <label className="block text-sm font-medium text-slate-700">سعر الشراء</label>
             <input type="number" value={form.purchasePrice} onChange={(e) => setField("purchasePrice", e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
-          <div className="space-y-1.5">
-            <label className="block text-sm font-medium text-slate-700">المالك الحالي</label>
-            <SearchableSelect value={form.currentOwnerId} onChange={(v) => setField("currentOwnerId", v)} options={customers.map((c) => ({ value: c.id, label: c.name }))} placeholder="بدون مالك" />
-          </div>
+          <SelectWithAdd
+            label="المالك الحالي"
+            value={form.currentOwnerId}
+            onChange={(v) => setField("currentOwnerId", v)}
+            options={customers.map((c) => ({ value: c.id, label: c.name }))}
+            placeholder="بدون مالك"
+            quickAddTitle="إضافة عميل جديد"
+            quickAddFields={[
+              { key: "name", label: "اسم العميل", required: true, colSpan: 2 },
+              { key: "phone", label: "الهاتف", placeholder: "01xxxxxxxxx", colSpan: 1 },
+              { key: "email", label: "البريد الإلكتروني", type: "email", colSpan: 1 },
+              { key: "address", label: "العنوان", colSpan: 2 },
+              {
+                key: "customerType",
+                label: "نوع العميل",
+                type: "select",
+                options: [
+                  { value: "INDIVIDUAL", label: "فرد" },
+                  { value: "COMPANY", label: "شركة" },
+                ],
+                colSpan: 1,
+              },
+            ]}
+            quickAddEndpoint="/api/customers"
+            notifyEntities={["customers"]}
+            onQuickAddSuccess={(item) => {
+              setCustomers((prev) => (prev.some((c) => c.id === item.id) ? prev : [...prev, item]));
+              setField("currentOwnerId", item.id);
+              toastSuccess("تمت إضافة العميل بنجاح");
+            }}
+          />
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-slate-700">{t("machines.deliveryCounters")}</label>
             <div className="grid grid-cols-2 gap-2">
