@@ -80,7 +80,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const actor = await requireAction("inventory", "add");
+    const actor = (await requireAction("products", "add")) ?? (await requireAction("inventory", "add"));
     if (!actor) {
       const authed = await requireAuth();
       return NextResponse.json(

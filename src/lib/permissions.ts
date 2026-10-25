@@ -74,6 +74,7 @@ export const ROLE_PERMISSIONS: Record<Role, Page[]> = {
   ACCOUNTANT: [
     "dashboard", "purchases", "sales", "finance",
     "settlements", "reports", "companies", "returns", "workshopDaily",
+    "products", "inventory",
     "hrPayroll", "hrReports", "hrSelfService",
   ],
 

@@ -56,7 +56,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const actor = await requireAction("inventory", "edit");
+    const actor = (await requireAction("products", "edit")) ?? (await requireAction("inventory", "edit"));
     if (!actor) {
       const authed = await requireAuth();
       return NextResponse.json(
@@ -190,7 +190,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const actor = await requireAction("inventory", "delete");
+    const actor = (await requireAction("products", "delete")) ?? (await requireAction("inventory", "delete"));
     if (!actor) {
       const authed = await requireAuth();
       return NextResponse.json(

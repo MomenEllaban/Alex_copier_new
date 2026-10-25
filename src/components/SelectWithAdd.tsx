@@ -28,9 +28,9 @@ export interface SelectWithAddProps {
   required?: boolean;
   disabled?: boolean;
   className?: string;
-  quickAddTitle: string;
-  quickAddFields: QuickAddField[];
-  quickAddEndpoint: string;
+  quickAddTitle?: string;
+  quickAddFields?: QuickAddField[];
+  quickAddEndpoint?: string;
   quickAddDefaults?: Record<string, string | number | undefined>;
   onQuickAddSuccess?: (newItem: any) => void;
   selectClassName?: string;
@@ -38,6 +38,7 @@ export interface SelectWithAddProps {
   buttonClassName?: string;
   modalWidthClass?: string;
   notifyEntities?: DataEntity[];
+  onCustomAdd?: () => void;
 }
 
 export default function SelectWithAdd({
@@ -51,7 +52,7 @@ export default function SelectWithAdd({
   disabled,
   className = "",
   quickAddTitle,
-  quickAddFields,
+  quickAddFields = [],
   quickAddEndpoint,
   quickAddDefaults = {},
   onQuickAddSuccess,
@@ -60,6 +61,7 @@ export default function SelectWithAdd({
   buttonClassName,
   modalWidthClass,
   notifyEntities,
+  onCustomAdd,
 }: SelectWithAddProps) {
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickAddForm, setQuickAddForm] = useState<Record<string, string>>({});
@@ -73,7 +75,7 @@ export default function SelectWithAdd({
 
   // Escape key handler when modal is open
   useEffect(() => {
-    if (!showQuickAdd) return;
+    if (!showQuickAdd || onCustomAdd) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         setShowQuickAdd(false);
@@ -81,9 +83,13 @@ export default function SelectWithAdd({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [showQuickAdd]);
+  }, [showQuickAdd, onCustomAdd]);
 
   const openQuickAdd = () => {
+    if (onCustomAdd) {
+      onCustomAdd();
+      return;
+    }
     const initial: Record<string, string> = {};
     for (const field of quickAddFields) {
       const defaultVal = quickAddDefaults[field.key];
@@ -105,6 +111,8 @@ export default function SelectWithAdd({
         }
       }
     }
+
+    if (!quickAddEndpoint) return;
 
     setSaving(true);
     setError("");
@@ -194,7 +202,7 @@ export default function SelectWithAdd({
         </button>
       </div>
 
-      {showQuickAdd && (
+      {showQuickAdd && !onCustomAdd && (
         <div
           className="fixed inset-0 z-[70] flex items-end justify-center bg-black/60 backdrop-blur-xs p-2 sm:items-center sm:p-4 animate-in fade-in duration-150"
           onClick={() => setShowQuickAdd(false)}

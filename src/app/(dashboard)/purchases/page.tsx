@@ -11,6 +11,7 @@ import { Eye, Pencil, Plus, Printer, Save, ShoppingCart, Trash2, Truck, Wallet, 
 import ExportButton from "@/components/ExportButton";
 import PrinterLoader from "@/components/PrinterLoader";
 import FormModal from "@/components/FormModal";
+import ProductFormModal from "@/components/ProductFormModal";
 import StatsCards from "@/components/StatsCards";
 import SelectWithAdd from "@/components/SelectWithAdd";
 import SearchableSelect from "@/components/SearchableSelect";
@@ -132,6 +133,9 @@ export default function PurchasesPage() {
   });
   const [interRows, setInterRows] = useState<InterRow[]>([{ productId: "", quantity: "", internalPrice: "", customerPrice: "", costPrice: "" }]);
   const [showIcForm, setShowIcForm] = useState(false);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [activeProductRowIdx, setActiveProductRowIdx] = useState<number | null>(null);
+  const [isIntercompanyProductAdd, setIsIntercompanyProductAdd] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -542,6 +546,11 @@ export default function PurchasesPage() {
                           options={products.map((p) => ({ value: p.id, label: p.name }))}
                           placeholder={t("purchases.selectProduct")}
                           disabled={editingLocked}
+                          onCustomAdd={() => {
+                            setActiveProductRowIdx(idx);
+                            setIsIntercompanyProductAdd(false);
+                            setShowProductModal(true);
+                          }}
                           quickAddTitle="إضافة منتج جديد"
                           quickAddFields={[
                             {
@@ -1057,6 +1066,11 @@ export default function PurchasesPage() {
                           onChange={(v) => updateInterRow(idx, "productId", v)}
                           options={products.map((p) => ({ value: p.id, label: p.name }))}
                           placeholder={t("purchases.selectProduct")}
+                          onCustomAdd={() => {
+                            setActiveProductRowIdx(idx);
+                            setIsIntercompanyProductAdd(true);
+                            setShowProductModal(true);
+                          }}
                           quickAddTitle="إضافة منتج جديد"
                           quickAddFields={[
                             {
@@ -1132,6 +1146,54 @@ export default function PurchasesPage() {
           </form>
         </FormModal>
       )}
+
+      <ProductFormModal
+        open={showProductModal}
+        onClose={() => {
+          setShowProductModal(false);
+          setActiveProductRowIdx(null);
+        }}
+        companies={companies}
+        initialCompanyId={isIntercompanyProductAdd ? (interForm.toCompanyId || interForm.fromCompanyId || form.companyId) : form.companyId}
+        onSuccess={(newProduct) => {
+          setProducts((prev) => (prev.some((p) => p.id === newProduct.id) ? prev : [...prev, newProduct]));
+          if (activeProductRowIdx !== null) {
+            if (isIntercompanyProductAdd) {
+              const updated = [...interRows];
+              if (updated[activeProductRowIdx]) {
+                const purchasePriceNum = newProduct.purchasePrice != null ? Number(newProduct.purchasePrice) : null;
+                updated[activeProductRowIdx] = {
+                  ...updated[activeProductRowIdx],
+                  productId: newProduct.id,
+                  costPrice:
+                    purchasePriceNum != null && !Number.isNaN(purchasePriceNum) && purchasePriceNum > 0
+                      ? String(purchasePriceNum)
+                      : updated[activeProductRowIdx].costPrice,
+                };
+                setInterRows(updated);
+              }
+            } else {
+              const updated = [...itemRows];
+              if (updated[activeProductRowIdx]) {
+                const purchasePriceNum = newProduct.purchasePrice != null ? Number(newProduct.purchasePrice) : null;
+                updated[activeProductRowIdx] = {
+                  ...updated[activeProductRowIdx],
+                  productId: newProduct.id,
+                  unitPrice:
+                    purchasePriceNum != null && !Number.isNaN(purchasePriceNum) && purchasePriceNum > 0
+                      ? String(purchasePriceNum)
+                      : updated[activeProductRowIdx].unitPrice,
+                };
+                setItemRows(updated);
+                if (newProduct.id) {
+                  loadPriceHistory([newProduct.id], form.companyId);
+                }
+              }
+            }
+          }
+          toastSuccess("تمت إضافة المنتج واختياره بنجاح");
+        }}
+      />
     </div>
   );
 }

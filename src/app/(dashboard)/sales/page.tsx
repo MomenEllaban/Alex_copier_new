@@ -15,6 +15,7 @@ import PrinterLoader from "@/components/PrinterLoader";
 import { useConfirm, useToast } from "@/components/UIProvider";
 import { apiErrorMessage, fill } from "@/lib/api-client";
 import FormModal from "@/components/FormModal";
+import ProductFormModal from "@/components/ProductFormModal";
 import SelectWithAdd from "@/components/SelectWithAdd";
 import SearchableSelect from "@/components/SearchableSelect";
 import PrintMenu from "@/components/PrintMenu";
@@ -206,6 +207,9 @@ export default function SalesPage() {
   const [showInterForm, setShowInterForm] = useState(false);
   const [interForm, setInterForm] = useState({ fromCompanyId: "", toCompanyId: "", customerId: "", engineerId: "", categoryId: "", orderType: "SPARE_PART_SALE", paymentMethod: "CREDIT", internalPaymentMethod: "CREDIT", paidAmount: "", internalPaidAmount: "", isTaxInvoice: false, taxRate: "0", discount: "", notes: "" });
   const [interRows, setInterRows] = useState<InterItemRow[]>([{ productId: "", quantity: "", internalPrice: "", customerPrice: "", costPrice: "" }]);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [activeProductRowIdx, setActiveProductRowIdx] = useState<number | null>(null);
+  const [isIntercompanyProductAdd, setIsIntercompanyProductAdd] = useState(false);
   const [tradeInProduct, setTradeInProduct] = useState<{ name: string; brand: string; condition: string; value: string; serialNumber: string }>({ name: "", brand: "", condition: "", value: "", serialNumber: "" });
   const [search, setSearch] = useState("");
   const [paymentFilter, setPaymentFilter] = useState("");
@@ -864,6 +868,11 @@ export default function SalesPage() {
                           options={companyProducts(form.companyId).map((product) => ({ value: product.id, label: product.name }))}
                           placeholder={t("purchases.selectProduct")}
                           required
+                          onCustomAdd={() => {
+                            setActiveProductRowIdx(index);
+                            setIsIntercompanyProductAdd(false);
+                            setShowProductModal(true);
+                          }}
                           quickAddTitle="إضافة منتج جديد"
                           quickAddFields={[
                             {
@@ -1108,6 +1117,11 @@ export default function SalesPage() {
                         options={companyProducts(interForm.fromCompanyId).map((product) => ({ value: product.id, label: product.name }))}
                         placeholder={t("purchases.selectProduct")}
                         required
+                        onCustomAdd={() => {
+                          setActiveProductRowIdx(index);
+                          setIsIntercompanyProductAdd(true);
+                          setShowProductModal(true);
+                        }}
                         quickAddTitle="إضافة منتج جديد"
                         quickAddFields={[
                           {
@@ -1416,6 +1430,30 @@ export default function SalesPage() {
           </>
         )}
       </div>
+
+      <ProductFormModal
+        open={showProductModal}
+        onClose={() => {
+          setShowProductModal(false);
+          setActiveProductRowIdx(null);
+        }}
+        companies={companies}
+        initialCompanyId={isIntercompanyProductAdd ? (interForm.fromCompanyId || interForm.toCompanyId || form.companyId) : form.companyId}
+        onSuccess={(newProduct) => {
+          setProducts((prev) => (prev.some((p) => p.id === newProduct.id) ? prev : [...prev, newProduct]));
+          if (activeProductRowIdx !== null) {
+            if (isIntercompanyProductAdd) {
+              updateInterRow(activeProductRowIdx, { productId: newProduct.id });
+            } else {
+              updateItemRow(activeProductRowIdx, {
+                productId: newProduct.id,
+                priceTier: itemRows[activeProductRowIdx]?.priceTier || "newCustomer",
+              });
+            }
+          }
+          toastSuccess("تمت إضافة المنتج واختياره بنجاح");
+        }}
+      />
     </div>
   );
 }
