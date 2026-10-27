@@ -24,6 +24,7 @@ interface Customer {
   remainingDebt: number;
   lastPaymentDate: string | null;
   createdAt: string;
+  payments?: { id: string; amount: number; paymentDate: string }[];
 }
 
 const TYPE_LABELS: Record<string, string> = { INDIVIDUAL: "فرد", COMPANY: "شركة" };
@@ -97,7 +98,7 @@ export default function CustomerBalancesPage() {
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
-  const dateFmt = (v: string | null) =>
+  const dateFmt = (v: string | null | undefined) =>
     v ? new Date(v).toLocaleDateString(locale === "ar" ? "ar-EG" : "en-GB") : "—";
 
   const openStatement = async (customer: Customer) => {
@@ -122,6 +123,7 @@ export default function CustomerBalancesPage() {
       t("customers.totalDebt"),
       t("customers.remaining"),
       t("customers.lastPayment"),
+      "قيمة آخر دفعة",
     ],
     rows: filtered.map((c) => [
       c.name,
@@ -130,6 +132,7 @@ export default function CustomerBalancesPage() {
       String(c.totalDebt || 0),
       String(c.remainingDebt || 0),
       c.lastPaymentDate ? new Date(c.lastPaymentDate).toISOString().slice(0, 10) : "",
+      String(c.payments?.[0]?.amount || 0),
     ]),
   });
 
@@ -139,17 +142,19 @@ export default function CustomerBalancesPage() {
     <>
       <style>{`
         @media print {
-          @page { size: A4; margin: 15mm; }
-          body { font-size: 11pt !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          @page { size: A4 portrait; margin: 10mm 10mm 12mm 10mm; }
+          body { font-size: 10pt !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; background: white !important; }
           .no-print { display: none !important; }
           * { overflow: visible !important; max-height: none !important; }
-          table { page-break-inside: auto; width: 100% !important; }
-          tr { page-break-inside: avoid; }
+          table { page-break-inside: auto; width: 100% !important; border-collapse: collapse; }
+          tr { page-break-inside: avoid; page-break-after: auto; }
           thead { display: table-header-group; }
+          tfoot { display: table-footer-group; }
         }
       `}</style>
 
       <div dir={dir} className="space-y-5">
+        {/* Top Header Controls (No-Print) */}
         <div className="no-print flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <Link
@@ -179,17 +184,8 @@ export default function CustomerBalancesPage() {
           </div>
         </div>
 
-        {/* Print-only header */}
-        <div className="hidden print:block rounded-2xl border border-slate-300 bg-white p-5">
-          <h1 className="text-xl font-bold">{t("customers.balancesTitle")}</h1>
-          <p className="mt-1 text-sm text-gray-600">
-            {t("customers.reportDate")}: {today} — {t("customers.statsDebtors")}: {stats.debtorsCount} (
-            {stats.totalDebt.toLocaleString("ar-EG")} ج.م) — {t("customers.statsTotalCredit")}:{" "}
-            {stats.totalCredit.toLocaleString("ar-EG")} ج.م ({stats.creditCount})
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {/* Stats Cards (No-Print on Screen Only) */}
+        <div className="no-print grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="rounded-xl border border-red-200 bg-red-50 p-3">
             <p className="text-xs font-medium text-red-500">{t("customers.statsDebtors")}</p>
             <p className="mt-1 text-lg font-bold text-red-600">
@@ -208,6 +204,7 @@ export default function CustomerBalancesPage() {
           </div>
         </div>
 
+        {/* Search & Filters (No-Print) */}
         <div className="no-print rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-col gap-3 border-b border-slate-200 p-4 md:flex-row md:items-center md:flex-wrap">
             <div className="w-full md:w-80 md:flex-none">
@@ -241,7 +238,8 @@ export default function CustomerBalancesPage() {
           </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+        {/* Screen Table (Paginated, Hidden in Print) */}
+        <div className="no-print rounded-2xl border border-slate-200 bg-white shadow-sm">
           {loading ? (
             <div className="flex min-h-[320px] w-full items-center justify-center px-4 py-8">
               <PrinterLoader size="md" label={t("common.loading")} />
@@ -260,7 +258,7 @@ export default function CustomerBalancesPage() {
                     <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("customers.totalDebt")}</th>
                     <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("customers.remaining")}</th>
                     <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("customers.lastPayment")}</th>
-                    <th className="no-print px-4 py-3 text-start text-sm font-medium text-gray-500">{t("common.actions")}</th>
+                    <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("common.actions")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -283,8 +281,24 @@ export default function CustomerBalancesPage() {
                           </span>
                         )}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm">{dateFmt(c.lastPaymentDate)}</td>
-                      <td className="no-print px-4 py-3">
+                      <td className="whitespace-nowrap px-4 py-3 text-sm">
+                        {c.payments?.[0] ? (
+                          <div className="flex flex-col items-start gap-0.5">
+                            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200/60 shadow-xs">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                              <span>{c.payments[0].amount.toLocaleString("ar-EG")} ج.م</span>
+                            </span>
+                            <span className="text-[11px] font-medium text-slate-500 tracking-tight ps-1" dir="ltr">
+                              {dateFmt(c.payments[0].paymentDate)}
+                            </span>
+                          </div>
+                        ) : c.lastPaymentDate ? (
+                          <span className="text-xs font-medium text-slate-500" dir="ltr">{dateFmt(c.lastPaymentDate)}</span>
+                        ) : (
+                          <span className="text-slate-300 font-medium">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
                         <button
                           onClick={() => openStatement(c)}
                           className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-xs font-medium text-sky-700 transition hover:bg-sky-100"
@@ -298,7 +312,7 @@ export default function CustomerBalancesPage() {
               </table>
             </div>
           )}
-          <div className="no-print">
+          <div>
             <Pagination
               currentPage={safePage}
               totalPages={totalPages}
@@ -307,6 +321,98 @@ export default function CustomerBalancesPage() {
               pageSize={PAGE_SIZE}
             />
           </div>
+        </div>
+
+        {/* Full Print Report (Prints ALL rows/pages, visible ONLY during print) */}
+        <div className="hidden print:block">
+          {/* Print Header */}
+          <div className="border-b-2 border-slate-900 pb-3 mb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Alex Copier ERP</p>
+                <h1 className="text-2xl font-black text-slate-900 mt-0.5">{t("customers.balancesTitle")}</h1>
+                <p className="text-xs text-slate-600 mt-1">تقرير شامل بأرصدة ومديونيات العملاء</p>
+              </div>
+              <div className="text-end text-xs text-slate-700 space-y-0.5">
+                <p><span className="font-bold">{t("customers.reportDate")}:</span> <span dir="ltr">{today}</span></p>
+                <p><span className="font-bold">إجمالي العملاء:</span> {filtered.length} عميل</p>
+              </div>
+            </div>
+
+            <div className="mt-3 grid grid-cols-3 gap-2 border-t border-slate-300 pt-2 text-xs font-medium text-slate-800">
+              <div className="rounded border border-red-200 bg-red-50/50 p-2">
+                <span className="block text-[10px] text-red-600 font-bold">{t("customers.statsDebtors")}</span>
+                <span className="text-sm font-bold text-red-700">{stats.debtorsCount} عميل ({stats.totalDebt.toLocaleString("ar-EG")} ج.م)</span>
+              </div>
+              <div className="rounded border border-green-200 bg-green-50/50 p-2">
+                <span className="block text-[10px] text-green-700 font-bold">{t("customers.statsTotalCredit")}</span>
+                <span className="text-sm font-bold text-green-800">{stats.creditCount} عميل ({stats.totalCredit.toLocaleString("ar-EG")} ج.م)</span>
+              </div>
+              <div className="rounded border border-slate-300 bg-slate-50 p-2">
+                <span className="block text-[10px] text-slate-600 font-bold">{t("customers.statsTotalRemaining")} (الصافي)</span>
+                <span className="text-sm font-black text-slate-900">{stats.net.toLocaleString("ar-EG")} ج.م</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Full Table */}
+          {filtered.length === 0 ? (
+            <p className="text-center py-8 text-sm text-slate-400">{t("common.noData")}</p>
+          ) : (
+            <table className="w-full text-start border-collapse text-xs">
+              <thead>
+                <tr className="border-y-2 border-slate-900 bg-slate-100 text-slate-900">
+                  <th className="py-2 px-2 text-start font-bold w-8">#</th>
+                  <th className="py-2 px-2 text-start font-bold">{t("customers.name")}</th>
+                  <th className="py-2 px-2 text-start font-bold">{t("customers.phone")}</th>
+                  <th className="py-2 px-2 text-start font-bold">{t("customers.type")}</th>
+                  <th className="py-2 px-2 text-end font-bold">{t("customers.totalDebt")}</th>
+                  <th className="py-2 px-2 text-end font-bold">{t("customers.remaining")}</th>
+                  <th className="py-2 px-2 text-start font-bold">{t("customers.lastPayment")}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-200">
+                {filtered.map((c, idx) => (
+                  <tr key={c.id} className="border-b border-slate-200">
+                    <td className="py-2 px-2 text-slate-400 font-mono text-[10px]">{idx + 1}</td>
+                    <td className="py-2 px-2 font-bold text-slate-900">{c.name}</td>
+                    <td className="py-2 px-2 font-mono text-slate-600" dir="ltr">{c.phone || "—"}</td>
+                    <td className="py-2 px-2 text-slate-600">{TYPE_LABELS[c.customerType] || c.customerType}</td>
+                    <td className="py-2 px-2 text-end font-medium text-slate-700">
+                      {c.totalDebt > 0 ? `${c.totalDebt.toLocaleString("ar-EG")} ج.م` : "—"}
+                    </td>
+                    <td className="py-2 px-2 text-end font-bold">
+                      {c.remainingDebt > 0 ? (
+                        <span className="text-red-700">{c.remainingDebt.toLocaleString("ar-EG")} ج.م</span>
+                      ) : (
+                        <span className="text-green-700 font-bold">
+                          ({Math.abs(c.remainingDebt).toLocaleString("ar-EG")} ج.م)
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-2 px-2 text-slate-700">
+                      {c.payments?.[0] ? (
+                        <div>
+                          <span className="font-bold text-emerald-800">{c.payments[0].amount.toLocaleString("ar-EG")} ج.م</span>
+                          <span className="text-[10px] text-slate-500 ms-1" dir="ltr">({dateFmt(c.payments[0].paymentDate)})</span>
+                        </div>
+                      ) : c.lastPaymentDate ? (
+                        <span dir="ltr">{dateFmt(c.lastPaymentDate)}</span>
+                      ) : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="border-t-2 border-slate-900 bg-slate-100 font-bold text-slate-900">
+                  <td colSpan={4} className="py-2.5 px-2 text-start">الإجمالي العام ({filtered.length} عميل)</td>
+                  <td className="py-2.5 px-2 text-end">{filtered.reduce((s, c) => s + (c.totalDebt || 0), 0).toLocaleString("ar-EG")} ج.م</td>
+                  <td className="py-2.5 px-2 text-end text-red-700 font-black">{stats.net.toLocaleString("ar-EG")} ج.م</td>
+                  <td className="py-2.5 px-2"></td>
+                </tr>
+              </tfoot>
+            </table>
+          )}
         </div>
       </div>
     </>
