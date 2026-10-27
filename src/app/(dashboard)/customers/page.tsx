@@ -434,6 +434,7 @@ export default function CustomersPage() {
   };
 
   const date = (value: string) => value ? `${new Date(value).toLocaleDateString("en-GB")} ${new Date(value).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}` : "—";
+  const dateOnly = (value: string | Date | null | undefined) => value ? new Date(value).toLocaleDateString("en-GB") : "—";
   const isOpen = (status: string) => !["RESOLVED", "CLOSED"].includes(status);
 
   return (
@@ -629,7 +630,20 @@ export default function CustomersPage() {
                 </div>
                 <div className="rounded-lg bg-white p-3 border border-amber-200">
                   <span className="block text-xs text-gray-500">آخر دفعة</span>
-                  <span className="mt-1 block text-sm font-medium text-slate-800">{selected.lastPaymentDate ? date(selected.lastPaymentDate) : "—"}</span>
+                  {selected.payments?.[0] ? (
+                    <div className="mt-1">
+                      <span className="block text-lg font-bold text-emerald-700">
+                        {selected.payments[0].amount.toLocaleString("ar-EG")} ج.م
+                      </span>
+                      <span className="text-xs text-gray-500 font-medium" dir="ltr">
+                        {dateOnly(selected.payments[0].paymentDate)}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="mt-1 block text-sm font-medium text-slate-800">
+                      {selected.lastPaymentDate ? dateOnly(selected.lastPaymentDate) : "—"}
+                    </span>
+                  )}
                 </div>
               </div>
               {selected.remainingDebt > 0 && selected.totalDebt > 0 && (
@@ -860,7 +874,25 @@ export default function CustomersPage() {
                         </span>
                       ) : "—"}
                     </td>
-                    <td className="px-4 py-3 text-sm">{customer.lastPaymentDate ? date(customer.lastPaymentDate) : "—"}</td>
+                    <td className="px-4 py-3 text-sm">
+                      {customer.payments?.[0] ? (
+                        <div className="flex flex-col items-start gap-1">
+                          <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700 border border-emerald-200/70 shadow-xs">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                            <span>{customer.payments[0].amount.toLocaleString("ar-EG")} ج.م</span>
+                          </span>
+                          <span className="text-[11px] font-medium text-slate-500 tracking-tight ps-1" dir="ltr">
+                            {dateOnly(customer.payments[0].paymentDate)}
+                          </span>
+                        </div>
+                      ) : customer.lastPaymentDate ? (
+                        <span className="text-xs font-medium text-slate-500" dir="ltr">
+                          {dateOnly(customer.lastPaymentDate)}
+                        </span>
+                      ) : (
+                        <span className="text-slate-300 font-medium">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                         <button onClick={() => openPaymentModal(customer)} className="inline-flex items-center gap-1 rounded-lg border border-green-200 bg-green-50 px-2.5 py-1.5 text-xs font-medium text-green-700 transition hover:bg-green-100" title="تسجيل دفعة">
