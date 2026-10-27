@@ -143,13 +143,17 @@ export default function CustomerBalancesPage() {
       <style>{`
         @media print {
           @page { size: A4 portrait; margin: 10mm 10mm 12mm 10mm; }
+          html, body { height: auto !important; overflow: visible !important; }
           body { font-size: 10pt !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; background: white !important; }
-          .no-print { display: none !important; }
-          * { overflow: visible !important; max-height: none !important; }
-          table { page-break-inside: auto; width: 100% !important; border-collapse: collapse; }
-          tr { page-break-inside: avoid; page-break-after: auto; }
-          thead { display: table-header-group; }
-          tfoot { display: table-footer-group; }
+          .no-print { display: none !important; visibility: hidden !important; }
+          * { overflow: visible !important; max-height: none !important; box-shadow: none !important; }
+          .print-all { display: block !important; visibility: visible !important; }
+          .print-table-wrapper { display: block !important; }
+          table { page-break-inside: auto !important; width: 100% !important; border-collapse: collapse !important; }
+          thead { display: table-header-group !important; }
+          tfoot { display: table-footer-group !important; }
+          tr { page-break-inside: avoid !important; page-break-after: auto !important; }
+          td, th { page-break-inside: avoid !important; }
         }
       `}</style>
 
@@ -324,7 +328,7 @@ export default function CustomerBalancesPage() {
         </div>
 
         {/* Full Print Report (Prints ALL rows/pages, visible ONLY during print) */}
-        <div className="hidden print:block">
+        <div className="hidden print:block print-all">
           {/* Print Header */}
           <div className="border-b-2 border-slate-900 pb-3 mb-4">
             <div className="flex items-center justify-between">
@@ -359,7 +363,8 @@ export default function CustomerBalancesPage() {
           {filtered.length === 0 ? (
             <p className="text-center py-8 text-sm text-slate-400">{t("common.noData")}</p>
           ) : (
-            <table className="w-full text-start border-collapse text-xs">
+            <div className="print-table-wrapper">
+              <table className="w-full text-start border-collapse text-xs">
               <thead>
                 <tr className="border-y-2 border-slate-900 bg-slate-100 text-slate-900">
                   <th className="py-2 px-2 text-start font-bold w-8">#</th>
@@ -411,7 +416,8 @@ export default function CustomerBalancesPage() {
                   <td className="py-2.5 px-2"></td>
                 </tr>
               </tfoot>
-            </table>
+              </table>
+            </div>
           )}
         </div>
       </div>
