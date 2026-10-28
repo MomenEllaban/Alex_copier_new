@@ -246,17 +246,9 @@ export async function calculatePayrollRun(options: CalculatePayrollOptions) {
       itemComponents.push({ label: "قسط قرض (Loan Installment)", type: "DEDUCTION", amount: loansAmount });
     }
 
-    // Social Insurance
+    // Social Insurance - disabled: do not deduct from employees
     let employeeInsuranceAmount = 0;
     let companyInsuranceAmount = 0;
-    if (settings.insuranceEnabled) {
-      const insurableSalary = Math.min(Math.max(basicSalary, settings.insuranceMinSalary), settings.insuranceMaxSalary);
-      employeeInsuranceAmount = Math.round(((insurableSalary * settings.insuranceEmployeeRate) / 100) * 100) / 100;
-      companyInsuranceAmount = Math.round(((insurableSalary * settings.insuranceCompanyRate) / 100) * 100) / 100;
-
-      if (employeeInsuranceAmount > 0) {
-        itemComponents.push({ label: "تأمينات اجتماعية (حصة العامل)", type: "DEDUCTION", amount: employeeInsuranceAmount });
-      }
     }
 
     // Gross salary
