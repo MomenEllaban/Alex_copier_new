@@ -17,12 +17,12 @@ export async function GET() {
         company: true,
         purchaseOrders: {
           where: { status: { notIn: ["DRAFT", "CANCELLED"] } },
-          select: { id: true, total: true, orderDate: true, createdAt: true, notes: true, status: true },
+          select: { id: true, supplierId: true, companyId: true, total: true, orderDate: true, createdAt: true, notes: true, status: true },
           orderBy: { orderDate: "desc" },
         },
         returns: {
           where: { status: { in: ["APPROVED", "COMPLETED"] } },
-          select: { id: true, total: true, createdAt: true, status: true, product: { select: { name: true } } },
+          select: { id: true, supplierId: true, purchaseOrderId: true, total: true, createdAt: true, status: true, product: { select: { name: true } } },
           orderBy: { createdAt: "desc" },
         },
       },
@@ -43,7 +43,7 @@ export async function GET() {
         ordersCount,
         lastOrderDate,
       };
-    });
+    }).sort((a, b) => (b.balance || 0) - (a.balance || 0));
 
     return NextResponse.json(enriched);
   } catch (error) {

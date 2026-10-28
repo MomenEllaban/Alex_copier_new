@@ -7,7 +7,7 @@ import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
 import ExportButton from "@/components/ExportButton";
-import { Eye, FileText, Pencil, Plus, Trash2, Upload, Save, Wallet, Truck, Users, Building2 } from "lucide-react";
+import { Eye, FileText, Pencil, Plus, Trash2, Upload, Save, Wallet, Truck, Users, Building2, Printer, Package, Receipt, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import ImportDialog from "@/components/ImportDialog";
 import PrinterLoader from "@/components/PrinterLoader";
 import { useConfirm, useToast } from "@/components/UIProvider";
@@ -18,7 +18,13 @@ import { apiErrorMessage } from "@/lib/api-client";
 import { DateTimeCell } from "@/components/DateTimeCell";
 import RefreshButton from "@/components/RefreshButton";
 import SupplierStatementModal from "@/components/SupplierStatementModal";
-import type { PurchaseOrderLite, PurchaseReturnLite } from "@/lib/supplier-statement";
+import {
+  buildSupplierStatement,
+  buildSupplierStatementPrintHtml,
+  type PurchaseOrderLite,
+  type PurchaseReturnLite,
+} from "@/lib/supplier-statement";
+import { getJumlaSupplierInvoices } from "@/lib/jumla-suppliers-ledger";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { notifyDataChanged } from "@/lib/data-events";
 
@@ -172,8 +178,28 @@ export default function SuppliersPage() {
     setShowForm(true);
   };
 
-  const openDetails = (supplier: Supplier) => {
+  const [detailsTab, setDetailsTab] = useState<"statement" | "invoices" | "contact">("statement");
+
+  const openDetails = async (supplier: Supplier) => {
     setSelected(supplier);
+    setDetailsTab("statement");
+    try {
+      const res = await fetch(`/api/suppliers/${supplier.id}`);
+      if (res.ok) {
+        const fullData = await res.json();
+        if (fullData && fullData.id === supplier.id) {
+          setSelected((prev) => (prev?.id === supplier.id ? { ...prev, ...fullData } : prev));
+          if (Array.isArray(fullData.purchaseOrders)) {
+            setOrders((prev) => [...prev.filter((o) => o.supplierId !== supplier.id), ...fullData.purchaseOrders]);
+          }
+          if (Array.isArray(fullData.returns)) {
+            setReturns((prev) => [...prev.filter((r) => r.supplierId !== supplier.id), ...fullData.returns]);
+          }
+        }
+      }
+    } catch {
+      // Keep basic info
+    }
   };
 
   const openStatement = async (supplierId: string) => {
@@ -318,36 +344,273 @@ export default function SuppliersPage() {
         </form>
       </FormModal>
 
-      <FormModal open={!!selected} onClose={() => setSelected(null)} title={selected ? selected.name : ""} wide>
-        {selected && (
-          <>
-            <div className="mb-4 grid grid-cols-1 gap-3 text-sm text-slate-700 md:grid-cols-2 xl:grid-cols-3">
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("suppliers.name")}</span><span className="mt-1 block font-medium text-slate-800">{selected.name || "—"}</span></div>
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("common.company")}</span><span className="mt-1 block font-medium text-slate-800">{selected.company?.name || "—"}</span></div>
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3"><span className="block text-xs font-semibold text-amber-700">{t("suppliers.balanceDue")}</span><span className="mt-1 block font-bold text-amber-800">{(selected.balance || 0).toLocaleString("ar-EG")} ج.م</span></div>
-              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3"><span className="block text-xs font-semibold text-blue-600">{t("suppliers.ordersCount")}</span><span className="mt-1 block font-bold text-blue-800">{selected.ordersCount || selected.purchaseOrders?.length || 0}</span></div>
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("suppliers.contactName")}</span><span className="mt-1 block font-medium text-slate-800">{selected.contactName || "—"}</span></div>
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("suppliers.phone")}</span><span className="mt-1 block font-medium text-slate-800" dir="ltr">{selected.phone || "—"}</span></div>
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("suppliers.email")}</span><span className="mt-1 block font-medium text-slate-800" dir="ltr">{selected.email || "—"}</span></div>
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("suppliers.address")}</span><span className="mt-1 block font-medium text-slate-800">{selected.address || "—"}</span></div>
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("suppliers.taxNumber")}</span><span className="mt-1 block font-medium text-slate-800" dir="ltr">{selected.taxNumber || "—"}</span></div>
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("common.status")}</span><span className={`mt-1 inline-flex rounded-full px-2 py-1 text-xs font-semibold ${selected.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>{selected.isActive ? t("common.active") : t("common.inactive")}</span></div>
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("common.creationDate")}</span><span className="mt-1 block font-medium text-slate-800"><DateTimeCell value={selected.createdAt} /></span></div>
+      <FormModal
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        title={selected ? `تفاصيل المورد — ${selected.name}` : ""}
+        wide
+      >
+        {selected && (() => {
+          const st = buildSupplierStatement(selected.id, orders, returns, selected.name);
+          const invList = getJumlaSupplierInvoices(selected.name);
+          const dateFmt = (v: string) => {
+            try {
+              if (v.includes("/")) return v;
+              return new Date(v).toLocaleDateString("ar-EG");
+            } catch {
+              return v;
+            }
+          };
+
+          return (
+            <div className="space-y-4">
+              {/* Header Banner */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between rounded-xl border border-slate-200 bg-slate-50/70 p-4 gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-black text-slate-900">{selected.name}</h2>
+                    {st.code && (
+                      <span className="rounded-md bg-slate-200 px-2 py-0.5 text-xs font-bold text-slate-700">
+                        كود {st.code}
+                      </span>
+                    )}
+                    <span className="rounded-md bg-blue-100 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                      {selected.company?.name || "شركة جملة آلات"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {selected.phone ? `هاتف: ${selected.phone}` : ""} {selected.contactName ? `| المسؤول: ${selected.contactName}` : ""}
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="rounded-lg bg-amber-100 border border-amber-300 px-3 py-1.5 text-end">
+                    <span className="block text-[10px] font-bold text-amber-800">صافي الرصيد المستحق (دائن)</span>
+                    <span className="text-base font-black text-amber-900">{st.balance.toLocaleString("ar-EG")} ج.م</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tab Selector */}
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-200 pb-2">
+                <div className="flex gap-1.5">
+                  <button
+                    onClick={() => setDetailsTab("statement")}
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                      detailsTab === "statement"
+                        ? "bg-slate-900 text-white shadow-xs"
+                        : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                    }`}
+                  >
+                    <FileText size={14} />
+                    كشف الحساب وسجل الحركات ({st.entries.length})
+                  </button>
+
+                  {invList.length > 0 && (
+                    <button
+                      onClick={() => setDetailsTab("invoices")}
+                      className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                        detailsTab === "invoices"
+                          ? "bg-sky-600 text-white shadow-xs"
+                          : "border border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100"
+                      }`}
+                    >
+                      <Package size={14} />
+                      فواتير المشتريات والآلات ({invList.length})
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => setDetailsTab("contact")}
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition ${
+                      detailsTab === "contact"
+                        ? "bg-slate-900 text-white shadow-xs"
+                        : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
+                    }`}
+                  >
+                    <Users size={14} />
+                    البيانات ومعلومات الاتصال
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const html = buildSupplierStatementPrintHtml(
+                        selected.name,
+                        selected.company?.name || "شركة جملة آلات",
+                        st,
+                        new Date().toLocaleDateString("ar-EG")
+                      );
+                      const w = window.open("", "_blank", "noopener,noreferrer,width=900,height=700");
+                      if (w) {
+                        w.document.write(html);
+                        w.document.close();
+                      }
+                    }}
+                    className="inline-flex items-center gap-1 rounded-lg border border-sky-300 bg-sky-50 px-2.5 py-1.5 text-xs font-semibold text-sky-700 hover:bg-sky-100"
+                  >
+                    <Printer size={13} />
+                    طباعة كشف الحساب
+                  </button>
+                </div>
+              </div>
+
+              {/* TAB 1: Statement Ledger */}
+              {detailsTab === "statement" && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    <div className="rounded-lg border border-blue-200 bg-blue-50/70 p-2.5">
+                      <span className="block text-[11px] font-semibold text-blue-700">إجمالي الفواتير (دائن)</span>
+                      <span className="text-base font-black text-blue-900">{st.totalPurchases.toLocaleString("ar-EG")} ج.م</span>
+                    </div>
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-2.5">
+                      <span className="block text-[11px] font-semibold text-emerald-700">المسدد كاش ودفعات (مدين)</span>
+                      <span className="text-base font-black text-emerald-900">{st.totalPaid.toLocaleString("ar-EG")} ج.م</span>
+                    </div>
+                    <div className="rounded-lg border border-amber-300 bg-amber-50 p-2.5">
+                      <span className="block text-[11px] font-semibold text-amber-700">صافي المستحق (دائن)</span>
+                      <span className="text-base font-black text-amber-900">{st.balance.toLocaleString("ar-EG")} ج.م</span>
+                    </div>
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+                      <span className="block text-[11px] font-semibold text-slate-500">آخر دفعة نقدية</span>
+                      <span className="text-sm font-bold text-slate-800">
+                        {st.lastPaymentAmount ? `${st.lastPaymentAmount.toLocaleString("ar-EG")} ج.م` : "—"}
+                      </span>
+                      <span className="block text-[10px] text-slate-500">{st.lastPaymentDate || ""}</span>
+                    </div>
+                  </div>
+
+                  <div className="max-h-[45vh] overflow-auto rounded-xl border border-gray-200">
+                    <table className="w-full min-w-[650px] text-xs">
+                      <thead className="sticky top-0 bg-slate-100 text-slate-800 border-b border-gray-200">
+                        <tr>
+                          <th className="px-3 py-2.5 text-start font-bold">التاريخ</th>
+                          <th className="px-3 py-2.5 text-center font-bold">رقم المستند</th>
+                          <th className="px-3 py-2.5 text-start font-bold">نوع الحركة</th>
+                          <th className="px-3 py-2.5 text-start font-bold">البيان</th>
+                          <th className="px-3 py-2.5 text-end font-bold text-emerald-700">مدين (مسدد)</th>
+                          <th className="px-3 py-2.5 text-end font-bold text-blue-700">دائن (مستحق)</th>
+                          <th className="px-3 py-2.5 text-end font-bold text-amber-800">الرصيد التراكمي</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 bg-white">
+                        {st.entries.map((e, idx) => (
+                          <tr key={`${e.id}-${idx}`} className="hover:bg-slate-50">
+                            <td className="whitespace-nowrap px-3 py-2 text-slate-700">{dateFmt(e.date)}</td>
+                            <td className="whitespace-nowrap px-3 py-2 text-center font-mono font-bold text-slate-900">{e.docNumber || "—"}</td>
+                            <td className="whitespace-nowrap px-3 py-2">
+                              <span className={`inline-flex rounded px-2 py-0.5 text-[10px] font-semibold ${
+                                e.debit > 0 ? "bg-emerald-100 text-emerald-800" : "bg-blue-100 text-blue-800"
+                              }`}>
+                                {e.docType || (e.kind === "PURCHASE" ? "فاتورة مشتريات" : "مرتجع")}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-slate-700 max-w-xs">{e.label}</td>
+                            <td className="whitespace-nowrap px-3 py-2 text-end font-bold text-emerald-700">
+                              {e.debit > 0 ? `${e.debit.toLocaleString("ar-EG")} ج.م` : "—"}
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-2 text-end font-bold text-blue-700">
+                              {e.credit > 0 ? `${e.credit.toLocaleString("ar-EG")} ج.م` : "—"}
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-2 text-end font-black text-amber-800">
+                              {e.runningBalance.toLocaleString("ar-EG")} ج.م
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: Invoices & Machine Breakdown */}
+              {detailsTab === "invoices" && (
+                <div className="space-y-3 max-h-[45vh] overflow-auto">
+                  {invList.map((inv) => (
+                    <div key={inv.invoiceNumber} className="rounded-xl border border-sky-200 bg-white p-3 shadow-xs">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b border-sky-100 pb-2 gap-2">
+                        <div>
+                          <span className="font-bold text-xs text-slate-900">فاتورة رقم {inv.invoiceNumber}</span>
+                          <span className="text-[11px] text-gray-500 ms-2">{inv.date}</span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <span className="rounded bg-slate-100 px-2 py-0.5 font-medium text-slate-700">
+                            الإجمالي: {inv.total.toLocaleString("ar-EG")} ج.م
+                          </span>
+                          <span className="rounded bg-emerald-100 px-2 py-0.5 font-bold text-emerald-800">
+                            مسدد: {inv.cashPaid.toLocaleString("ar-EG")} ج.م
+                          </span>
+                          <span className="rounded bg-amber-100 px-2 py-0.5 font-black text-amber-900">
+                            آجل: {inv.remainingDue.toLocaleString("ar-EG")} ج.م
+                          </span>
+                        </div>
+                      </div>
+                      <div className="mt-2 overflow-x-auto">
+                        <table className="w-full text-start text-xs">
+                          <thead>
+                            <tr className="bg-slate-50 text-slate-600 border-b border-gray-200">
+                              <th className="py-1 px-2 text-center w-6">#</th>
+                              <th className="py-1 px-2 text-start font-semibold">كود الصنف</th>
+                              <th className="py-1 px-2 text-start font-semibold">الصنف / الموديل</th>
+                              <th className="py-1 px-2 text-center font-semibold">الكمية</th>
+                              <th className="py-1 px-2 text-end font-semibold">السعر</th>
+                              <th className="py-1 px-2 text-end font-semibold">الصافي</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {inv.items.map((item) => (
+                              <tr key={item.index} className="hover:bg-slate-50/50">
+                                <td className="py-1.5 px-2 text-center text-gray-400 font-mono">{item.index}</td>
+                                <td className="py-1.5 px-2 font-mono text-gray-600">{item.code}</td>
+                                <td className="py-1.5 px-2 font-bold text-slate-800">{item.name}</td>
+                                <td className="py-1.5 px-2 text-center font-semibold">{item.quantity}</td>
+                                <td className="py-1.5 px-2 text-end text-slate-600">{item.unitPrice.toLocaleString("ar-EG")} ج.م</td>
+                                <td className="py-1.5 px-2 text-end font-bold text-slate-900">{item.total.toLocaleString("ar-EG")} ج.م</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* TAB 3: Contact & Info */}
+              {detailsTab === "contact" && (
+                <div className="grid grid-cols-1 gap-3 text-xs text-slate-700 md:grid-cols-2 xl:grid-cols-3">
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-[11px] text-gray-500">اسم المورد</span><span className="mt-1 block font-bold text-slate-800">{selected.name || "—"}</span></div>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-[11px] text-gray-500">الشركة</span><span className="mt-1 block font-medium text-slate-800">{selected.company?.name || "—"}</span></div>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-[11px] text-gray-500">المسؤول</span><span className="mt-1 block font-medium text-slate-800">{selected.contactName || "—"}</span></div>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-[11px] text-gray-500">الهاتف</span><span className="mt-1 block font-medium text-slate-800" dir="ltr">{selected.phone || "—"}</span></div>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-[11px] text-gray-500">البريد الإلكتروني</span><span className="mt-1 block font-medium text-slate-800" dir="ltr">{selected.email || "—"}</span></div>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-[11px] text-gray-500">العنوان</span><span className="mt-1 block font-medium text-slate-800">{selected.address || "—"}</span></div>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-[11px] text-gray-500">السجل الضريبي</span><span className="mt-1 block font-medium text-slate-800" dir="ltr">{selected.taxNumber || "—"}</span></div>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-[11px] text-gray-500">الحالة</span><span className={`mt-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${selected.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>{selected.isActive ? "نشط" : "غير نشط"}</span></div>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-[11px] text-gray-500">تاريخ الإنشاء</span><span className="mt-1 block font-medium text-slate-800"><DateTimeCell value={selected.createdAt} /></span></div>
+                </div>
+              )}
+
+              {/* Modal Footer Controls */}
+              <div className="mt-4 flex flex-wrap items-center justify-between border-t border-gray-200 pt-3 gap-2">
+                <div className="flex gap-2">
+                  <button onClick={() => { const s = selected; setSelected(null); openStatement(s.id); }} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-sky-700">
+                    <FileText size={14} /> فتح كشف الحساب المنفصل
+                  </button>
+                  <button onClick={() => openEdit(selected)} className="inline-flex items-center gap-1.5 rounded-lg border border-blue-300 bg-blue-50 px-3.5 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100">
+                    <Pencil size={14} /> {t("common.edit")}
+                  </button>
+                  <button onClick={() => handleDelete(selected.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100">
+                    <Trash2 size={14} /> {t("common.delete")}
+                  </button>
+                </div>
+                <button onClick={() => setSelected(null)} className="rounded-lg border border-gray-300 px-4 py-2 text-xs font-semibold text-gray-700 transition hover:bg-gray-50">
+                  {t("common.close")}
+                </button>
+              </div>
             </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <button onClick={() => setSelected(null)} className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">{t("common.close")}</button>
-              <button onClick={() => { const s = selected; setSelected(null); openStatement(s.id); }} className="inline-flex items-center gap-2 rounded-lg bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-sky-700">
-                <FileText size={14} />{t("suppliers.statement")}
-              </button>
-              <button onClick={() => openEdit(selected)} className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700">
-                <Pencil size={14} />{t("common.edit")}
-              </button>
-              <button onClick={() => handleDelete(selected.id)} className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-700">
-                <Trash2 size={14} />{t("common.delete")}
-              </button>
-            </div>
-          </>
-        )}
+          );
+        })()}
       </FormModal>
 
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
