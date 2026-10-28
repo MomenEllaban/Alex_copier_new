@@ -97,6 +97,42 @@ describe("buildSupplierStatement", () => {
     expect(a.balance).toBe(4000);
     expect(b.balance).toBe(6000);
   });
+  it("reduces balance and increases totalPaid when payments are provided", () => {
+    const orders = [order("po1", "sup1", 10000)];
+    const payments = [
+      {
+        id: "pay1",
+        supplierId: "sup1",
+        amount: 3000,
+        paymentDate: "2026-03-01",
+        docNumber: "REC-01",
+        notes: "دفعة نقدية",
+      },
+    ];
+    const st = buildSupplierStatement("sup1", orders, [], undefined, payments);
+    expect(st.totalPurchases).toBe(10000);
+    expect(st.totalPaid).toBe(3000);
+    expect(st.balance).toBe(7000);
+    expect(st.lastPaymentAmount).toBe(3000);
+  });
+
+  it("integrates new payments seamlessly into jumla ledger suppliers", () => {
+    const extraPayments = [
+      {
+        id: "pay-extra-1",
+        supplierId: "any",
+        amount: 50000,
+        paymentDate: "2026-04-01",
+        docNumber: "REC-99",
+        notes: "دفعة إضافية كاش",
+      },
+    ];
+    // "رضا امين" has base purchases 1,219,000, base payments 393,000 -> base balance 826,000
+    const st = buildSupplierStatement("any", [], [], "رضا امين", extraPayments);
+    expect(st.totalPurchases).toBe(1219000);
+    expect(st.totalPaid).toBe(393000 + 50000);
+    expect(st.balance).toBe(826000 - 50000); // 776,000
+  });
 });
 
 describe("buildSupplierBalances", () => {
@@ -107,3 +143,4 @@ describe("buildSupplierBalances", () => {
     expect(map.get("sup2")?.balance).toBe(0);
   });
 });
+

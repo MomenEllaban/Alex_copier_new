@@ -25,23 +25,35 @@ export async function GET() {
           select: { id: true, supplierId: true, purchaseOrderId: true, total: true, createdAt: true, status: true, product: { select: { name: true } } },
           orderBy: { createdAt: "desc" },
         },
+        payments: {
+          select: { id: true, supplierId: true, companyId: true, amount: true, paymentDate: true, paymentMethod: true, docNumber: true, notes: true, createdAt: true },
+          orderBy: { paymentDate: "desc" },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
 
     const enriched = suppliers.map((s) => {
       const totalPurchases = s.purchaseOrders.reduce((sum, o) => sum + (o.total || 0), 0);
+      const totalPayments = s.payments.reduce((sum, p) => sum + (p.amount || 0), 0);
       const returnsTotal = s.returns.reduce((sum, r) => sum + (r.total || 0), 0);
-      const balance = totalPurchases;
+      const balance = totalPurchases - totalPayments;
       const ordersCount = s.purchaseOrders.length;
+      const paymentsCount = s.payments.length;
       const lastOrderDate = s.purchaseOrders[0]?.orderDate || s.purchaseOrders[0]?.createdAt || null;
+      const lastPayment = s.payments[0] || null;
+
       return {
         ...s,
         totalPurchases,
+        totalPayments,
         returnsTotal,
         balance,
         ordersCount,
+        paymentsCount,
         lastOrderDate,
+        lastPaymentDate: lastPayment ? lastPayment.paymentDate : null,
+        lastPaymentAmount: lastPayment ? lastPayment.amount : 0,
       };
     }).sort((a, b) => (b.balance || 0) - (a.balance || 0));
 

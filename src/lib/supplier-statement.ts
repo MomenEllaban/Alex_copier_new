@@ -54,6 +54,18 @@ export interface PurchaseReturnLite {
   quantity?: number;
 }
 
+export interface SupplierPaymentLite {
+  id: string;
+  supplierId: string;
+  companyId?: string | null;
+  amount: number;
+  paymentDate: string | Date;
+  paymentMethod?: string;
+  docNumber?: string | null;
+  notes?: string | null;
+  createdAt?: string | Date;
+}
+
 /** Orders that represent real payables — everything except drafts & cancellations. */
 export function isPayableOrder(status: string): boolean {
   return status !== "DRAFT" && status !== "CANCELLED";
@@ -84,6 +96,7 @@ export interface SupplierStatement {
   code?: number;
   orders: PurchaseOrderLite[];
   returns: PurchaseReturnLite[];
+  payments?: SupplierPaymentLite[];
   entries: SupplierStatementEntry[];
   ordersCount: number;
   totalPurchases: number; // Σ دائن (إجمالي الاستحقاق / الفواتير)
@@ -100,6 +113,7 @@ export function buildSupplierStatement(
   allOrders: PurchaseOrderLite[],
   allReturns: PurchaseReturnLite[],
   supplierName?: string,
+  allPayments: SupplierPaymentLite[] = [],
 ): SupplierStatement {
   const jumlaLedger = supplierName ? getJumlaSupplierLedger(supplierName) : null;
   const orders = allOrders
@@ -122,6 +136,8 @@ export function buildSupplierStatement(
       return false;
     })
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+  const payments = allPayments.filter((p) => p.supplierId === supplierId);
 
   // 1. If detailed Jumla Ledger exists, build canonical 7-column accounting ledger
   if (jumlaLedger) {
@@ -150,6 +166,49 @@ export function buildSupplierStatement(
       };
     });
 
+    // Check for any newly added database payments that exceed the historical seed
+    const historicalMovements = jumlaLedger.movements.filter((m) => m.debit > 0);
+    const historicalPaymentsCount = historicalMovements.length;
+    let running = entries.length > 0 ? entries[entries.length - 1].runningBalance : jumlaLedger.finalBalance;
+    let extraPaid = 0;
+    let latestPaymentDate = jumlaLedger.lastPaymentDate;
+    let latestPaymentAmount = jumlaLedger.lastPaymentAmount;
+
+    let extraList: SupplierPaymentLite[] = [];
+    if (payments.length > historicalPaymentsCount) {
+      const sortedNew = [...payments].sort(
+        (a, b) => new Date(a.paymentDate).getTime() - new Date(b.paymentDate).getTime()
+      );
+      extraList = sortedNew.slice(historicalPaymentsCount);
+    } else if (payments.length > 0) {
+      const historicalDocs = new Set(
+        historicalMovements.map((m) => m.docNumber).filter((d): d is string => Boolean(d && d !== "—"))
+      );
+      extraList = payments.filter((p) => p.docNumber && !historicalDocs.has(p.docNumber));
+    }
+
+    if (extraList.length > 0) {
+      for (const p of extraList) {
+        running -= p.amount;
+        extraPaid += p.amount;
+        latestPaymentDate = new Date(p.paymentDate).toISOString().slice(0, 10);
+        latestPaymentAmount = p.amount;
+        entries.push({
+          kind: "PAYMENT",
+          id: p.id,
+          date: new Date(p.paymentDate).toISOString().slice(0, 10),
+          docNumber: p.docNumber || "—",
+          docType: p.notes?.includes("صرف") ? "صرف نقدية" : "كاش",
+          label: p.notes || "سداد دفعة نقدية للمورد",
+          debit: p.amount,
+          credit: 0,
+          runningBalance: running,
+          amount: -p.amount,
+          status: "COMPLETED",
+        });
+      }
+    }
+
     const purchaseOrdersCount = jumlaLedger.movements.filter(
       (m) => m.docType === "فاتورة مشتريات"
     ).length;
@@ -160,21 +219,23 @@ export function buildSupplierStatement(
       code: jumlaLedger.code,
       orders,
       returns,
+      payments,
       entries,
       ordersCount: purchaseOrdersCount || orders.length,
       totalPurchases: sumCredit,
-      totalPaid: sumDebit,
+      totalPaid: sumDebit + extraPaid,
       returnsTotal: 0,
-      balance: jumlaLedger.finalBalance,
+      balance: running,
       lastOrderDate: entries.length > 0 ? entries[entries.length - 1].date : null,
-      lastPaymentDate: jumlaLedger.lastPaymentDate,
-      lastPaymentAmount: jumlaLedger.lastPaymentAmount,
+      lastPaymentDate: latestPaymentDate,
+      lastPaymentAmount: latestPaymentAmount,
     };
   }
 
   // 2. Standard DB supplier fallback
   const totalPurchases = orders.reduce((s, o) => s + (o.total || 0), 0);
   const returnsTotal = returns.reduce((s, r) => s + (r.total || 0), 0);
+  const totalPayments = payments.reduce((s, p) => s + (p.amount || 0), 0);
 
   // Build chronologically to compute running balance
   const rawList = [
@@ -195,10 +256,21 @@ export function buildSupplierStatement(
       date: r.createdAt,
       docNumber: r.id.slice(0, 8),
       docType: "مرتجع مشتريات",
-      label: `مرتجع مشتريات${r.product?.name ? ` — ${r.product.name}` : ""}`,
-      debit: r.total || 0,
+      label: `مرتجع مشتريات${r.product?.name ? ` — ${r.product.name}` : ""} (معلوماتي)`,
+      debit: 0,
       credit: 0,
       status: r.status,
+    })),
+    ...payments.map((p) => ({
+      kind: "PAYMENT" as const,
+      id: p.id,
+      date: typeof p.paymentDate === "string" ? p.paymentDate : new Date(p.paymentDate).toISOString(),
+      docNumber: p.docNumber || "—",
+      docType: p.notes?.includes("صرف") ? "صرف نقدية" : "كاش",
+      label: p.notes || "سداد دفعة نقدية للمورد",
+      debit: p.amount || 0,
+      credit: 0,
+      status: "COMPLETED",
     })),
   ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
@@ -212,18 +284,23 @@ export function buildSupplierStatement(
     };
   });
 
+  const lastPayment = payments.sort((a, b) => new Date(b.paymentDate).getTime() - new Date(a.paymentDate).getTime())[0];
+
   return {
     supplierId,
     supplierName,
     orders,
     returns,
+    payments,
     entries,
     ordersCount: orders.length,
     totalPurchases,
-    totalPaid: returnsTotal,
+    totalPaid: totalPayments,
     returnsTotal,
-    balance: totalPurchases,
+    balance: totalPurchases - totalPayments,
     lastOrderDate: orders.length ? orders[0].orderDate || orders[0].createdAt : null,
+    lastPaymentDate: lastPayment ? (typeof lastPayment.paymentDate === "string" ? lastPayment.paymentDate : new Date(lastPayment.paymentDate).toISOString().slice(0, 10)) : null,
+    lastPaymentAmount: lastPayment ? lastPayment.amount : 0,
   };
 }
 

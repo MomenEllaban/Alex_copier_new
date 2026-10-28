@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Printer, Download, Receipt, Package, FileText, CheckCircle2, ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { Printer, Download, Receipt, Package, FileText, CheckCircle2, ArrowDownLeft, ArrowUpRight, Wallet } from "lucide-react";
 import { useI18n } from "@/i18n/context";
 import FormModal from "@/components/FormModal";
 import { exportRowsToCsv } from "@/lib/csv";
@@ -10,6 +10,7 @@ import {
   buildSupplierStatementPrintHtml,
   type PurchaseOrderLite,
   type PurchaseReturnLite,
+  type SupplierPaymentLite,
 } from "@/lib/supplier-statement";
 import { getJumlaSupplierInvoices } from "@/lib/jumla-suppliers-ledger";
 
@@ -21,6 +22,8 @@ interface Props {
   companyName?: string;
   orders: PurchaseOrderLite[];
   returns: PurchaseReturnLite[];
+  payments?: SupplierPaymentLite[];
+  onRecordPayment?: (supplierId: string) => void;
 }
 
 export default function SupplierStatementModal({
@@ -31,13 +34,15 @@ export default function SupplierStatementModal({
   companyName,
   orders,
   returns,
+  payments,
+  onRecordPayment,
 }: Props) {
   const { t, locale } = useI18n();
   const [activeTab, setActiveTab] = useState<"ledger" | "invoices">("ledger");
 
   if (!open) return null;
 
-  const statement = buildSupplierStatement(supplierId, orders, returns, supplierName);
+  const statement = buildSupplierStatement(supplierId, orders, returns, supplierName, payments);
   const invoiceDetails = getJumlaSupplierInvoices(supplierName);
 
   const dateFmt = (v: string) => {
@@ -184,7 +189,16 @@ export default function SupplierStatementModal({
           )}
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {onRecordPayment && (
+            <button
+              onClick={() => onRecordPayment(supplierId)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700 shadow-xs"
+            >
+              <Wallet size={14} />
+              تسجيل دفعة سداد
+            </button>
+          )}
           <button
             onClick={handlePrint}
             className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-sky-700 shadow-xs"

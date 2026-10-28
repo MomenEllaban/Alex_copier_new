@@ -18,11 +18,13 @@ import { apiErrorMessage } from "@/lib/api-client";
 import { DateTimeCell } from "@/components/DateTimeCell";
 import RefreshButton from "@/components/RefreshButton";
 import SupplierStatementModal from "@/components/SupplierStatementModal";
+import RecordSupplierPaymentModal, { type SupplierForPayment } from "@/components/RecordSupplierPaymentModal";
 import {
   buildSupplierStatement,
   buildSupplierStatementPrintHtml,
   type PurchaseOrderLite,
   type PurchaseReturnLite,
+  type SupplierPaymentLite,
 } from "@/lib/supplier-statement";
 import { getJumlaSupplierInvoices } from "@/lib/jumla-suppliers-ledger";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
@@ -42,11 +44,15 @@ interface Supplier {
   company?: Company;
   balance?: number;
   totalPurchases?: number;
+  totalPayments?: number;
   returnsTotal?: number;
   ordersCount?: number;
   lastOrderDate?: string | null;
+  lastPaymentDate?: string | null;
+  lastPaymentAmount?: number;
   purchaseOrders?: PurchaseOrderLite[];
   returns?: PurchaseReturnLite[];
+  payments?: SupplierPaymentLite[];
 }
 interface Company { id: string; name: string; }
 
@@ -80,7 +86,10 @@ export default function SuppliersPage() {
   const [page, setPage] = useState(1);
   const [orders, setOrders] = useState<PurchaseOrderLite[]>([]);
   const [returns, setReturns] = useState<PurchaseReturnLite[]>([]);
+  const [payments, setPayments] = useState<SupplierPaymentLite[]>([]);
   const [statementId, setStatementId] = useState<string | null>(null);
+  const [paymentSupplier, setPaymentSupplier] = useState<SupplierForPayment | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const PAGE_SIZE = 10;
 
   const fetchSuppliers = async () => {
@@ -90,15 +99,18 @@ export default function SuppliersPage() {
       const list = Array.isArray(data) ? data : [];
       setSuppliers(list);
 
-      // Collect all orders and returns across suppliers for instant statement modal
+      // Collect all orders, returns, and payments across suppliers for instant statement modal
       const allOrders: PurchaseOrderLite[] = [];
       const allReturns: PurchaseReturnLite[] = [];
+      const allPayments: SupplierPaymentLite[] = [];
       for (const s of list) {
         if (Array.isArray(s.purchaseOrders)) allOrders.push(...s.purchaseOrders);
         if (Array.isArray(s.returns)) allReturns.push(...s.returns);
+        if (Array.isArray(s.payments)) allPayments.push(...s.payments);
       }
       setOrders(allOrders);
       setReturns(allReturns);
+      setPayments(allPayments);
 
       setCompanies(await companyRes.json());
     } finally {
@@ -109,7 +121,7 @@ export default function SuppliersPage() {
   useEffect(() => {
     fetchSuppliers();
   }, []);
-  const { refresh, refreshing } = useAutoRefresh(fetchSuppliers, ["suppliers", "purchases", "returns"]);
+  const { refresh, refreshing } = useAutoRefresh(fetchSuppliers, ["suppliers", "purchases", "returns", "payments"]);
 
   const filtered = suppliers.filter(
     (s) =>
@@ -180,6 +192,11 @@ export default function SuppliersPage() {
 
   const [detailsTab, setDetailsTab] = useState<"statement" | "invoices" | "contact">("statement");
 
+  const openPaymentModal = (supplier: SupplierForPayment) => {
+    setPaymentSupplier(supplier);
+    setShowPaymentModal(true);
+  };
+
   const openDetails = async (supplier: Supplier) => {
     setSelected(supplier);
     setDetailsTab("statement");
@@ -194,6 +211,9 @@ export default function SuppliersPage() {
           }
           if (Array.isArray(fullData.returns)) {
             setReturns((prev) => [...prev.filter((r) => r.supplierId !== supplier.id), ...fullData.returns]);
+          }
+          if (Array.isArray(fullData.payments)) {
+            setPayments((prev) => [...prev.filter((p) => p.supplierId !== supplier.id), ...fullData.payments]);
           }
         }
       }
@@ -213,6 +233,9 @@ export default function SuppliersPage() {
           setOrders((prev) => [...prev.filter((o) => o.supplierId !== supplierId), ...data.purchaseOrders]);
           if (Array.isArray(data.returns)) {
             setReturns((prev) => [...prev.filter((r) => r.supplierId !== supplierId), ...data.returns]);
+          }
+          if (Array.isArray(data.payments)) {
+            setPayments((prev) => [...prev.filter((p) => p.supplierId !== supplierId), ...data.payments]);
           }
         }
       } catch {
@@ -351,7 +374,7 @@ export default function SuppliersPage() {
         wide
       >
         {selected && (() => {
-          const st = buildSupplierStatement(selected.id, orders, returns, selected.name);
+          const st = buildSupplierStatement(selected.id, orders, returns, selected.name, payments);
           const invList = getJumlaSupplierInvoices(selected.name);
           const dateFmt = (v: string) => {
             try {
@@ -383,6 +406,17 @@ export default function SuppliersPage() {
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const s = selected;
+                      setSelected(null);
+                      openPaymentModal(s);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-emerald-700"
+                  >
+                    <Wallet size={14} />
+                    تسجيل دفعة سداد
+                  </button>
                   <div className="rounded-lg bg-amber-100 border border-amber-300 px-3 py-1.5 text-end">
                     <span className="block text-[10px] font-bold text-amber-800">صافي الرصيد المستحق (دائن)</span>
                     <span className="text-base font-black text-amber-900">{st.balance.toLocaleString("ar-EG")} ج.م</span>
@@ -593,7 +627,17 @@ export default function SuppliersPage() {
 
               {/* Modal Footer Controls */}
               <div className="mt-4 flex flex-wrap items-center justify-between border-t border-gray-200 pt-3 gap-2">
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => {
+                      const s = selected;
+                      setSelected(null);
+                      openPaymentModal(s);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-emerald-700"
+                  >
+                    <Wallet size={14} /> تسجيل دفعة
+                  </button>
                   <button onClick={() => { const s = selected; setSelected(null); openStatement(s.id); }} className="inline-flex items-center gap-1.5 rounded-lg bg-sky-600 px-3.5 py-2 text-xs font-semibold text-white transition hover:bg-sky-700">
                     <FileText size={14} /> فتح كشف الحساب المنفصل
                   </button>
@@ -694,7 +738,10 @@ export default function SuppliersPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex gap-1">
+                      <div className="flex flex-wrap gap-1">
+                        <button onClick={() => openPaymentModal(supplier)} className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100" title="تسجيل دفعة سداد">
+                          <Wallet size={14} />تسجيل دفعة
+                        </button>
                         <button onClick={() => openStatement(supplier.id)} className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-xs font-medium text-sky-700 transition hover:bg-sky-100" title={t("suppliers.statement")}>
                           <FileText size={14} />{t("suppliers.statement")}
                         </button>
@@ -732,6 +779,17 @@ export default function SuppliersPage() {
         onImported={refresh}
       />
 
+      <RecordSupplierPaymentModal
+        open={showPaymentModal}
+        onClose={() => {
+          setShowPaymentModal(false);
+          setPaymentSupplier(null);
+        }}
+        supplier={paymentSupplier}
+        companies={companies}
+        onSuccess={refresh}
+      />
+
       {statementId && (() => {
         const s = suppliers.find((x) => x.id === statementId) || null;
         return s ? (
@@ -743,6 +801,11 @@ export default function SuppliersPage() {
             companyName={s.company?.name}
             orders={orders}
             returns={returns}
+            payments={payments}
+            onRecordPayment={(id) => {
+              const target = suppliers.find((x) => x.id === id);
+              if (target) openPaymentModal(target);
+            }}
           />
         ) : null;
       })()}

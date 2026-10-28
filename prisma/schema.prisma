@@ -291,6 +291,7 @@ model Company {
   accounts              Account[]
   journalEntries        JournalEntry[]
   payments              CustomerPayment[]
+  supplierPayments      SupplierPayment[]
   workshopBooks         WorkshopDailyBook[]
   workshopTransactions  WorkshopTransaction[]
   departments           Department[]
@@ -418,6 +419,24 @@ model Supplier {
   purchaseOrders PurchaseOrder[]
   invoices       PurchaseInvoice[]
   returns        ReturnTransaction[]
+  payments       SupplierPayment[]
+}
+
+model SupplierPayment {
+  id            String   @id @default(cuid())
+  supplierId    String
+  companyId     String?
+  amount        Float
+  paymentDate   DateTime @default(now())
+  paymentMethod String   @default("CASH")
+  docNumber     String?
+  notes         String?
+  createdAt     DateTime @default(now())
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  company  Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  @@index([supplierId, paymentDate])
 }
 
 model Engineer {

@@ -11,8 +11,9 @@ import ExportButton from "@/components/ExportButton";
 import PrinterLoader from "@/components/PrinterLoader";
 import RefreshButton from "@/components/RefreshButton";
 import SupplierStatementModal from "@/components/SupplierStatementModal";
+import RecordSupplierPaymentModal, { type SupplierForPayment } from "@/components/RecordSupplierPaymentModal";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
-import type { PurchaseOrderLite, PurchaseReturnLite } from "@/lib/supplier-statement";
+import type { PurchaseOrderLite, PurchaseReturnLite, SupplierPaymentLite } from "@/lib/supplier-statement";
 
 interface Supplier {
   id: string;
@@ -24,11 +25,13 @@ interface Supplier {
   company?: { id: string; name: string } | null;
   balance?: number;
   totalPurchases?: number;
+  totalPayments?: number;
   returnsTotal?: number;
   ordersCount?: number;
   lastOrderDate?: string | null;
   purchaseOrders?: PurchaseOrderLite[];
   returns?: PurchaseReturnLite[];
+  payments?: SupplierPaymentLite[];
 }
 
 interface Company {
@@ -42,11 +45,14 @@ export default function SupplierBalancesPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [orders, setOrders] = useState<PurchaseOrderLite[]>([]);
   const [returns, setReturns] = useState<PurchaseReturnLite[]>([]);
+  const [payments, setPayments] = useState<SupplierPaymentLite[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [companyFilter, setCompanyFilter] = useState("");
   const [page, setPage] = useState(1);
   const [statementId, setStatementId] = useState<string | null>(null);
+  const [paymentSupplier, setPaymentSupplier] = useState<SupplierForPayment | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const PAGE_SIZE = 10;
 
   const fetchAll = async () => {
@@ -64,19 +70,22 @@ export default function SupplierBalancesPage() {
 
       const allOrders: PurchaseOrderLite[] = [];
       const allReturns: PurchaseReturnLite[] = [];
+      const allPayments: SupplierPaymentLite[] = [];
       for (const s of supList) {
         if (Array.isArray(s.purchaseOrders)) allOrders.push(...s.purchaseOrders);
         if (Array.isArray(s.returns)) allReturns.push(...s.returns);
+        if (Array.isArray(s.payments)) allPayments.push(...s.payments);
       }
       setOrders(allOrders);
       setReturns(allReturns);
+      setPayments(allPayments);
       setCompanies(Array.isArray(compData) ? compData : []);
     } finally {
       setLoading(false);
     }
   };
 
-  const { refresh, refreshing } = useAutoRefresh(fetchAll, ["suppliers", "purchases", "returns"]);
+  const { refresh, refreshing } = useAutoRefresh(fetchAll, ["suppliers", "purchases", "returns", "payments"]);
 
   useEffect(() => {
     fetchAll();
@@ -305,12 +314,24 @@ export default function SupplierBalancesPage() {
                         {dateFmt(supplier.lastOrderDate)}
                       </td>
                       <td className="px-4 py-3">
-                        <button
-                          onClick={() => setStatementId(supplier.id)}
-                          className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-xs font-semibold text-sky-700 transition hover:bg-sky-100"
-                        >
-                          <FileText size={14} />{t("suppliers.statement")}
-                        </button>
+                        <div className="flex flex-wrap gap-1">
+                          <button
+                            onClick={() => {
+                              setPaymentSupplier(supplier);
+                              setShowPaymentModal(true);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                            title="تسجيل دفعة سداد"
+                          >
+                            <Wallet size={14} />تسجيل دفعة
+                          </button>
+                          <button
+                            onClick={() => setStatementId(supplier.id)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-xs font-semibold text-sky-700 transition hover:bg-sky-100"
+                          >
+                            <FileText size={14} />{t("suppliers.statement")}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -412,6 +433,17 @@ export default function SupplierBalancesPage() {
         </div>
       </div>
 
+      <RecordSupplierPaymentModal
+        open={showPaymentModal}
+        onClose={() => {
+          setShowPaymentModal(false);
+          setPaymentSupplier(null);
+        }}
+        supplier={paymentSupplier}
+        companies={companies}
+        onSuccess={refresh}
+      />
+
       {statementSupplier && (
         <SupplierStatementModal
           open={!!statementSupplier}
@@ -421,6 +453,14 @@ export default function SupplierBalancesPage() {
           companyName={statementSupplier.company?.name}
           orders={orders}
           returns={returns}
+          payments={payments}
+          onRecordPayment={(id) => {
+            const s = suppliers.find((x) => x.id === id);
+            if (s) {
+              setPaymentSupplier(s);
+              setShowPaymentModal(true);
+            }
+          }}
         />
       )}
     </>

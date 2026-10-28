@@ -35,6 +35,10 @@ export async function GET(
             product: { select: { id: true, name: true, sku: true } },
           },
         },
+        payments: {
+          orderBy: { paymentDate: "desc" },
+          include: { company: { select: { id: true, name: true } } },
+        },
       },
     });
 
@@ -45,17 +49,23 @@ export async function GET(
     const totalPurchases = supplier.purchaseOrders
       .filter((o) => o.status !== "DRAFT" && o.status !== "CANCELLED")
       .reduce((sum, o) => sum + (o.total || 0), 0);
+    const totalPayments = supplier.payments.reduce((sum, p) => sum + (p.amount || 0), 0);
     const returnsTotal = supplier.returns
       .filter((r) => r.status === "APPROVED" || r.status === "COMPLETED")
       .reduce((sum, r) => sum + (r.total || 0), 0);
-    const balance = totalPurchases;
+    const balance = totalPurchases - totalPayments;
+    const lastPayment = supplier.payments[0] || null;
 
     return NextResponse.json({
       ...supplier,
       totalPurchases,
+      totalPayments,
       returnsTotal,
       balance,
       ordersCount: supplier.purchaseOrders.length,
+      paymentsCount: supplier.payments.length,
+      lastPaymentDate: lastPayment ? lastPayment.paymentDate : null,
+      lastPaymentAmount: lastPayment ? lastPayment.amount : 0,
     });
   } catch (error) {
     return NextResponse.json({ error: "Failed to fetch supplier" }, { status: 500 });
