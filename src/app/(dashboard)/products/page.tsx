@@ -127,9 +127,15 @@ export default function ProductsPage() {
 
   useAutoAddForm(() => setShowForm(true));
 
-  const filtered = useMemo(
-    () =>
-      products.filter(
+  const filtered = useMemo(() => {
+    const seen = new Set<string>();
+    return products
+      .filter((p) => {
+        if (seen.has(p.id)) return false;
+        seen.add(p.id);
+        return true;
+      })
+      .filter(
         (p) =>
           (matchesQuery(p.name, search) ||
             matchesQuery(p.sku, search) ||
@@ -137,9 +143,8 @@ export default function ProductsPage() {
           (!typeFilter || p.productType === typeFilter) &&
           (!companyFilter || p.companyId === companyFilter) &&
           (!activeFilter || String(p.isActive) === activeFilter)
-      ),
-    [products, search, typeFilter, companyFilter, activeFilter]
-  );
+      );
+  }, [products, search, typeFilter, companyFilter, activeFilter]);
   const hasActiveFilters = typeFilter !== "" || companyFilter !== "" || activeFilter !== "" || search !== "";
 
   const stats = useMemo(() => {

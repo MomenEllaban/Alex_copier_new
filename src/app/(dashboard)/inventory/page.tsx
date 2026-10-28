@@ -86,27 +86,32 @@ export default function InventoryPage() {
     return acc;
   }, {});
 
-  const filtered = inventory.filter((item) => {
-    const matchesCompany = (() => {
-      if (!companyFilter) return true;
-      const companyId = item.warehouse?.companyId;
-      if (companyFilter === "jumla-both") {
-        return [companyMap.jumlaMachines, companyMap.jumlaParts].includes(companyId || "");
-      }
-      return companyId === companyMap[companyFilter as keyof typeof companyMap];
-    })();
+  const filtered = inventory
+    .filter((item) => {
+      const matchesCompany = (() => {
+        if (!companyFilter) return true;
+        const companyId = item.warehouse?.companyId;
+        if (companyFilter === "jumla-both") {
+          return [companyMap.jumlaMachines, companyMap.jumlaParts].includes(companyId || "");
+        }
+        return companyId === companyMap[companyFilter as keyof typeof companyMap];
+      })();
 
-    return (
-      matchesCompany &&
-      (!warehouseFilter || item.warehouseId === warehouseFilter) &&
-      // A deficit is a real balance, so it is filtered on like any other
-      // quantity rather than being hidden behind "out of stock".
-      (!negativeOnly || (item.quantity || 0) < 0) &&
-      (matchesQuery(item.product?.name, search) ||
-        matchesQuery(item.product?.sku, search) ||
-        matchesQuery(item.warehouse?.name, search))
-    );
-  });
+      return (
+        matchesCompany &&
+        (!warehouseFilter || item.warehouseId === warehouseFilter) &&
+        // A deficit is a real balance, so it is filtered on like any other
+        // quantity rather than being hidden behind "out of stock".
+        (!negativeOnly || (item.quantity || 0) < 0) &&
+        (matchesQuery(item.product?.name, search) ||
+          matchesQuery(item.product?.sku, search) ||
+          matchesQuery(item.warehouse?.name, search))
+      );
+    })
+    .filter((item, idx, arr) => {
+      const key = `${item.warehouseId}:${item.productId}`;
+      return arr.findIndex((i) => `${i.warehouseId}:${i.productId}` === key) === idx;
+    });
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
   const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);

@@ -240,23 +240,17 @@ export default function SalesPage() {
   const unpaid = filtered.filter((o) => o.paymentStatus !== "PAID").length;
   const stats = { totalOrders: filtered.length, totalValue, paid, unpaid };
 
-  const companyStock = (companyId: string) => inventoryByProductPerCompany[companyId] ?? {};
   const companyProducts = (companyId: string) => {
-    if (!companyId) return products;
-    const company = companies.find((c) => c.id === companyId);
-    const isRetailCompany =
-      companyId === "company3" ||
-      Boolean(company?.name && (company.name.includes("قطاع") || company.name.toLowerCase().includes("retail")));
-
-    // Retail / القطاعي sells all machines and spare parts catalog products even if stock is 0
-    if (isRetailCompany) {
-      return products;
-    }
-
-    const stock = companyStock(companyId);
-    // Include products assigned to this company, or present in its warehouse inventory (even if stock is 0 or negative)
-    const matching = products.filter((p) => p.companyId === companyId || stock[p.id] !== undefined);
-    return matching.length > 0 ? matching : products;
+    if (!companyId) return [];
+    // Show products belonging to the selected company even if stock is 0 or negative
+    const filtered = products.filter((p) => p.companyId === companyId);
+    // Deduplicate by id
+    const seen = new Set<string>();
+    return filtered.filter((p) => {
+      if (seen.has(p.id)) return false;
+      seen.add(p.id);
+      return true;
+    });
   };
 
   const exportSales = () => ({
