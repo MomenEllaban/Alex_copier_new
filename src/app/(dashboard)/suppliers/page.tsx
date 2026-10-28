@@ -25,15 +25,22 @@ import { notifyDataChanged } from "@/lib/data-events";
 interface Supplier {
   id: string;
   name: string;
-  contactName: string;
-  phone: string;
-  email: string;
-  address: string;
-  taxNumber: string;
+  contactName?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  taxNumber?: string | null;
   companyId: string;
   isActive: boolean;
   createdAt: string;
   company?: Company;
+  balance?: number;
+  totalPurchases?: number;
+  returnsTotal?: number;
+  ordersCount?: number;
+  lastOrderDate?: string | null;
+  purchaseOrders?: PurchaseOrderLite[];
+  returns?: PurchaseReturnLite[];
 }
 interface Company { id: string; name: string; }
 
@@ -74,7 +81,19 @@ export default function SuppliersPage() {
     try {
       const [res, companyRes] = await Promise.all([fetch("/api/suppliers"), fetch("/api/companies")]);
       const data = await res.json();
-      setSuppliers(data);
+      const list = Array.isArray(data) ? data : [];
+      setSuppliers(list);
+
+      // Collect all orders and returns across suppliers for instant statement modal
+      const allOrders: PurchaseOrderLite[] = [];
+      const allReturns: PurchaseReturnLite[] = [];
+      for (const s of list) {
+        if (Array.isArray(s.purchaseOrders)) allOrders.push(...s.purchaseOrders);
+        if (Array.isArray(s.returns)) allReturns.push(...s.returns);
+      }
+      setOrders(allOrders);
+      setReturns(allReturns);
+
       setCompanies(await companyRes.json());
     } finally {
       setLoading(false);
@@ -89,10 +108,10 @@ export default function SuppliersPage() {
   const filtered = suppliers.filter(
     (s) =>
       (matchesQuery(s.name, search) ||
-        matchesQuery(s.contactName, search) ||
-        matchesQuery(s.email, search) ||
-        matchesQuery(s.company?.name, search) ||
-        (Boolean(s.phone) && s.phone.includes(search))) &&
+        matchesQuery(s.contactName || "", search) ||
+        matchesQuery(s.email || "", search) ||
+        matchesQuery(s.company?.name || "", search) ||
+        (Boolean(s.phone) && s.phone!.includes(search))) &&
       (!companyFilter || s.companyId === companyFilter)
   );
   const hasActiveFilters = companyFilter !== "" || search !== "";
@@ -102,7 +121,8 @@ export default function SuppliersPage() {
 
   const active = filtered.filter((s) => s.isActive).length;
   const companiesCount = new Set(filtered.filter((s) => s.companyId).map((s) => s.companyId)).size;
-  const stats = { total: filtered.length, active, companiesCount };
+  const totalBalance = filtered.reduce((s, x) => s + (x.balance || 0), 0);
+  const stats = { total: filtered.length, active, companiesCount, totalBalance };
 
   const exportSuppliers = () => ({
     headers: [
@@ -110,6 +130,8 @@ export default function SuppliersPage() {
       t("common.company"),
       t("suppliers.contactName"),
       t("suppliers.phone"),
+      t("suppliers.ordersCount"),
+      t("suppliers.balanceDue"),
       t("suppliers.email"),
       t("suppliers.address"),
       t("suppliers.taxNumber"),
@@ -119,6 +141,8 @@ export default function SuppliersPage() {
       s.company?.name || "",
       s.contactName || "",
       s.phone || "",
+      String(s.ordersCount || s.purchaseOrders?.length || 0),
+      String(s.balance || 0),
       s.email || "",
       s.address || "",
       s.taxNumber || "",
@@ -154,12 +178,17 @@ export default function SuppliersPage() {
 
   const openStatement = async (supplierId: string) => {
     setStatementId(supplierId);
-    if (orders.length === 0) {
+    const target = suppliers.find((s) => s.id === supplierId);
+    if (!target?.purchaseOrders || target.purchaseOrders.length === 0) {
       try {
-        const [purRes, retRes] = await Promise.all([fetch("/api/purchases"), fetch("/api/returns")]);
-        const [purData, retData] = await Promise.all([purRes.json(), retRes.json()]);
-        setOrders(Array.isArray(purData?.orders) ? purData.orders : []);
-        setReturns(Array.isArray(retData) ? retData : []);
+        const res = await fetch(`/api/suppliers/${supplierId}`);
+        const data = await res.json();
+        if (data && Array.isArray(data.purchaseOrders)) {
+          setOrders((prev) => [...prev.filter((o) => o.supplierId !== supplierId), ...data.purchaseOrders]);
+          if (Array.isArray(data.returns)) {
+            setReturns((prev) => [...prev.filter((r) => r.supplierId !== supplierId), ...data.returns]);
+          }
+        }
       } catch {
         // Modal still opens; statement engine handles empty arrays.
       }
@@ -234,10 +263,11 @@ export default function SuppliersPage() {
       </div>
 
       <StatsCards
-        columns={3}
+        columns={4}
         stats={[
           { label: t("suppliers.stats.total"), value: stats.total.toLocaleString("ar-EG"), icon: <Truck size={18} />, tone: "sky" },
           { label: t("suppliers.stats.active"), value: stats.active.toLocaleString("ar-EG"), icon: <Users size={18} />, tone: "green" },
+          { label: t("suppliers.balanceDue"), value: stats.totalBalance.toLocaleString("ar-EG") + " ج.م", icon: <Wallet size={18} />, tone: "amber" },
           { label: t("suppliers.stats.companies"), value: stats.companiesCount.toLocaleString("ar-EG"), icon: <Building2 size={18} />, tone: "purple" },
         ]}
       />
@@ -294,6 +324,8 @@ export default function SuppliersPage() {
             <div className="mb-4 grid grid-cols-1 gap-3 text-sm text-slate-700 md:grid-cols-2 xl:grid-cols-3">
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("suppliers.name")}</span><span className="mt-1 block font-medium text-slate-800">{selected.name || "—"}</span></div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("common.company")}</span><span className="mt-1 block font-medium text-slate-800">{selected.company?.name || "—"}</span></div>
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3"><span className="block text-xs font-semibold text-amber-700">{t("suppliers.balanceDue")}</span><span className="mt-1 block font-bold text-amber-800">{(selected.balance || 0).toLocaleString("ar-EG")} ج.م</span></div>
+              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3"><span className="block text-xs font-semibold text-blue-600">{t("suppliers.ordersCount")}</span><span className="mt-1 block font-bold text-blue-800">{selected.ordersCount || selected.purchaseOrders?.length || 0}</span></div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("suppliers.contactName")}</span><span className="mt-1 block font-medium text-slate-800">{selected.contactName || "—"}</span></div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("suppliers.phone")}</span><span className="mt-1 block font-medium text-slate-800" dir="ltr">{selected.phone || "—"}</span></div>
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3"><span className="block text-xs text-gray-500">{t("suppliers.email")}</span><span className="mt-1 block font-medium text-slate-800" dir="ltr">{selected.email || "—"}</span></div>
@@ -369,21 +401,35 @@ export default function SuppliersPage() {
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("suppliers.name")}</th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("common.company")}</th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("suppliers.contactName")}</th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("suppliers.phone")}</th>
-                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("suppliers.email")}</th>
-                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("suppliers.taxNumber")}</th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("suppliers.ordersCount")}</th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("suppliers.balanceDue")}</th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("common.actions")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {paged.map((supplier) => (
                   <tr key={supplier.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm font-medium">{supplier.name}</td>
-                    <td className="px-4 py-3 text-sm">{supplier.contactName || "—"}</td>
-                    <td className="px-4 py-3 text-sm">{supplier.phone || "—"}</td>
-                    <td className="px-4 py-3 text-sm">{supplier.email || "—"}</td>
-                    <td className="px-4 py-3 text-sm">{supplier.taxNumber || "—"}</td>
+                    <td className="px-4 py-3 text-sm font-semibold text-slate-900">{supplier.name}</td>
+                    <td className="px-4 py-3 text-sm">
+                      <span className="inline-flex rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                        {supplier.company?.name || "—"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-gray-600">{supplier.contactName || "—"}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600"><span dir="ltr">{supplier.phone || "—"}</span></td>
+                    <td className="px-4 py-3 text-sm font-medium text-gray-700">
+                      {supplier.ordersCount || supplier.purchaseOrders?.length || 0}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      <span className={`inline-flex rounded-lg px-2.5 py-1 text-xs font-bold ${
+                        (supplier.balance || 0) > 0 ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800"
+                      }`}>
+                        {(supplier.balance || 0).toLocaleString("ar-EG")} ج.م
+                      </span>
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1">
                         <button onClick={() => openStatement(supplier.id)} className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-xs font-medium text-sky-700 transition hover:bg-sky-100" title={t("suppliers.statement")}>

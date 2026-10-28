@@ -15,10 +15,37 @@ export async function GET() {
     const suppliers = await prisma.supplier.findMany({
       include: {
         company: true,
+        purchaseOrders: {
+          where: { status: { notIn: ["DRAFT", "CANCELLED"] } },
+          select: { id: true, total: true, orderDate: true, createdAt: true, notes: true, status: true },
+          orderBy: { orderDate: "desc" },
+        },
+        returns: {
+          where: { status: { in: ["APPROVED", "COMPLETED"] } },
+          select: { id: true, total: true, createdAt: true, status: true, product: { select: { name: true } } },
+          orderBy: { createdAt: "desc" },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
-    return NextResponse.json(suppliers);
+
+    const enriched = suppliers.map((s) => {
+      const totalPurchases = s.purchaseOrders.reduce((sum, o) => sum + (o.total || 0), 0);
+      const returnsTotal = s.returns.reduce((sum, r) => sum + (r.total || 0), 0);
+      const balance = totalPurchases;
+      const ordersCount = s.purchaseOrders.length;
+      const lastOrderDate = s.purchaseOrders[0]?.orderDate || s.purchaseOrders[0]?.createdAt || null;
+      return {
+        ...s,
+        totalPurchases,
+        returnsTotal,
+        balance,
+        ordersCount,
+        lastOrderDate,
+      };
+    });
+
+    return NextResponse.json(enriched);
   } catch (error) {
     return NextResponse.json({ error: "Failed to fetch suppliers" }, { status: 500 });
   }

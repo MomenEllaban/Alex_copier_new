@@ -48,21 +48,25 @@ export default function SupplierBalancesPage() {
 
   const fetchAll = async () => {
     try {
-      const [supRes, purRes, retRes, compRes] = await Promise.all([
+      const [supRes, compRes] = await Promise.all([
         fetch("/api/suppliers"),
-        fetch("/api/purchases"),
-        fetch("/api/returns"),
         fetch("/api/companies"),
       ]);
-      const [supData, purData, retData, compData] = await Promise.all([
+      const [supData, compData] = await Promise.all([
         supRes.json(),
-        purRes.json(),
-        retRes.json(),
         compRes.json(),
       ]);
-      setSuppliers(Array.isArray(supData) ? supData : []);
-      setOrders(Array.isArray(purData?.orders) ? purData.orders : []);
-      setReturns(Array.isArray(retData) ? retData : []);
+      const supList = Array.isArray(supData) ? supData : [];
+      setSuppliers(supList);
+
+      const allOrders: PurchaseOrderLite[] = [];
+      const allReturns: PurchaseReturnLite[] = [];
+      for (const s of supList) {
+        if (Array.isArray((s as any).purchaseOrders)) allOrders.push(...(s as any).purchaseOrders);
+        if (Array.isArray((s as any).returns)) allReturns.push(...(s as any).returns);
+      }
+      setOrders(allOrders);
+      setReturns(allReturns);
       setCompanies(Array.isArray(compData) ? compData : []);
     } finally {
       setLoading(false);

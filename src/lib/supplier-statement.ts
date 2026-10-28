@@ -30,6 +30,7 @@ export interface PurchaseOrderLite {
   companyId?: string;
   status: string;
   total: number;
+  notes?: string | null;
   orderDate?: string | null;
   createdAt: string;
 }
@@ -111,7 +112,7 @@ export function buildSupplierStatement(
       kind: "PURCHASE" as const,
       id: o.id,
       date: o.orderDate || o.createdAt,
-      label: `فاتورة شراء ${o.id.slice(0, 8)}`,
+      label: o.notes || `فاتورة شراء ${o.id.slice(0, 8)}`,
       amount: o.total || 0,
       status: o.status,
     })),

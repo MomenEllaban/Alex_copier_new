@@ -1,7 +1,66 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, requireAction } from "@/lib/auth-helpers";
+import { requireAuth, requireAction, requirePageAccess } from "@/lib/auth-helpers";
 import { traceError } from "@/lib/prisma-errors";
+
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const user = await requirePageAccess("suppliers");
+    if (!user) {
+      const authed = await requireAuth();
+      return NextResponse.json(
+        { error: authed ? "Forbidden" : "Unauthorized", code: authed ? "FORBIDDEN" : "UNAUTHORIZED" },
+        { status: authed ? 403 : 401 }
+      );
+    }
+    const { id } = await params;
+    const supplier = await prisma.supplier.findUnique({
+      where: { id },
+      include: {
+        company: true,
+        purchaseOrders: {
+          orderBy: { orderDate: "desc" },
+          include: {
+            items: {
+              include: { product: { select: { id: true, name: true, sku: true } } },
+            },
+          },
+        },
+        returns: {
+          orderBy: { createdAt: "desc" },
+          include: {
+            product: { select: { id: true, name: true, sku: true } },
+          },
+        },
+      },
+    });
+
+    if (!supplier) {
+      return NextResponse.json({ error: "Supplier not found" }, { status: 404 });
+    }
+
+    const totalPurchases = supplier.purchaseOrders
+      .filter((o) => o.status !== "DRAFT" && o.status !== "CANCELLED")
+      .reduce((sum, o) => sum + (o.total || 0), 0);
+    const returnsTotal = supplier.returns
+      .filter((r) => r.status === "APPROVED" || r.status === "COMPLETED")
+      .reduce((sum, r) => sum + (r.total || 0), 0);
+    const balance = totalPurchases;
+
+    return NextResponse.json({
+      ...supplier,
+      totalPurchases,
+      returnsTotal,
+      balance,
+      ordersCount: supplier.purchaseOrders.length,
+    });
+  } catch (error) {
+    return NextResponse.json({ error: "Failed to fetch supplier" }, { status: 500 });
+  }
+}
 
 export async function PUT(
   request: Request,
