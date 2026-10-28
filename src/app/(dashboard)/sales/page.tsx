@@ -852,7 +852,7 @@ export default function SalesPage() {
               // The API deducts from the SELECTED company's main warehouse, so the
               // number shown here must be that company's stock — not the global
               // total, which would let the user enter a qty the sale then rejects.
-              const availableQty = row.productId ? companyStock(form.companyId)[row.productId] ?? 0 : 0;
+              const availableQty = row.productId ? (inventoryByProductPerCompany[form.companyId]?.[row.productId] ?? 0) : 0;
               const rowPrice = selectedProduct
                 ? row.priceTier === "custom"
                   ? Number(row.unitPrice) || 0
@@ -1111,7 +1111,7 @@ export default function SalesPage() {
             <div className="space-y-3">
               {interRows.map((row, index) => {
                 const selectedProduct = products.find((p) => p.id === row.productId);
-                const availableQty = row.productId ? companyStock(interForm.fromCompanyId)[row.productId] ?? 0 : 0;
+                const availableQty = row.productId ? (inventoryByProductPerCompany[interForm.fromCompanyId]?.[row.productId] ?? 0) : 0;
                 return (
                   <div key={index} className="grid gap-2 rounded-lg border border-gray-200 bg-white p-3 sm:grid-cols-[1.2fr_90px_130px_130px_110px_auto]">
                     <div>
