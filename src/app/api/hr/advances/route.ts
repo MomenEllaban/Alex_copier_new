@@ -118,7 +118,7 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const actor = await requireAction("hrPayroll", "edit");
+    const actor = await requireAction("hrPayroll", "edit") ?? await requireAction("hrPayroll", "approve");
     if (!actor) {
       const authed = await requireAuth();
       return NextResponse.json(
