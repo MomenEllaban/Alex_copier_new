@@ -1008,7 +1008,10 @@
       "recoveredAdvances": "Advances recovered",
       "recoveredLoans": "Loan installments recovered",
       "companyInsurance": "Company insurance",
-      "tax": "Tax"
+      "tax": "Tax",
+      "status": "Status",
+      "disbursedAt": "Disbursement date",
+      "amount": "Amount"
     },
     "totalIn": "Total In",
     "totalOut": "Total Out",

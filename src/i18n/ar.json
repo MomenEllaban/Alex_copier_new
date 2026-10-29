@@ -1001,7 +1001,10 @@
       "recoveredAdvances": "استرداد سلف",
       "recoveredLoans": "استرداد أقساط قروض",
       "companyInsurance": "تأمين الشركة",
-      "tax": "الضرائب"
+      "tax": "الضرائب",
+      "status": "الحالة",
+      "disbursedAt": "تاريخ الصرف",
+      "amount": "المبلغ"
     },
     "totalIn": "إجمالي الوارد",
     "totalOut": "إجمالي الصادر",

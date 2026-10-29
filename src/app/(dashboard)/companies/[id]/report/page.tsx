@@ -276,10 +276,15 @@ const STATUS_BADGE: Record<string, string> = {
   REJECTED: "bg-red-100 text-red-700",
   LOCKED: "bg-indigo-100 text-indigo-700",
   CALCULATED: "bg-sky-100 text-sky-700",
+  DISBURSED: "bg-teal-100 text-teal-700",
+  ACTIVE: "bg-emerald-100 text-emerald-700",
+  PAUSED: "bg-amber-100 text-amber-700",
+  POSTPONED: "bg-amber-100 text-amber-700",
 };
 
 const statusBadge = (status: string) => {
-  const cls = STATUS_BADGE[status] ?? "bg-gray-100 text-gray-600";
+  const s = (status || "").toUpperCase();
+  const cls = STATUS_BADGE[s] ?? "bg-gray-100 text-gray-600";
   const labels: Record<string, string> = {
     INITIAL: "أولي",
     VERIFIED: "تم التحقق",
@@ -301,10 +306,14 @@ const statusBadge = (status: string) => {
     REJECTED: "مرفوض",
     LOCKED: "مقفل",
     CALCULATED: "محسوب",
+    DISBURSED: "تم الصرف",
+    ACTIVE: "نشط",
+    PAUSED: "موقوف",
+    POSTPONED: "مؤجل",
   };
   return (
     <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}>
-      {labels[status] ?? status}
+      {labels[s] ?? status}
     </span>
   );
 };
@@ -1327,8 +1336,8 @@ function HrSection({ report, t }: { report: ReportData; t: (key: string) => stri
                 <tr className="bg-slate-50">
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.employee")}</th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.status")}</th>
-                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.disbursed")}</th>
-                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.total")}</th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.disbursedAt")}</th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.amount")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1352,6 +1361,16 @@ function HrSection({ report, t }: { report: ReportData; t: (key: string) => stri
                   </tr>
                 )}
               </tbody>
+              {hr.advances.items.length > 0 && (
+                <tfoot>
+                  <SubtotalRow
+                    label={t("reports.hr.total")}
+                    value={hr.advances.total}
+                    colSpan={3}
+                    color="text-amber-600"
+                  />
+                </tfoot>
+              )}
             </table>
           </div>
         </div>
@@ -1366,8 +1385,8 @@ function HrSection({ report, t }: { report: ReportData; t: (key: string) => stri
                 <tr className="bg-slate-50">
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.employee")}</th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.status")}</th>
-                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.disbursed")}</th>
-                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.total")}</th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.disbursedAt")}</th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("reports.hr.amount")}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1391,6 +1410,16 @@ function HrSection({ report, t }: { report: ReportData; t: (key: string) => stri
                   </tr>
                 )}
               </tbody>
+              {hr.loans.items.length > 0 && (
+                <tfoot>
+                  <SubtotalRow
+                    label={t("reports.hr.total")}
+                    value={hr.loans.total}
+                    colSpan={3}
+                    color="text-amber-600"
+                  />
+                </tfoot>
+              )}
             </table>
           </div>
         </div>
