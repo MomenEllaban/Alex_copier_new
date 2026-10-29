@@ -134,6 +134,27 @@ export async function rejectAdvance(advanceId: string, rejectedBy: string, reaso
   });
 }
 
+export async function repayAdvance(advanceId: string, actorId: string, notes?: string) {
+  const advance = await prisma.employeeAdvance.findUnique({ where: { id: advanceId } });
+  if (!advance) throw new Error("طلب السلفة غير موجود");
+  if (advance.status === "COMPLETED") throw new Error("السلفة مسددة ومغلقة بالفعل مسبقاً");
+  if (advance.status === "REJECTED") throw new Error("لا يمكن سداد سلفة مرفوضة");
+
+  const appendNote = notes ? ` [تم السداد نقداً: ${notes}]` : " [تم السداد نقداً مباشرة]";
+  const updatedReason = advance.reason ? `${advance.reason}${appendNote}` : appendNote.trim();
+
+  return prisma.employeeAdvance.update({
+    where: { id: advanceId },
+    data: {
+      status: "COMPLETED",
+      disbursedAt: advance.disbursedAt || new Date(),
+      disbursedBy: advance.disbursedBy || actorId,
+      reason: updatedReason,
+    },
+  });
+}
+
+
 // ───────────────────────────────────────────────
 // LOANS & INSTALLMENTS (القروض المجدولة والأقساط)
 // ───────────────────────────────────────────────

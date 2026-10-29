@@ -28,6 +28,8 @@ import {
   DollarSign,
   TrendingUp,
   Building,
+  Info,
+  ShieldCheck,
 } from "lucide-react";
 
 // ─────────────────────────────────────────────
@@ -117,6 +119,7 @@ interface Advance {
   approvedAt: string | null;
   disbursedAt: string | null;
   disbursementMethod: string | null;
+  payrollItemId: string | null;
   createdAt: string;
   Employee: HREmployeeRef & { Department: HRDepartmentRef | null };
 }
@@ -135,7 +138,7 @@ interface Loan {
   disbursedAt: string | null;
   disbursementMethod: string | null;
   createdAt: string;
-  Employee: HREmployeeRef;
+  Employee: HREmployeeRef & { Department?: HRDepartmentRef | null };
   Installments: LoanInstallment[];
 }
 
@@ -145,6 +148,9 @@ interface LoanInstallment {
   amount: number;
   dueDate: string;
   paidDate: string | null;
+  paidMonth?: number | null;
+  paidYear?: number | null;
+  payrollItemId?: string | null;
   status: string;
   postponedReason: string | null;
 }
@@ -565,11 +571,13 @@ export default function ComprehensivePayrollPage() {
     }
   };
 
-  const handleAdvanceAction = async (id: string, action: "approve" | "reject" | "disburse") => {
-    const actionLabel = action === "approve" ? "اعتماد" : action === "reject" ? "رفض" : "صرف";
+  const handleAdvanceAction = async (id: string, action: "approve" | "reject" | "disburse" | "repay") => {
+    const actionLabel = action === "approve" ? "اعتماد" : action === "reject" ? "رفض" : action === "disburse" ? "صرف" : "سداد نقدي مباشر لـ";
     const ok = await confirmAction({
       title: `${actionLabel} السلفة`,
-      message: `هل أنت متأكد من رغبتك في ${actionLabel} هذه السلفة؟`,
+      message: action === "repay"
+        ? "هل أنت متأكد من تسجيل سداد نقدي مباشر لهذه السلفة؟ سيتم إغلاقها فورياً وتجنب خصمها من الراتب."
+        : `هل أنت متأكد من رغبتك في ${actionLabel} هذه السلفة؟`,
     });
     if (!ok) return;
 
@@ -586,6 +594,30 @@ export default function ComprehensivePayrollPage() {
       fetchLoansAndAdvances();
     } catch (err) {
       toastError(errorMessage(err, "حدث خطأ غير متوقع"));
+    }
+  };
+
+  const handleRepayAdvance = async (adv: Advance) => {
+    const empName = adv.Employee?.fullNameAr || adv.Employee?.fullName || "الموظف";
+    const ok = await confirmAction({
+      title: "تسجيل سداد نقدي مباشر للسلفة",
+      message: `هل أنت متأكد من تسجيل سداد نقدي مباشر للسلفة بمبلغ (${adv.amount.toLocaleString()} ج.م) للموظف (${empName})؟\n\nسيتم إغلاق السلفة واعتبارها مسددة بالكامل فورياً، ولن يتم خصمها من مسير الراتب الشهري لشهر ${adv.deductMonth}/${adv.deductYear}.`,
+    });
+    if (!ok) return;
+
+    try {
+      const res = await fetch("/api/hr/advances", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: adv.id, action: "repay" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "فشل تسجيل سداد السلفة");
+
+      toastSuccess(`تم تسجيل سداد السلفة (${adv.amount.toLocaleString()} ج.م) نقداً بنجاح وإغلاقها`);
+      fetchLoansAndAdvances();
+    } catch (err) {
+      toastError(errorMessage(err, "حدث خطأ أثناء سداد السلفة"));
     }
   };
 
@@ -700,6 +732,86 @@ export default function ComprehensivePayrollPage() {
       }
     } catch (err) {
       toastError(errorMessage(err, "حدث خطأ غير متوقع"));
+    }
+  };
+
+  const handlePayNextInstallment = async (loan: Loan) => {
+    const nextInst = loan.Installments?.filter((i) => i.status === "PENDING_PAY")
+      .sort((a, b) => a.installmentNo - b.installmentNo)[0];
+
+    if (!nextInst) {
+      toastError("لا توجد أقساط متبقية بانتظار السداد في هذا القرض");
+      return;
+    }
+
+    const empName = loan.Employee?.fullNameAr || loan.Employee?.fullName || "الموظف";
+    const ok = await confirmAction({
+      title: `سداد القسط رقم ${nextInst.installmentNo} نقداً`,
+      message: `هل تريد تسجيل سداد القسط رقم (${nextInst.installmentNo}) بمبلغ (${nextInst.amount.toLocaleString()} ج.م) للموظف (${empName}) نقداً الآن؟\n\nسيتم إغلاق القسط فوراً ولن يتم خصمه من الراتب القادم.`,
+    });
+    if (!ok) return;
+
+    try {
+      const res = await fetch("/api/hr/loans", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "earlyPayoffInstallment",
+          installmentId: nextInst.id,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "فشل سداد القسط");
+
+      toastSuccess(`تم سداد القسط رقم ${nextInst.installmentNo} (${nextInst.amount.toLocaleString()} ج.م) بنجاح`);
+      fetchLoansAndAdvances();
+      if (selectedLoanForInstallments) {
+        const refreshedLoans: Loan[] = await (await fetch("/api/hr/loans")).json();
+        const updatedLoan = refreshedLoans.find((l) => l.id === selectedLoanForInstallments.id);
+        if (updatedLoan) setSelectedLoanForInstallments(updatedLoan);
+      }
+    } catch (err) {
+      toastError(errorMessage(err, "حدث خطأ أثناء سداد القسط"));
+    }
+  };
+
+  const handleEarlyPayoffLoan = async (loan: Loan) => {
+    const pendingInsts = loan.Installments?.filter((i) => i.status === "PENDING_PAY") || [];
+    const remainingAmount = pendingInsts.reduce((sum, i) => sum + i.amount, 0);
+
+    if (pendingInsts.length === 0 || remainingAmount <= 0) {
+      toastError("القرض مسدد بالكامل مسبقاً ولا توجد مبالغ متبقية");
+      return;
+    }
+
+    const empName = loan.Employee?.fullNameAr || loan.Employee?.fullName || "الموظف";
+    const ok = await confirmAction({
+      title: "سداد كامل المبلغ المتبقي من القرض",
+      message: `هل تريد تأكيد سداد كامل المتبقي من القرض (${remainingAmount.toLocaleString()} ج.م) لعدد (${pendingInsts.length}) قسط متبقي للموظف (${empName})؟\n\nسيتم إغلاق القرض وجميع أقساطه نهائياً وإيقاف أي استقطاعات مستقبلية له.`,
+    });
+    if (!ok) return;
+
+    try {
+      const res = await fetch("/api/hr/loans", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "earlyPayoffLoan",
+          loanId: loan.id,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "فشل سداد كامل القرض");
+
+      toastSuccess(`تم سداد كامل المتبقي من القرض (${remainingAmount.toLocaleString()} ج.م) وإغلاقه بنجاح`);
+      fetchLoansAndAdvances();
+      if (selectedLoanForInstallments) {
+        const refreshedLoans: Loan[] = await (await fetch("/api/hr/loans")).json();
+        const updatedLoan = refreshedLoans.find((l) => l.id === selectedLoanForInstallments.id);
+        if (updatedLoan) setSelectedLoanForInstallments(updatedLoan);
+      }
+    } catch (err) {
+      toastError(errorMessage(err, "حدث خطأ أثناء سداد كامل القرض"));
     }
   };
 
@@ -1057,8 +1169,8 @@ export default function ComprehensivePayrollPage() {
       {/* ───────────────────────────────────────────── */}
       {activeTab === "loans" && (
         <div className="space-y-6">
+          {/* Sub-navigation & Top Controls */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            {/* Sub-navigation */}
             <div className="flex bg-gray-100 p-1 rounded-lg gap-1 text-sm font-semibold">
               <button
                 onClick={() => setLoansSubTab("advances")}
@@ -1100,6 +1212,148 @@ export default function ComprehensivePayrollPage() {
             </div>
           </div>
 
+          {/* STATS & GUIDANCE BANNER */}
+          {(() => {
+            const totalAdvancesSum = advances.reduce((s, a) => s + (a.amount || 0), 0);
+            const pendingAdvancesCount = advances.filter((a) => a.status === "PENDING").length;
+            const pendingAdvancesSum = advances.filter((a) => a.status === "PENDING").reduce((s, a) => s + (a.amount || 0), 0);
+            const activeAdvancesCount = advances.filter((a) => a.status === "APPROVED").length;
+            const activeAdvancesSum = advances.filter((a) => a.status === "APPROVED").reduce((s, a) => s + (a.amount || 0), 0);
+            const completedAdvancesSum = advances.filter((a) => a.status === "COMPLETED").reduce((s, a) => s + (a.amount || 0), 0);
+
+            const totalLoansSum = loans.reduce((s, l) => s + (l.totalAmount || 0), 0);
+            let totalLoansPaidSum = 0;
+            let totalLoansRemainingSum = 0;
+            let activeLoansCount = 0;
+            for (const l of loans) {
+              if (l.status === "DEDUCTING" || l.status === "APPROVED") activeLoansCount++;
+              for (const inst of (l.Installments || [])) {
+                if (inst.status === "PAID") totalLoansPaidSum += inst.amount;
+                else if (inst.status === "PENDING_PAY") totalLoansRemainingSum += inst.amount;
+              }
+            }
+
+            return (
+              <div className="space-y-4">
+                {/* GUIDANCE BANNER */}
+                <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-emerald-50 border border-blue-200/80 rounded-xl p-4 shadow-xs">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 bg-blue-600 text-white rounded-lg shadow-xs mt-0.5 shrink-0">
+                      <Info size={20} />
+                    </div>
+                    <div className="space-y-1.5 text-xs text-gray-700 w-full">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <h4 className="font-bold text-sm text-gray-900 flex items-center gap-2">
+                          <span>دليل المحاسب والمدير المالي: آلية سداد السلف والأقساط</span>
+                          <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full text-[11px] font-semibold">مضبوطة حسابياً وآلياً</span>
+                        </h4>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                        <div className="bg-white/85 p-3 rounded-lg border border-blue-100 shadow-2xs">
+                          <p className="font-bold text-blue-900 flex items-center gap-1.5 mb-1 text-xs">
+                            <Calendar size={14} className="text-blue-600" />
+                            1. الخصم التلقائي الشهري من الراتب
+                          </p>
+                          <p className="text-gray-600 text-[11px] leading-relaxed">
+                            عند اعتماد وإغلاق <b>مسير الرواتب الشهري</b>، يقوم النظام أوتوماتيكياً بخصم السلف المعتمدة للشهر المحدد وأقساط القروض المستحقة من صافي راتب الموظف وتتحول فوراً إلى <b>«مسددة بالمرتب»</b> دون أي تدخل يدوي.
+                          </p>
+                        </div>
+                        <div className="bg-white/85 p-3 rounded-lg border border-emerald-100 shadow-2xs">
+                          <p className="font-bold text-emerald-900 flex items-center gap-1.5 mb-1 text-xs">
+                            <Wallet size={14} className="text-emerald-600" />
+                            2. السداد النقدي المباشر (خارج مسير الراتب)
+                          </p>
+                          <p className="text-gray-600 text-[11px] leading-relaxed">
+                            إذا سدد الموظف كاش للخزينة، اضغط زر <b>«سداد نقدي مباشر»</b> أو <b>«سداد قسط»</b> أو <b>«سداد كامل القرض»</b> لإغلاق المستحق فورياً ولن يتم خصمه مطلقاً في مسير الرواتب القادم.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* KPI CARDS */}
+                {loansSubTab === "advances" ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-gray-500">إجمالي مبالغ السلف</span>
+                        <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><Coins size={16} /></div>
+                      </div>
+                      <p className="text-xl font-bold text-gray-900 mt-2">{totalAdvancesSum.toLocaleString()} ج.م</p>
+                      <span className="text-[11px] text-gray-500">{advances.length} طلب سلفة مسجل</span>
+                    </div>
+
+                    <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-gray-500">سلف قيد المراجعة</span>
+                        <div className="p-2 bg-amber-50 text-amber-600 rounded-lg"><Clock size={16} /></div>
+                      </div>
+                      <p className="text-xl font-bold text-amber-700 mt-2">{pendingAdvancesSum.toLocaleString()} ج.م</p>
+                      <span className="text-[11px] text-amber-600 font-medium">{pendingAdvancesCount} بانتظار الاعتماد</span>
+                    </div>
+
+                    <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-gray-500">سلف مجدولة للخصم</span>
+                        <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><Calendar size={16} /></div>
+                      </div>
+                      <p className="text-xl font-bold text-indigo-700 mt-2">{activeAdvancesSum.toLocaleString()} ج.م</p>
+                      <span className="text-[11px] text-indigo-600 font-medium">{activeAdvancesCount} معتمدة ونشطة</span>
+                    </div>
+
+                    <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-gray-500">سلف مسددة ومغلقة</span>
+                        <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><CheckCircle2 size={16} /></div>
+                      </div>
+                      <p className="text-xl font-bold text-emerald-700 mt-2">{completedAdvancesSum.toLocaleString()} ج.م</p>
+                      <span className="text-[11px] text-emerald-600 font-medium">سواء بالمرتب أو نقداً</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-gray-500">إجمالي مبالغ القروض</span>
+                        <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><Banknote size={16} /></div>
+                      </div>
+                      <p className="text-xl font-bold text-gray-900 mt-2">{totalLoansSum.toLocaleString()} ج.م</p>
+                      <span className="text-[11px] text-gray-500">{loans.length} قرض مسجل</span>
+                    </div>
+
+                    <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-gray-500">إجمالي المحصل والمسدد</span>
+                        <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><CheckCircle2 size={16} /></div>
+                      </div>
+                      <p className="text-xl font-bold text-emerald-700 mt-2">{totalLoansPaidSum.toLocaleString()} ج.م</p>
+                      <span className="text-[11px] text-emerald-600 font-medium">تم تحصيله من الأقساط</span>
+                    </div>
+
+                    <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-gray-500">صافي المتبقي للتحصيل</span>
+                        <div className="p-2 bg-amber-50 text-amber-600 rounded-lg"><Wallet size={16} /></div>
+                      </div>
+                      <p className="text-xl font-bold text-amber-700 mt-2">{totalLoansRemainingSum.toLocaleString()} ج.م</p>
+                      <span className="text-[11px] text-amber-600 font-medium">أقساط جارية مستحقة</span>
+                    </div>
+
+                    <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-gray-500">القروض النشطة الجارية</span>
+                        <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><TrendingUp size={16} /></div>
+                      </div>
+                      <p className="text-xl font-bold text-indigo-700 mt-2">{activeLoansCount}</p>
+                      <span className="text-[11px] text-indigo-600 font-medium">قروض تحت التحصيل والخصم</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {/* ADVANCES SUBTAB TABLE */}
           {loansSubTab === "advances" && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -1108,9 +1362,9 @@ export default function ComprehensivePayrollPage() {
                   <tr>
                     <th className="p-3 text-start">الموظف</th>
                     <th className="p-3 text-start">مبلغ السلفة</th>
-                    <th className="p-3 text-start">شهر الخصم</th>
-                    <th className="p-3 text-start">السبب</th>
-                    <th className="p-3 text-start">حالة السلفة</th>
+                    <th className="p-3 text-start">شهر الخصم المستهدف</th>
+                    <th className="p-3 text-start">السبب والملاحظات</th>
+                    <th className="p-3 text-start">حالة السلفة والجدولة</th>
                     <th className="p-3 text-start">حالة الصرف</th>
                     <th className="p-3 text-center">الإجراءات</th>
                   </tr>
@@ -1124,33 +1378,72 @@ export default function ComprehensivePayrollPage() {
                     </tr>
                   ) : (
                     advances.map((adv) => (
-                      <tr key={adv.id} className="hover:bg-gray-50">
+                      <tr key={adv.id} className="hover:bg-gray-50 transition-colors">
                         <td className="p-3 font-bold text-gray-900">
-                          {adv.Employee?.fullNameAr || adv.Employee?.fullName} ({adv.Employee?.code})
+                          <div>
+                            <span>{adv.Employee?.fullNameAr || adv.Employee?.fullName}</span>
+                            <span className="text-xs text-gray-500 block font-normal">
+                              كود: {adv.Employee?.code} {adv.Employee?.Department ? `• ${adv.Employee.Department.nameAr || adv.Employee.Department.name}` : ""}
+                            </span>
+                          </div>
                         </td>
-                        <td className="p-3 font-semibold text-blue-700">{adv.amount.toLocaleString()} ج.م</td>
-                        <td className="p-3 font-medium">شهر {adv.deductMonth} / {adv.deductYear}</td>
-                        <td className="p-3 text-gray-600">{adv.reason}</td>
+                        <td className="p-3 font-extrabold text-blue-700">{adv.amount.toLocaleString()} ج.م</td>
+                        <td className="p-3 font-semibold text-gray-800">
+                          <span className="inline-flex items-center gap-1">
+                            <Calendar size={13} className="text-gray-500" />
+                            شهر {adv.deductMonth} / {adv.deductYear}
+                          </span>
+                        </td>
+                        <td className="p-3 text-gray-600 max-w-xs truncate" title={adv.reason}>{adv.reason}</td>
                         <td className="p-3">
-                          {adv.status === "PENDING" && <span className="px-2 py-0.5 rounded text-xs bg-amber-50 text-amber-700 font-bold border border-amber-200">معلقة</span>}
-                          {adv.status === "APPROVED" && <span className="px-2 py-0.5 rounded text-xs bg-blue-50 text-blue-700 font-bold border border-blue-200">معتمدة</span>}
-                          {adv.status === "REJECTED" && <span className="px-2 py-0.5 rounded text-xs bg-rose-50 text-rose-700 font-bold border border-rose-200">مرفوضة</span>}
-                          {adv.status === "COMPLETED" && <span className="px-2 py-0.5 rounded text-xs bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">تم الخصم بالمرتب</span>}
+                          {adv.status === "PENDING" && (
+                            <span className="px-2.5 py-1 rounded-md text-xs bg-amber-50 text-amber-700 font-bold border border-amber-200 inline-flex items-center gap-1">
+                              <Clock size={12} />
+                              معلقة بانتظار الاعتماد
+                            </span>
+                          )}
+                          {adv.status === "APPROVED" && (
+                            <span className="px-2.5 py-1 rounded-md text-xs bg-blue-50 text-blue-700 font-bold border border-blue-200 inline-flex items-center gap-1">
+                              <Clock size={12} />
+                              معتمدة (مجدولة للخصم بالمرتب)
+                            </span>
+                          )}
+                          {adv.status === "REJECTED" && (
+                            <span className="px-2.5 py-1 rounded-md text-xs bg-rose-50 text-rose-700 font-bold border border-rose-200">
+                              مرفوضة
+                            </span>
+                          )}
+                          {adv.status === "COMPLETED" && (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="px-2.5 py-1 rounded-md text-xs bg-emerald-50 text-emerald-700 font-bold border border-emerald-200 inline-flex items-center gap-1 w-fit">
+                                <CheckCircle2 size={12} />
+                                مسددة ومغلقة
+                              </span>
+                              <span className="text-[11px] text-gray-500">
+                                {adv.payrollItemId ? "تم الخصم بمسير الراتب" : "تم السداد نقداً للخزينة"}
+                              </span>
+                            </div>
+                          )}
                         </td>
                         <td className="p-3">
                           {adv.disbursedAt ? (
-                            <span className="text-xs text-emerald-600 font-medium">تم الصرف ({new Date(adv.disbursedAt).toLocaleDateString()})</span>
+                            <span className="text-xs text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 inline-flex items-center gap-1">
+                              <CheckCircle2 size={11} />
+                              تم الصرف ({new Date(adv.disbursedAt).toLocaleDateString("ar-EG")})
+                            </span>
                           ) : (
-                            <span className="text-xs text-gray-400">لم تصرف بعد</span>
+                            <span className="text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded border border-gray-200">
+                              لم تُصرف بعد
+                            </span>
                           )}
                         </td>
                         <td className="p-3 text-center">
-                          <div className="flex items-center justify-center gap-1">
+                          <div className="flex items-center justify-center gap-1.5 flex-wrap">
                             {adv.status === "PENDING" && (
                               <>
                                 <button
                                   onClick={() => handleAdvanceAction(adv.id, "approve")}
-                                  className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold"
+                                  className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold shadow-2xs"
                                 >
                                   اعتماد
                                 </button>
@@ -1162,13 +1455,33 @@ export default function ComprehensivePayrollPage() {
                                 </button>
                               </>
                             )}
-                            {adv.status === "APPROVED" && !adv.disbursedAt && (
-                              <button
-                                onClick={() => handleAdvanceAction(adv.id, "disburse")}
-                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-semibold"
-                              >
-                                تأكيد الصرف
-                              </button>
+
+                            {adv.status === "APPROVED" && (
+                              <>
+                                {!adv.disbursedAt && (
+                                  <button
+                                    onClick={() => handleAdvanceAction(adv.id, "disburse")}
+                                    className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-xs font-semibold shadow-2xs"
+                                  >
+                                    تأكيد الصرف
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleRepayAdvance(adv)}
+                                  className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold inline-flex items-center gap-1 shadow-2xs"
+                                  title="تسجيل سداد نقدي كاش وإغلاق السلفة دون خصمها من الراتب"
+                                >
+                                  <Wallet size={13} />
+                                  سداد نقدي مباشر
+                                </button>
+                              </>
+                            )}
+
+                            {adv.status === "COMPLETED" && (
+                              <span className="text-xs text-emerald-600 font-bold inline-flex items-center gap-1">
+                                <CheckCircle2 size={14} />
+                                مسددة بالكامل
+                              </span>
                             )}
                           </div>
                         </td>
@@ -1187,59 +1500,93 @@ export default function ComprehensivePayrollPage() {
                 <thead className="bg-gray-50 text-gray-700 border-b border-gray-200">
                   <tr>
                     <th className="p-3 text-start">الموظف</th>
-                    <th className="p-3 text-start">مبلغ القرض</th>
-                    <th className="p-3 text-start">الأقساط</th>
+                    <th className="p-3 text-start">إجمالي القرض</th>
+                    <th className="p-3 text-start">الأقساط (مسدد/إجمالي)</th>
+                    <th className="p-3 text-start">المسدد حتى الآن</th>
+                    <th className="p-3 text-start">المتبقي للتحصيل</th>
                     <th className="p-3 text-start">القسط الشهري</th>
-                    <th className="p-3 text-start">تاريخ البداية</th>
-                    <th className="p-3 text-start">الحالة</th>
+                    <th className="p-3 text-start">القسط القادم المستحق</th>
+                    <th className="p-3 text-start">حالة القرض</th>
                     <th className="p-3 text-center">الإجراءات</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {loans.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="p-8 text-center text-gray-500">
+                      <td colSpan={9} className="p-8 text-center text-gray-500">
                         لا توجد قروض مسجلة حالياً. اضغط &quot;إنشاء قرض مجدول&quot; لجدولة أول قرض.
                       </td>
                     </tr>
                   ) : (
                     loans.map((loan) => {
-                      const paidCount = loan.Installments?.filter((i) => i.status === "PAID").length || 0;
+                      const paidInstallments = loan.Installments?.filter((i) => i.status === "PAID") || [];
+                      const pendingInstallments = loan.Installments?.filter((i) => i.status === "PENDING_PAY") || [];
+                      const paidAmount = paidInstallments.reduce((sum, i) => sum + i.amount, 0);
+                      const remainingAmount = pendingInstallments.reduce((sum, i) => sum + i.amount, 0);
+                      const nextInst = pendingInstallments.sort((a, b) => a.installmentNo - b.installmentNo)[0];
+
                       return (
-                        <tr key={loan.id} className="hover:bg-gray-50">
+                        <tr key={loan.id} className="hover:bg-gray-50 transition-colors">
                           <td className="p-3 font-bold text-gray-900">
-                            {loan.Employee?.fullNameAr || loan.Employee?.fullName} ({loan.Employee?.code})
+                            <div>
+                              <span>{loan.Employee?.fullNameAr || loan.Employee?.fullName}</span>
+                              <span className="text-xs text-gray-500 block font-normal">
+                                كود: {loan.Employee?.code} {loan.Employee?.Department ? `• ${loan.Employee.Department.nameAr || loan.Employee.Department.name}` : ""}
+                              </span>
+                            </div>
                           </td>
                           <td className="p-3 font-extrabold text-blue-700">{loan.totalAmount.toLocaleString()} ج.م</td>
                           <td className="p-3 font-medium">
-                            <span className="text-emerald-700 font-bold">{paidCount}</span> من {loan.installmentCount} قسط
+                            <span className="text-emerald-700 font-bold">{paidInstallments.length}</span> من {loan.installmentCount} قسط
+                          </td>
+                          <td className="p-3 font-semibold text-emerald-700">{paidAmount.toLocaleString()} ج.م</td>
+                          <td className="p-3 font-bold text-amber-700">
+                            {remainingAmount > 0 ? `${remainingAmount.toLocaleString()} ج.م` : <span className="text-emerald-600 font-bold">0 ج.م (خالص)</span>}
                           </td>
                           <td className="p-3 font-semibold text-gray-800">{loan.monthlyAmount.toLocaleString()} ج.م</td>
-                          <td className="p-3 text-gray-600">{new Date(loan.startDate).toLocaleDateString()}</td>
+                          <td className="p-3">
+                            {nextInst ? (
+                              <div className="text-xs">
+                                <span className="font-bold text-gray-800">قسط {nextInst.installmentNo} ({nextInst.amount.toLocaleString()} ج.م)</span>
+                                <span className="text-gray-500 block text-[11px]">{new Date(nextInst.dueDate).toLocaleDateString("ar-EG")}</span>
+                              </div>
+                            ) : (
+                              <span className="text-xs text-emerald-600 font-semibold">لا يوجد (مكتمل)</span>
+                            )}
+                          </td>
                           <td className="p-3">
                             {loan.status === "PENDING" && <span className="px-2 py-0.5 rounded text-xs bg-amber-50 text-amber-700 font-bold border border-amber-200">معلق</span>}
-                            {loan.status === "APPROVED" && <span className="px-2 py-0.5 rounded text-xs bg-blue-50 text-blue-700 font-bold border border-blue-200">معتمد</span>}
+                            {loan.status === "APPROVED" && <span className="px-2 py-0.5 rounded text-xs bg-blue-50 text-blue-700 font-bold border border-blue-200">معتمد بانتظار الصرف</span>}
                             {loan.status === "DEDUCTING" && <span className="px-2 py-0.5 rounded text-xs bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">تحت الخصم النشط</span>}
                             {loan.status === "COMPLETED" && <span className="px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-700 font-bold border border-gray-300">مسدد بالكامل</span>}
                             {loan.status === "REJECTED" && <span className="px-2 py-0.5 rounded text-xs bg-rose-50 text-rose-700 font-bold border border-rose-200">مرفوض</span>}
                           </td>
                           <td className="p-3 text-center">
-                            <div className="flex items-center justify-center gap-1.5">
+                            <div className="flex items-center justify-center gap-1.5 flex-wrap">
                               <button
                                 onClick={() => setSelectedLoanForInstallments(loan)}
-                                className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded text-xs font-semibold flex items-center gap-1"
+                                className="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded text-xs font-semibold flex items-center gap-1 shadow-2xs"
+                                title="عرض جدول استحقاقات الأقساط"
                               >
                                 <Calendar size={13} />
-                                جدول الأقساط
+                                الأقساط
                               </button>
 
                               {loan.status === "PENDING" && (
-                                <button
-                                  onClick={() => handleLoanAction(loan.id, "approve")}
-                                  className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold"
-                                >
-                                  اعتماد
-                                </button>
+                                <>
+                                  <button
+                                    onClick={() => handleLoanAction(loan.id, "approve")}
+                                    className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-semibold"
+                                  >
+                                    اعتماد
+                                  </button>
+                                  <button
+                                    onClick={() => handleLoanAction(loan.id, "reject")}
+                                    className="px-2.5 py-1 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded text-xs font-semibold"
+                                  >
+                                    رفض
+                                  </button>
+                                </>
                               )}
 
                               {loan.status === "APPROVED" && !loan.disbursedAt && (
@@ -1249,6 +1596,34 @@ export default function ComprehensivePayrollPage() {
                                 >
                                   صرف
                                 </button>
+                              )}
+
+                              {(loan.status === "DEDUCTING" || (loan.status === "APPROVED" && loan.disbursedAt)) && remainingAmount > 0 && (
+                                <>
+                                  <button
+                                    onClick={() => handlePayNextInstallment(loan)}
+                                    className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs font-bold inline-flex items-center gap-1 shadow-2xs"
+                                    title="سداد القسط القادم نقداً الآن دون انتظار المرتب"
+                                  >
+                                    <DollarSign size={13} />
+                                    سداد قسط
+                                  </button>
+                                  <button
+                                    onClick={() => handleEarlyPayoffLoan(loan)}
+                                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-xs font-bold inline-flex items-center gap-1 shadow-2xs"
+                                    title="سداد كامل المبلغ المتبقي من القرض وإغلاقه"
+                                  >
+                                    <Wallet size={13} />
+                                    سداد كامل القرض
+                                  </button>
+                                </>
+                              )}
+
+                              {loan.status === "COMPLETED" && (
+                                <span className="text-xs text-emerald-600 font-bold inline-flex items-center gap-1">
+                                  <CheckCircle2 size={14} />
+                                  مسدد
+                                </span>
                               )}
                             </div>
                           </td>
@@ -2146,79 +2521,162 @@ export default function ComprehensivePayrollPage() {
       {/* ───────────────────────────────────────────── */}
       {/* MODAL 5: VIEW LOAN INSTALLMENTS SCHEDULE      */}
       {/* ───────────────────────────────────────────── */}
-      {selectedLoanForInstallments && (
-        <FormModal
-          open={true}
-          onClose={() => setSelectedLoanForInstallments(null)}
-          title={`جدول أقساط قرض: ${selectedLoanForInstallments.Employee?.fullNameAr || selectedLoanForInstallments.Employee?.fullName}`}
-        >
-          <div className="space-y-4 max-h-[70vh] overflow-y-auto p-1">
-            <div className="flex justify-between items-center bg-gray-50 p-3 rounded-lg border text-xs">
-              <span>إجمالي القرض: <b>{selectedLoanForInstallments.totalAmount.toLocaleString()} ج.م</b></span>
-              <span>عدد الأقساط: <b>{selectedLoanForInstallments.installmentCount}</b></span>
-              <span>الحالة: <b>{selectedLoanForInstallments.status}</b></span>
+      {selectedLoanForInstallments && (() => {
+        const paidInstallments = selectedLoanForInstallments.Installments?.filter((i) => i.status === "PAID") || [];
+        const pendingInstallments = selectedLoanForInstallments.Installments?.filter((i) => i.status === "PENDING_PAY") || [];
+        const paidSum = paidInstallments.reduce((sum, i) => sum + i.amount, 0);
+        const remainingSum = pendingInstallments.reduce((sum, i) => sum + i.amount, 0);
+
+        return (
+          <FormModal
+            open={true}
+            onClose={() => setSelectedLoanForInstallments(null)}
+            title={`جدول أقساط وسداد قرض: ${selectedLoanForInstallments.Employee?.fullNameAr || selectedLoanForInstallments.Employee?.fullName}`}
+          >
+            <div className="space-y-4 max-h-[75vh] overflow-y-auto p-1">
+              {/* TOP SUMMARY CARDS */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-200">
+                  <span className="text-gray-500 block text-[11px]">إجمالي القرض</span>
+                  <span className="font-extrabold text-blue-700 text-sm">
+                    {selectedLoanForInstallments.totalAmount.toLocaleString()} ج.م
+                  </span>
+                </div>
+                <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-200">
+                  <span className="text-gray-500 block text-[11px]">عدد الأقساط</span>
+                  <span className="font-bold text-gray-800 text-sm">
+                    {paidInstallments.length} / {selectedLoanForInstallments.installmentCount}
+                  </span>
+                </div>
+                <div className="bg-emerald-50/70 p-2.5 rounded-lg border border-emerald-200">
+                  <span className="text-emerald-700 block text-[11px] font-semibold">المسدد حتى الآن</span>
+                  <span className="font-extrabold text-emerald-800 text-sm">
+                    {paidSum.toLocaleString()} ج.م
+                  </span>
+                </div>
+                <div className="bg-amber-50/70 p-2.5 rounded-lg border border-amber-200">
+                  <span className="text-amber-700 block text-[11px] font-semibold">المتبقي للتحصيل</span>
+                  <span className="font-extrabold text-amber-800 text-sm">
+                    {remainingSum.toLocaleString()} ج.م
+                  </span>
+                </div>
+              </div>
+
+              {/* EARLY PAYOFF ACTION BANNER */}
+              {remainingSum > 0 && (
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-emerald-50 border border-emerald-200 p-3 rounded-xl shadow-2xs">
+                  <div>
+                    <h5 className="font-bold text-xs text-emerald-900 flex items-center gap-1.5">
+                      <Wallet size={15} className="text-emerald-600" />
+                      سداد كامل المبلغ المتبقي نقداً
+                    </h5>
+                    <p className="text-[11px] text-emerald-700 mt-0.5 leading-relaxed">
+                      يمكنك سداد جميع الأقساط المتبقية ({pendingInstallments.length} قسط بمجموع {remainingSum.toLocaleString()} ج.م) دفعة واحدة نقداً وإغلاق القرض نهائياً.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleEarlyPayoffLoan(selectedLoanForInstallments)}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs transition-colors shrink-0"
+                  >
+                    <CheckCircle2 size={15} />
+                    سداد كامل المتبقي ({remainingSum.toLocaleString()} ج.م)
+                  </button>
+                </div>
+              )}
+
+              {/* INSTALLMENTS TABLE */}
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <table className="w-full text-xs">
+                  <thead className="bg-gray-100 border-b border-gray-200">
+                    <tr>
+                      <th className="p-2.5 text-start">#</th>
+                      <th className="p-2.5 text-start">تاريخ الاستحقاق</th>
+                      <th className="p-2.5 text-start">مبلغ القسط</th>
+                      <th className="p-2.5 text-start">حالة وطريقة السداد</th>
+                      <th className="p-2.5 text-center">إجراءات القسط</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {selectedLoanForInstallments.Installments?.map((inst) => (
+                      <tr key={inst.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="p-2.5 font-bold text-gray-800">قسط {inst.installmentNo}</td>
+                        <td className="p-2.5 text-gray-700">
+                          {new Date(inst.dueDate).toLocaleDateString("ar-EG")}
+                        </td>
+                        <td className="p-2.5 font-extrabold text-blue-700">{inst.amount.toLocaleString()} ج.م</td>
+                        <td className="p-2.5">
+                          {inst.status === "PENDING_PAY" && (
+                            <span className="px-2 py-0.5 rounded text-[11px] bg-amber-50 text-amber-700 font-bold border border-amber-200 inline-flex items-center gap-1">
+                              <Clock size={11} />
+                              بانتظار الخصم بالمرتب
+                            </span>
+                          )}
+                          {inst.status === "PAID" && (
+                            <span className="px-2 py-0.5 rounded text-[11px] bg-emerald-50 text-emerald-700 font-bold border border-emerald-200 inline-flex items-center gap-1">
+                              <CheckCircle2 size={11} />
+                              {inst.payrollItemId
+                                ? `مسدد بمسير الراتب (شهر ${inst.paidMonth || ""}/${inst.paidYear || ""})`
+                                : `مسدد نقداً (${inst.paidDate ? new Date(inst.paidDate).toLocaleDateString("ar-EG") : "مباشر"})`}
+                            </span>
+                          )}
+                          {inst.status === "POSTPONED" && (
+                            <span className="px-2 py-0.5 rounded text-[11px] bg-purple-50 text-purple-700 font-bold border border-purple-200">
+                              مؤجل: {inst.postponedReason || "بطلب الإدارة"}
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-2.5 text-center">
+                          {inst.status === "PENDING_PAY" && (
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleEarlyPayoffInstallment(inst.id)}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[11px] font-bold shadow-2xs inline-flex items-center gap-1"
+                                title="تسجيل سداد نقدي كاش لهذا القسط الآن"
+                              >
+                                <DollarSign size={12} />
+                                سداد نقدي الآن
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setPostponeInstallmentId(inst.id);
+                                  setShowPostponeModal(true);
+                                }}
+                                className="px-2.5 py-1 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded text-[11px] font-bold border border-purple-200"
+                                title="تأجيل القسط وترحيله لنهاية الجدول"
+                              >
+                                تأجيل
+                              </button>
+                            </div>
+                          )}
+                          {inst.status === "PAID" && (
+                            <span className="text-emerald-600 font-bold text-xs inline-flex items-center gap-1">
+                              <CheckCircle2 size={13} />
+                              مسدد
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedLoanForInstallments(null)}
+                  className="px-4 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-xs font-semibold"
+                >
+                  إغلاق
+                </button>
+              </div>
             </div>
-
-            <table className="w-full text-xs">
-              <thead className="bg-gray-100 border-b">
-                <tr>
-                  <th className="p-2 text-start">#</th>
-                  <th className="p-2 text-start">تاريخ الاستحقاق</th>
-                  <th className="p-2 text-start">مبلغ القسط</th>
-                  <th className="p-2 text-start">الحالة</th>
-                  <th className="p-2 text-center">إجراءات القسط</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {selectedLoanForInstallments.Installments?.map((inst) => (
-                  <tr key={inst.id} className="hover:bg-gray-50">
-                    <td className="p-2 font-bold text-gray-700">قسط {inst.installmentNo}</td>
-                    <td className="p-2">{new Date(inst.dueDate).toLocaleDateString()}</td>
-                    <td className="p-2 font-bold text-blue-700">{inst.amount.toLocaleString()} ج.م</td>
-                    <td className="p-2">
-                      {inst.status === "PENDING_PAY" && <span className="px-2 py-0.5 rounded text-[11px] bg-amber-50 text-amber-700 font-bold">بانتظار الخصم</span>}
-                      {inst.status === "PAID" && <span className="px-2 py-0.5 rounded text-[11px] bg-emerald-50 text-emerald-700 font-bold">مسدد بالمرتب</span>}
-                      {inst.status === "POSTPONED" && <span className="px-2 py-0.5 rounded text-[11px] bg-purple-50 text-purple-700 font-bold">مؤجل</span>}
-                    </td>
-                    <td className="p-2 text-center">
-                      {inst.status === "PENDING_PAY" && (
-                        <div className="flex items-center justify-center gap-1">
-                          <button
-                            onClick={() => {
-                              setPostponeInstallmentId(inst.id);
-                              setShowPostponeModal(true);
-                            }}
-                            className="px-2 py-0.5 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded text-[10px] font-bold border border-purple-200"
-                          >
-                            تأجيل
-                          </button>
-                          <button
-                            onClick={() => handleEarlyPayoffInstallment(inst.id)}
-                            className="px-2 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded text-[10px] font-bold border border-emerald-200"
-                          >
-                            سداد مبكر
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-
-            <div className="flex justify-end pt-2">
-              <button
-                type="button"
-                onClick={() => setSelectedLoanForInstallments(null)}
-                className="px-4 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg text-xs font-semibold"
-              >
-                إغلاق
-              </button>
-            </div>
-          </div>
-        </FormModal>
-      )}
-
+          </FormModal>
+        );
+      })()}
       {/* ───────────────────────────────────────────── */}
       {/* MODAL 6: POSTPONE INSTALLMENT                 */}
       {/* ───────────────────────────────────────────── */}

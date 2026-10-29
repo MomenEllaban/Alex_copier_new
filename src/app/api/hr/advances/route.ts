@@ -6,6 +6,7 @@ import {
   approveAdvance,
   disburseAdvance,
   rejectAdvance,
+  repayAdvance,
 } from "@/lib/services/hr/loan-advance-service";
 import { errorMessage } from "@/lib/prisma-errors";
 import { Prisma } from "@/generated/prisma/client";
@@ -118,7 +119,7 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const actor = await requireAction("hrPayroll", "edit") ?? await requireAction("hrPayroll", "approve");
+    const actor = await requireAction("hrPayroll", "edit");
     if (!actor) {
       const authed = await requireAuth();
       return NextResponse.json(
@@ -128,7 +129,7 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json();
-    const { id, action, reason, disbursementMethod, treasuryAccountId } = body;
+    const { id, action, reason, notes, disbursementMethod, treasuryAccountId } = body;
 
     if (!id || !action) {
       return NextResponse.json({ error: "id and action are required" }, { status: 400 });
@@ -146,6 +147,8 @@ export async function PATCH(request: Request) {
       result = await disburseAdvance(id, actor.id, disbursementMethod, treasuryAccountId);
     } else if (action === "reject") {
       result = await rejectAdvance(id, actor.id, reason);
+    } else if (action === "repay" || action === "earlyPayoff") {
+      result = await repayAdvance(id, actor.id, reason || notes);
     } else {
       return NextResponse.json({ error: "Invalid action" }, { status: 400 });
     }

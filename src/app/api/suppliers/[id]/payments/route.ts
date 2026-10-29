@@ -33,7 +33,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const actor = await requireAction("suppliers", "edit");
+    const actor = await requireAction("suppliers", "add");
     if (!actor) {
       const authed = await requireAuth();
       return NextResponse.json(
