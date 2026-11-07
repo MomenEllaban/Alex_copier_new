@@ -72,6 +72,31 @@ export async function GET() {
   }
 }
 
+const PAYMENT_METHOD_VALUES = new Set(["CASH", "CREDIT", "INSTALLMENT", "MIXED"]);
+
+function normalizePurchasePayment(input: {
+  paymentMethod?: unknown;
+  paidAmount?: unknown;
+  total: number;
+}): { paymentMethod: "CASH" | "CREDIT" | "INSTALLMENT" | "MIXED"; paymentStatus: "PENDING" | "PARTIAL" | "PAID"; paidAmount: number } {
+  const rawMethod = typeof input.paymentMethod === "string" ? input.paymentMethod.trim().toUpperCase() : "";
+  const paymentMethod = (PAYMENT_METHOD_VALUES.has(rawMethod) ? rawMethod : "CASH") as "CASH" | "CREDIT" | "INSTALLMENT" | "MIXED";
+  const total = Number.isFinite(input.total) && input.total >= 0 ? input.total : 0;
+  const provided = input.paidAmount !== undefined && input.paidAmount !== null && input.paidAmount !== "";
+  let paidAmountRaw = provided ? Number(input.paidAmount) : NaN;
+  if (!Number.isFinite(paidAmountRaw)) paidAmountRaw = paymentMethod === "CASH" ? total : 0;
+  paidAmountRaw = Math.max(0, Math.min(paidAmountRaw, total));
+
+  // CASH defaults to fully paid unless an explicit paidAmount was provided.
+  const paidAmount = paymentMethod === "CASH" && !provided ? total : paidAmountRaw;
+  let paymentStatus: "PENDING" | "PARTIAL" | "PAID" = "PENDING";
+  if (paidAmount >= total && total > 0) paymentStatus = "PAID";
+  else if (paidAmount > 0) paymentStatus = "PARTIAL";
+  else paymentStatus = "PENDING";
+
+  return { paymentMethod, paymentStatus, paidAmount };
+}
+
 export async function POST(request: Request) {
   try {
 
@@ -81,7 +106,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: authed ? "Forbidden" : "Unauthorized" }, { status: authed ? 403 : 401 });
     }
         const body = await request.json();
-    const { items, ...data } = body;
+    const { items, paymentMethod: rawPaymentMethod, paidAmount: rawPaidAmount, ...data } = body;
 
     const total = items?.reduce(
       (sum: number, item: { quantity: number; unitPrice: number }) =>
@@ -115,11 +140,20 @@ export async function POST(request: Request) {
       }
     }
 
+    const payment = normalizePurchasePayment({ paymentMethod: rawPaymentMethod, paidAmount: rawPaidAmount, total });
+
     const purchaseOrder = await prisma.$transaction(async (tx) => {
       const created = await tx.purchaseOrder.create({
         data: {
-          ...data,
+          companyId: data.companyId,
+          supplierId: data.supplierId,
+          status: data.status,
+          orderDate: data.orderDate,
+          notes: data.notes ?? null,
           total,
+          paymentMethod: payment.paymentMethod,
+          paymentStatus: payment.paymentStatus,
+          paidAmount: payment.paidAmount,
           ...(items && {
             items: {
               create: items.map((item: { productId: string; quantity: number; unitPrice: number }) => ({
@@ -132,12 +166,32 @@ export async function POST(request: Request) {
         },
         include: {
           supplier: true,
+          company: true,
           items: {
             include: { product: true },
           },
           invoices: true,
         },
       });
+
+      // دفعة مرتبطة بالفاتورة (نقدًا أو دفعة مقدمة) — تظهر في تقارير الموردين وتسوية الأرصدة.
+      if (created.paidAmount > 0) {
+        await tx.supplierPayment.create({
+          data: {
+            supplierId: created.supplierId,
+            companyId: created.companyId || null,
+            purchaseOrderId: created.id,
+            amount: created.paidAmount,
+            paymentDate: created.orderDate ? new Date(created.orderDate) : new Date(),
+            paymentMethod: created.paymentMethod === "CASH" ? "كاش" : "دفعة مع فاتورة شراء",
+            docNumber: `PO-${created.id.slice(0, 8)}`,
+            notes:
+              created.paymentMethod === "CASH"
+                ? `سداد نقدي مع فاتورة شراء #${created.id.slice(0, 8)}`
+                : `دفعة مقدمة مع فاتورة شراء #${created.id.slice(0, 8)}`,
+          },
+        });
+      }
 
       // استلام فوري عند الإنشاء: أدخل البضاعة للمخزون مرتبطة بأمر الشراء الحقيقي.
       if (created.status === "RECEIVED") {
@@ -153,7 +207,10 @@ export async function POST(request: Request) {
         });
       }
 
-      return created;
+      return tx.purchaseOrder.findUnique({
+        where: { id: created.id },
+        include: { supplier: true, company: true, items: { include: { product: true } }, invoices: true },
+      });
     });
 
     return NextResponse.json(purchaseOrder, { status: 201 });

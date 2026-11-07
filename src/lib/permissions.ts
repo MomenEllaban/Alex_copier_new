@@ -70,11 +70,11 @@ export const ROLE_PERMISSIONS: Record<Role, Page[]> = {
     "hrDashboard", "hrEmployees", "hrAttendance", "hrLeaves", "hrPayroll", "hrSettings", "hrReports", "hrSelfService",
   ],
 
-  // المحاسب — المالية والفواتير والتقارير + الرواتب
+  // المحاسب — المالية والفواتير والتقارير + الرواتب + الموردين والعملاء
   ACCOUNTANT: [
     "dashboard", "purchases", "sales", "finance",
     "settlements", "reports", "companies", "returns", "workshopDaily",
-    "products", "inventory",
+    "products", "inventory", "suppliers", "customers",
     "hrPayroll", "hrReports", "hrSelfService",
   ],
 

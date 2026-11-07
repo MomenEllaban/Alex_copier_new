@@ -4,6 +4,62 @@ import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helper
 import { findOrCreateMainWarehouse, receivePurchaseIntoStock, reversePurchaseFromStock } from "@/lib/stock-movement-helper";
 import { traceError } from "@/lib/prisma-errors";
 
+const PAYMENT_METHOD_VALUES = new Set(["CASH", "CREDIT", "INSTALLMENT", "MIXED"]);
+
+function normalizePurchasePayment(input: {
+  paymentMethod?: unknown;
+  paidAmount?: unknown;
+  total: number;
+  existingMethod?: string | null;
+  existingPaid?: number | null;
+}): { paymentMethod: "CASH" | "CREDIT" | "INSTALLMENT" | "MIXED"; paymentStatus: "PENDING" | "PARTIAL" | "PAID"; paidAmount: number } {
+  const rawMethod = typeof input.paymentMethod === "string" ? input.paymentMethod.trim().toUpperCase() : (input.existingMethod || "CASH");
+  const paymentMethod = (PAYMENT_METHOD_VALUES.has(rawMethod) ? rawMethod : "CASH") as "CASH" | "CREDIT" | "INSTALLMENT" | "MIXED";
+  const total = Number.isFinite(input.total) && input.total >= 0 ? input.total : 0;
+  const provided = input.paidAmount !== undefined && input.paidAmount !== null && input.paidAmount !== "";
+  let paidAmountRaw = provided ? Number(input.paidAmount) : NaN;
+  if (!Number.isFinite(paidAmountRaw)) {
+    // CASH defaults to fully paid; CREDIT keeps existing paid amount when method unchanged, else 0.
+    if (paymentMethod === "CASH") paidAmountRaw = total;
+    else if (input.existingMethod === paymentMethod && input.existingPaid != null) paidAmountRaw = Number(input.existingPaid);
+    else paidAmountRaw = 0;
+  }
+  paidAmountRaw = Math.max(0, Math.min(paidAmountRaw, total));
+
+  // CASH always means fully settled unless explicitly overridden.
+  const paidAmount = paymentMethod === "CASH" && !provided ? total : paidAmountRaw;
+  let paymentStatus: "PENDING" | "PARTIAL" | "PAID" = "PENDING";
+  if (paidAmount >= total && total > 0) paymentStatus = "PAID";
+  else if (paidAmount > 0) paymentStatus = "PARTIAL";
+  else paymentStatus = "PENDING";
+  return { paymentMethod, paymentStatus, paidAmount };
+}
+
+async function syncPurchasePayment(tx: any, po: { id: string; supplierId: string; companyId: string; orderDate: Date | string | null; total: number; paymentMethod: string; paidAmount: number; status: string }) {
+  const existing = await tx.supplierPayment.findUnique({ where: { purchaseOrderId: po.id } }).catch(() => null);
+  const active = po.status !== "CANCELLED" && po.status !== "DRAFT";
+  const amount = active ? Math.max(0, Math.min(Number(po.paidAmount) || 0, Number(po.total) || 0)) : 0;
+  if (amount <= 0) {
+    if (existing) await tx.supplierPayment.delete({ where: { id: existing.id } });
+    return;
+  }
+  const data = {
+    supplierId: po.supplierId,
+    companyId: po.companyId || null,
+    purchaseOrderId: po.id,
+    amount,
+    paymentDate: po.orderDate ? new Date(po.orderDate) : new Date(),
+    paymentMethod: po.paymentMethod === "CASH" ? "كاش" : "دفعة مع فاتورة شراء",
+    docNumber: `PO-${po.id.slice(0, 8)}`,
+    notes:
+      po.paymentMethod === "CASH"
+        ? `سداد نقدي مع فاتورة شراء #${po.id.slice(0, 8)}`
+        : `دفعة مع فاتورة شراء #${po.id.slice(0, 8)}`,
+  };
+  if (existing) await tx.supplierPayment.update({ where: { id: existing.id }, data });
+  else await tx.supplierPayment.create({ data });
+}
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -42,12 +98,12 @@ export async function PUT(
     const { id } = await params;
     const existing = await prisma.purchaseOrder.findUnique({
       where: { id },
-      select: { id: true, companyId: true, status: true, items: { select: { productId: true, quantity: true } } },
+      select: { id: true, companyId: true, supplierId: true, status: true, total: true, orderDate: true, paymentMethod: true, paymentStatus: true, paidAmount: true, items: { select: { productId: true, quantity: true } } },
     });
     if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const body = await request.json();
-    const { items, ...data } = body;
+    const { items, paymentMethod: rawPaymentMethod, paidAmount: rawPaidAmount, ...data } = body;
     const itemsProvided = Array.isArray(items);
     const nextStatus =
       typeof data.status === "string" && data.status
@@ -78,6 +134,7 @@ export async function PUT(
     }
 
     const companyId = typeof data.companyId === "string" && data.companyId ? data.companyId : existing.companyId;
+    const supplierId = typeof data.supplierId === "string" && data.supplierId ? data.supplierId : existing.supplierId;
     if (nextStatus === "RECEIVED" && !companyId) {
       return NextResponse.json({ error: "الشركة مطلوبة عند استلام أمر الشراء", code: "COMPANY_REQUIRED_FOR_RECEIVE" }, { status: 400 });
     }
@@ -98,6 +155,17 @@ export async function PUT(
         ) ?? 0
       : undefined;
 
+    const paymentProvided = rawPaymentMethod !== undefined || rawPaidAmount !== undefined || total !== undefined;
+    const payment = paymentProvided || !existing.paymentMethod
+      ? normalizePurchasePayment({
+          paymentMethod: rawPaymentMethod ?? existing.paymentMethod,
+          paidAmount: rawPaidAmount,
+          total: total ?? existing.total ?? 0,
+          existingMethod: existing.paymentMethod,
+          existingPaid: existing.paidAmount,
+        })
+      : null;
+
     const wasReceived = existing.status === "RECEIVED";
     const becomesReceived = nextStatus === "RECEIVED";
 
@@ -111,6 +179,7 @@ export async function PUT(
           ...(data.orderDate !== undefined ? { orderDate: data.orderDate } : {}),
           ...(data.notes !== undefined ? { notes: data.notes } : {}),
           ...(total !== undefined ? { total } : {}),
+          ...(payment ? { paymentMethod: payment.paymentMethod, paymentStatus: payment.paymentStatus, paidAmount: payment.paidAmount } : {}),
           ...(itemsProvided
             ? {
                 items: {
@@ -126,9 +195,21 @@ export async function PUT(
         },
         include: {
           supplier: true,
+          company: true,
           items: { include: { product: true } },
           invoices: true,
         },
+      });
+
+      await syncPurchasePayment(tx, {
+        id: updated.id,
+        supplierId: updated.supplierId,
+        companyId: updated.companyId,
+        orderDate: updated.orderDate,
+        total: updated.total,
+        paymentMethod: (updated as any).paymentMethod || "CREDIT",
+        paidAmount: (updated as any).paidAmount ?? 0,
+        status: updated.status,
       });
 
       if (becomesReceived && !wasReceived) {
@@ -148,7 +229,10 @@ export async function PUT(
         await reversePurchaseFromStock(tx, id);
       }
 
-      return updated;
+      return tx.purchaseOrder.findUnique({
+        where: { id },
+        include: { supplier: true, company: true, items: { include: { product: true } }, invoices: true },
+      });
     });
 
     return NextResponse.json(po);
@@ -163,7 +247,8 @@ export async function PUT(
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
-) {  try {
+) {
+  try {
     const actor = await requireAction("purchases", "delete");
     if (!actor) {
       const authed = await requireAuth();
@@ -176,12 +261,16 @@ export async function DELETE(
       if (existing.status === "RECEIVED") {
         await reversePurchaseFromStock(tx, id);
       }
+      await tx.supplierPayment.deleteMany({ where: { purchaseOrderId: id } });
       await tx.purchaseOrder.delete({ where: { id } });
     });
     return NextResponse.json({ message: "Deleted" });
   } catch (error: unknown) {
-    if (error && typeof error === "object" && "code" in error && error.code === "P2025") {
+    if (error && typeof error === "object" && "code" in error && (error as any).code === "P2025") {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+    if (error instanceof Error && error.message.startsWith("INSUFFICIENT_STOCK")) {
+      return NextResponse.json({ error: "الكمية المتاحة في المخزون لا تكفي للعكس — لا يُسمح برصيد سالب", code: "INSUFFICIENT_STOCK" }, { status: 409 });
     }
     return NextResponse.json({ error: "Failed" }, { status: 500 });
   }

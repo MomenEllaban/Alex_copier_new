@@ -212,13 +212,15 @@ export async function GET(
     // ─────────────────────────────────────────────────────────
     // PURCHASES
     // ─────────────────────────────────────────────────────────
-    const totalPurchases = purchaseOrders.reduce((sum, o) => sum + (o.total || 0), 0);
-    const totalPurchasesCount = purchaseOrders.length;
-    // Cash paid out for purchases: the total of received purchase orders
-    // (purchases have no per-order payment tracking yet, so received = paid).
-    const cashForPurchases = purchaseOrders
-      .filter((o) => o.status === "RECEIVED")
-      .reduce((sum, o) => sum + (o.total || 0), 0);
+    const payablePurchases = purchaseOrders.filter((o) => o.status !== "DRAFT" && o.status !== "CANCELLED");
+    const totalPurchases = payablePurchases.reduce((sum, o) => sum + (o.total || 0), 0);
+    const totalPurchasesCount = payablePurchases.length;
+    // Cash paid out for purchases: actual paid amount (cash purchases / partial upfront payments).
+    const cashForPurchases = payablePurchases.reduce((sum, o) => {
+      const paid = (o as any).paidAmount;
+      if (typeof paid === "number") return sum + Math.max(0, Math.min(paid, o.total || 0));
+      return sum + ((o as any).paymentMethod === "CASH" ? (o.total || 0) : 0);
+    }, 0);
 
     // ─────────────────────────────────────────────────────────
     // EXPENSES

@@ -35,6 +35,7 @@ interface PurchaseItem { id: string; productId: string; quantity: number; unitPr
 interface PurchaseOrder {
   id: string; companyId: string; supplierId: string; status: string; total: number; notes: string | null;
   orderDate: string; createdAt: string; supplier: Supplier; company?: Company; items: PurchaseItem[];
+  paymentMethod?: string; paymentStatus?: string; paidAmount?: number;
 }
 interface ItemRow { productId: string; quantity: string; unitPrice: string; }
 
@@ -89,6 +90,20 @@ const statusColors: Record<string, string> = {
   CANCELLED: "bg-red-100 text-red-800",
 };
 
+const PAYMENT_METHOD_LABELS: Record<string, string> = {
+  CASH: "نقدًا",
+  CREDIT: "آجل",
+  INSTALLMENT: "تقسيط",
+  MIXED: "مختلط",
+};
+
+const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  PENDING: "غير مسدد",
+  PARTIAL: "مسدد جزئيًا",
+  PAID: "مدفوع",
+  OVERDUE: "متأخر",
+};
+
 export default function PurchasesPage() {
   const { t, dir } = useI18n();
   const confirmAction = useConfirm();
@@ -107,7 +122,7 @@ export default function PurchasesPage() {
   const [supplierFilter, setSupplierFilter] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [form, setForm] = useState({ companyId: "", supplierId: "", notes: "", status: "RECEIVED", orderDate: new Date().toISOString().slice(0, 10) });
+  const [form, setForm] = useState({ companyId: "", supplierId: "", notes: "", status: "RECEIVED", orderDate: new Date().toISOString().slice(0, 10), paymentMethod: "CASH", paidAmount: "" });
   const [itemRows, setItemRows] = useState<ItemRow[]>([{ productId: "", quantity: "", unitPrice: "" }]);
   const [priceHistory, setPriceHistory] = useState<Record<string, PriceHistory>>({});
   const [priceHistoryLoading, setPriceHistoryLoading] = useState<Record<string, boolean>>({});
@@ -162,7 +177,7 @@ export default function PurchasesPage() {
 
   const openCreateOrder = () => {
     setEditingId(null);
-    setForm({ companyId: "", supplierId: "", notes: "", status: "RECEIVED", orderDate: new Date().toISOString().slice(0, 10) });
+    setForm({ companyId: "", supplierId: "", notes: "", status: "RECEIVED", orderDate: new Date().toISOString().slice(0, 10), paymentMethod: "CASH", paidAmount: "" });
     setItemRows([{ productId: "", quantity: "", unitPrice: "" }]);
     setPriceHistory({});
     setPriceHistoryLoading({});
@@ -276,14 +291,19 @@ export default function PurchasesPage() {
           .map((r) => ({ productId: r.productId, quantity: parseInt(r.quantity), unitPrice: parseFloat(r.unitPrice) }))
           .filter((it) => Number.isFinite(it.quantity) && it.quantity > 0 && Number.isFinite(it.unitPrice) && it.unitPrice >= 0);
     if (!locked && items.length === 0) { toastError(t("purchases.addItemsFirst")); return; }
+    const computedTotal = items.reduce((s, it) => s + it.quantity * it.unitPrice, 0);
+    const paidAmountPayload =
+      form.paymentMethod === "CASH"
+        ? (locked ? (orders.find((o) => o.id === editingId)?.total ?? 0) : computedTotal)
+        : (form.paidAmount === "" ? 0 : Number(form.paidAmount));
     setSaving(true);
     try {
       const orderDateIso = form.orderDate
         ? new Date(`${form.orderDate}T12:00:00.000Z`).toISOString()
         : new Date().toISOString();
       const payload = editingId
-        ? { ...form, orderDate: orderDateIso, ...(locked ? {} : { items }) }
-        : { ...form, orderDate: orderDateIso, items };
+        ? { ...form, orderDate: orderDateIso, paidAmount: paidAmountPayload, ...(locked ? {} : { items }) }
+        : { ...form, orderDate: orderDateIso, paidAmount: paidAmountPayload, items };
       const url = editingId ? `/api/purchases/${editingId}` : "/api/purchases";
       const method = editingId ? "PUT" : "POST";
       const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
@@ -299,7 +319,7 @@ export default function PurchasesPage() {
   };
 
   const resetOrderForm = () => {
-    setForm({ companyId: "", supplierId: "", notes: "", status: "RECEIVED", orderDate: new Date().toISOString().slice(0, 10) });
+    setForm({ companyId: "", supplierId: "", notes: "", status: "RECEIVED", orderDate: new Date().toISOString().slice(0, 10), paymentMethod: "CASH", paidAmount: "" });
     setItemRows([{ productId: "", quantity: "", unitPrice: "" }]);
     setEditingId(null);
     setShowForm(false);
@@ -325,12 +345,15 @@ export default function PurchasesPage() {
 
   const openEditOrder = (order: PurchaseOrder) => {
     setEditingId(order.id);
+    const pm = (order.paymentMethod as string) || "CASH";
     setForm({
       companyId: order.companyId,
       supplierId: order.supplierId,
       notes: order.notes || "",
       status: order.status,
       orderDate: (order.orderDate || order.createdAt || "").slice(0, 10),
+      paymentMethod: pm,
+      paidAmount: pm === "CASH" ? "" : String(order.paidAmount ?? ""),
     });
     setItemRows(
       order.items.length > 0
@@ -512,6 +535,49 @@ export default function PurchasesPage() {
                 <p className="text-xs text-amber-700">{t("purchases.notReceivedStockHint")}</p>
               )}
             </div>
+          </div>
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
+            <h3 className="mb-3 text-sm font-semibold text-emerald-900">الدفع للمورد</h3>
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="space-y-1.5">
+                <label className="block text-sm font-medium text-slate-700">طريقة الدفع <span className="text-red-500">*</span></label>
+                <select
+                  value={form.paymentMethod}
+                  onChange={(e) => {
+                    const pm = e.target.value;
+                    setForm((f) => ({ ...f, paymentMethod: pm, paidAmount: pm === "CASH" ? "" : f.paidAmount }));
+                  }}
+                  className={inputClass}
+                  required
+                >
+                  <option value="CASH">نقدًا (مدفوع الآن)</option>
+                  <option value="CREDIT">آجل (على الحساب)</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="block text-sm font-medium text-slate-700">المبلغ المدفوع (ج.م)</label>
+                {form.paymentMethod === "CASH" ? (
+                  <div className="rounded-lg border border-emerald-200 bg-white px-3 py-2.5 text-sm font-bold text-emerald-700">
+                    {orderTotals.grandTotal.toLocaleString("ar-EG")} ج.م — سداد نقدي كامل
+                  </div>
+                ) : (
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0 = آجل بالكامل"
+                    value={form.paidAmount}
+                    onChange={(e) => setForm((f) => ({ ...f, paidAmount: e.target.value }))}
+                    className={inputClass}
+                  />
+                )}
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-slate-600">
+              {form.paymentMethod === "CASH"
+                ? "سيتم تسجيل الفاتورة كمدفوعة نقدًا وإنشاء سداد تلقائي في تقارير الموردين."
+                : "سيظهر الرصيد كمستحق للمورد (آجل) ويمكن تسجيل دفعات السداد لاحقًا من صفحة أرصدة الموردين."}
+            </p>
           </div>
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-slate-700">{t("common.notes")}</label>
@@ -702,6 +768,7 @@ export default function PurchasesPage() {
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("common.company")}</th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("purchases.supplier")}</th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("common.status")}</th>
+                  <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">الدفع</th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("purchases.total")}</th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("common.date")}</th>
                   <th className="px-4 py-3 text-start text-sm font-medium text-gray-500">{t("common.actions")}</th>
@@ -717,6 +784,23 @@ export default function PurchasesPage() {
                       <span className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColors[order.status] || ""}`}>
                         {STATUS_LABELS[order.status] || order.status}
                       </span>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-sm">
+                      {(() => {
+                        const pm = order.paymentMethod || "CREDIT";
+                        const paid = Number(order.paidAmount ?? (pm === "CASH" ? order.total : 0));
+                        const due = Math.max(0, (order.total || 0) - paid);
+                        const isCashSettled = pm === "CASH" || due <= 0;
+                        return (
+                          <div className="space-y-0.5">
+                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${isCashSettled ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-800"}`}>
+                              {PAYMENT_METHOD_LABELS[pm] || (pm === "CASH" ? "نقدًا" : "آجل")}
+                              {isCashSettled ? " — مدفوع" : ""}
+                            </span>
+                            {!isCashSettled && <div className="text-[11px] text-amber-700">متبقي {due.toLocaleString("ar-EG")} ج.م</div>}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm font-medium">{order.total.toLocaleString()} ج.م</td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm"><DateTimeCell value={order.orderDate || order.createdAt} /></td>
@@ -838,6 +922,24 @@ export default function PurchasesPage() {
               <div>
                 <p className="text-xs text-gray-500">{t("common.date")}</p>
                 <p className="text-sm font-medium"><DateTimeCell value={viewingOrder.orderDate || viewingOrder.createdAt} /></p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">طريقة الدفع</p>
+                <p className="text-sm font-medium">{PAYMENT_METHOD_LABELS[viewingOrder.paymentMethod || "CREDIT"] || (viewingOrder.paymentMethod === "CASH" ? "نقدًا" : "آجل")}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">حالة السداد</p>
+                {(() => {
+                  const pm = viewingOrder.paymentMethod || "CREDIT";
+                  const paid = Number(viewingOrder.paidAmount ?? (pm === "CASH" ? viewingOrder.total : 0));
+                  const due = Math.max(0, (viewingOrder.total || 0) - paid);
+                  return (
+                    <p className={`text-sm font-semibold ${due <= 0 ? "text-emerald-700" : "text-amber-700"}`}>
+                      {due <= 0 ? "مدفوع بالكامل" : `آجل — متبقي ${due.toLocaleString("ar-EG")} ج.م`}
+                      {paid > 0 && due > 0 ? ` (مدفوع ${paid.toLocaleString("ar-EG")} ج.م)` : ""}
+                    </p>
+                  );
+                })()}
               </div>
             </div>
             <div className="overflow-x-auto rounded-lg border border-gray-200">

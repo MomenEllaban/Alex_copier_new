@@ -34,6 +34,9 @@ export interface PurchaseOrderLite {
   notes?: string | null;
   orderDate?: string | null;
   createdAt: string;
+  paymentMethod?: string | null;
+  paymentStatus?: string | null;
+  paidAmount?: number | null;
   items?: Array<{
     id?: string;
     quantity: number;
@@ -239,17 +242,23 @@ export function buildSupplierStatement(
 
   // Build chronologically to compute running balance
   const rawList = [
-    ...orders.map((o) => ({
-      kind: "PURCHASE" as const,
-      id: o.id,
-      date: o.orderDate || o.createdAt,
-      docNumber: o.id.slice(0, 8),
-      docType: "فاتورة مشتريات",
-      label: o.notes || `فاتورة شراء #${o.id.slice(0, 8)}`,
-      debit: 0,
-      credit: o.total || 0,
-      status: o.status,
-    })),
+    ...orders.map((o) => {
+      const pm = (o.paymentMethod || "").toUpperCase();
+      const paid = Number(o.paidAmount ?? (pm === "CASH" ? o.total : 0));
+      const due = Math.max(0, (o.total || 0) - paid);
+      const payTag = pm === "CASH" || due <= 0 ? "نقدًا" : due < (o.total || 0) ? "آجل جزئي" : "آجل";
+      return {
+        kind: "PURCHASE" as const,
+        id: o.id,
+        date: o.orderDate || o.createdAt,
+        docNumber: o.id.slice(0, 8),
+        docType: "فاتورة مشتريات",
+        label: `${o.notes || `فاتورة شراء #${o.id.slice(0, 8)}`} (${payTag})`,
+        debit: 0,
+        credit: o.total || 0,
+        status: o.status,
+      };
+    }),
     ...returns.map((r) => ({
       kind: "RETURN" as const,
       id: r.id,

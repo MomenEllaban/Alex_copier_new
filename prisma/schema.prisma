@@ -423,20 +423,23 @@ model Supplier {
 }
 
 model SupplierPayment {
-  id            String   @id @default(cuid())
-  supplierId    String
-  companyId     String?
-  amount        Float
-  paymentDate   DateTime @default(now())
-  paymentMethod String   @default("CASH")
-  docNumber     String?
-  notes         String?
-  createdAt     DateTime @default(now())
+  id              String         @id @default(cuid())
+  supplierId      String
+  companyId       String?
+  purchaseOrderId String?        @unique
+  amount          Float
+  paymentDate     DateTime       @default(now())
+  paymentMethod   String         @default("CASH")
+  docNumber       String?
+  notes           String?
+  createdAt       DateTime       @default(now())
 
-  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
-  company  Company? @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  supplier      Supplier       @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  company       Company?       @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  purchaseOrder PurchaseOrder? @relation(fields: [purchaseOrderId], references: [id], onDelete: SetNull)
 
   @@index([supplierId, paymentDate])
+  @@index([purchaseOrderId])
 }
 
 model Engineer {
@@ -831,15 +834,18 @@ enum PurchaseOrderStatus {
 }
 
 model PurchaseOrder {
-  id         String              @id @default(cuid())
-  companyId  String
-  supplierId String
-  status     PurchaseOrderStatus @default(DRAFT)
-  total      Float               @default(0)
-  notes      String?
-  orderDate  DateTime
-  createdAt  DateTime            @default(now())
-  updatedAt  DateTime            @updatedAt
+  id            String              @id @default(cuid())
+  companyId     String
+  supplierId    String
+  status        PurchaseOrderStatus @default(DRAFT)
+  total         Float               @default(0)
+  notes         String?
+  orderDate     DateTime
+  paymentMethod PaymentMethod       @default(CREDIT)
+  paymentStatus PaymentStatus       @default(PENDING)
+  paidAmount    Float               @default(0)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
 
   company   Company             @relation(fields: [companyId], references: [id], onDelete: Cascade)
   supplier  Supplier            @relation(fields: [supplierId], references: [id], onDelete: Cascade)
@@ -847,6 +853,7 @@ model PurchaseOrder {
   invoices  PurchaseInvoice[]
   returns   ReturnTransaction[]
   movements StockMovement[]
+  payments  SupplierPayment[]
 }
 
 model PurchaseOrderItem {
