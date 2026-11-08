@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { AddFormBoundary, useAutoAddForm } from "@/hooks/useAutoAddForm";
 import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
 import DateRangeFilter, { inDateRange } from "@/components/DateRangeFilter";
-import { ArrowLeftRight, Eye, Pencil, Plus, Receipt, RotateCcw, Save, Tags, Trash2, Wallet, X } from "lucide-react";
+import { ArrowLeftRight, Eye, Pencil, Plus, Printer, Receipt, RotateCcw, Save, Tags, Trash2, Wallet, X } from "lucide-react";
 import ExportButton from "@/components/ExportButton";
 import StatsCards from "@/components/StatsCards";
 import PrinterLoader from "@/components/PrinterLoader";
@@ -211,6 +211,99 @@ export default function SalesPage() {
   const [activeProductRowIdx, setActiveProductRowIdx] = useState<number | null>(null);
   const [isIntercompanyProductAdd, setIsIntercompanyProductAdd] = useState(false);
   const [tradeInProduct, setTradeInProduct] = useState<{ name: string; brand: string; condition: string; value: string; serialNumber: string }>({ name: "", brand: "", condition: "", value: "", serialNumber: "" });
+
+  const liveSalesTotals = useMemo(() => {
+    const subtotal = itemRows.reduce((sum, row) => {
+      const q = parseFloat(row.quantity) || 0;
+      const p = parseFloat(row.unitPrice) || 0;
+      const d = parseFloat(row.discount) || 0;
+      return sum + (q > 0 && p >= 0 ? q * p - Math.min(d, q * p) : 0);
+    }, 0);
+    const tradeInVal =
+      formMode === "tradeIn"
+        ? parseFloat(tradeInProduct.value) || 0
+        : itemRows.reduce((sum, row) => sum + (row.tradeIn?.value ? parseFloat(String(row.tradeIn.value)) || 0 : 0), 0);
+    const discVal = parseFloat(form.discount) || 0;
+    const orderDiscount =
+      form.discountType === "PERCENTAGE"
+        ? (subtotal * Math.min(discVal, 100)) / 100
+        : Math.min(discVal, subtotal);
+    const taxable = Math.max(0, subtotal - orderDiscount);
+    const safeTaxRate = form.isTaxInvoice ? 14 : parseFloat(form.taxRate) || 0;
+    const taxAmount = (taxable * Math.max(0, safeTaxRate)) / 100;
+    const total = Math.round((taxable + taxAmount) * 100) / 100;
+    const netPayable = Math.max(0, total - tradeInVal);
+
+    const isCredit = form.paymentMethod !== "CASH";
+    const paidInput = isCredit
+      ? form.paidAmount === "" ? 0 : parseFloat(form.paidAmount) || 0
+      : netPayable;
+    const safePaid = Math.max(0, paidInput);
+    const remaining = Math.max(0, Math.round((netPayable - safePaid) * 100) / 100);
+    const isOverpaid = isCredit && safePaid > netPayable;
+
+    return {
+      subtotal,
+      orderDiscount,
+      taxable,
+      taxAmount,
+      total,
+      tradeInVal,
+      netPayable,
+      paid: safePaid,
+      remaining,
+      isOverpaid,
+      isCredit,
+    };
+  }, [itemRows, formMode, tradeInProduct.value, form.discount, form.discountType, form.isTaxInvoice, form.taxRate, form.paymentMethod, form.paidAmount]);
+
+  const liveInterTotals = useMemo(() => {
+    const customerSubtotal = interRows.reduce((sum, row) => {
+      const q = parseFloat(row.quantity) || 0;
+      const p = parseFloat(row.customerPrice) || 0;
+      return sum + (q > 0 && p >= 0 ? q * p : 0);
+    }, 0);
+    const internalSubtotal = interRows.reduce((sum, row) => {
+      const q = parseFloat(row.quantity) || 0;
+      const p = parseFloat(row.internalPrice) || 0;
+      return sum + (q > 0 && p >= 0 ? q * p : 0);
+    }, 0);
+
+    const discVal = parseFloat(interForm.discount) || 0;
+    const custDiscount = Math.min(discVal, customerSubtotal);
+    const custTaxable = Math.max(0, customerSubtotal - custDiscount);
+    const safeTaxRate = interForm.isTaxInvoice ? 14 : parseFloat(interForm.taxRate) || 0;
+    const custTax = (custTaxable * Math.max(0, safeTaxRate)) / 100;
+    const customerTotal = Math.round((custTaxable + custTax) * 100) / 100;
+    const internalTotal = Math.round(internalSubtotal * 100) / 100;
+
+    const custIsCredit = interForm.paymentMethod !== "CASH";
+    const custPaidInput = custIsCredit
+      ? interForm.paidAmount === "" ? 0 : parseFloat(interForm.paidAmount) || 0
+      : customerTotal;
+    const custPaid = Math.max(0, custPaidInput);
+    const custRemaining = Math.max(0, Math.round((customerTotal - custPaid) * 100) / 100);
+
+    const intIsCredit = interForm.internalPaymentMethod !== "CASH";
+    const intPaidInput = intIsCredit
+      ? interForm.internalPaidAmount === "" ? 0 : parseFloat(interForm.internalPaidAmount) || 0
+      : internalTotal;
+    const intPaid = Math.max(0, intPaidInput);
+    const intRemaining = Math.max(0, Math.round((internalTotal - intPaid) * 100) / 100);
+
+    return {
+      customerTotal,
+      custPaid,
+      custRemaining,
+      custIsCredit,
+      custOverpaid: custIsCredit && custPaid > customerTotal,
+      internalTotal,
+      intPaid,
+      intRemaining,
+      intIsCredit,
+      intOverpaid: intIsCredit && intPaid > internalTotal,
+    };
+  }, [interRows, interForm.discount, interForm.isTaxInvoice, interForm.taxRate, interForm.paymentMethod, interForm.paidAmount, interForm.internalPaymentMethod, interForm.internalPaidAmount]);
   const [search, setSearch] = useState("");
   const [paymentFilter, setPaymentFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
@@ -808,16 +901,116 @@ export default function SalesPage() {
                 toastSuccess("تمت إضافة تصنيف المبيعات بنجاح");
               }}
             />
-            <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">طريقة الدفع</label><select value={form.paymentMethod === "CREDIT" ? "CREDIT" : form.paymentMethod} onChange={(e) => setForm({ ...form, paymentMethod: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="CASH">{PAYMENT_METHOD_LABELS.CASH}</option><option value="CREDIT">{PAYMENT_METHOD_LABELS.CREDIT}</option></select></div>
-            {form.paymentMethod !== "CASH" && (
-              <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">المبلغ المدفوع نقداً (ج.م) <span className="text-xs font-normal text-gray-400">— يُخصم رصيد تحت الحساب تلقائياً أولاً</span></label><input type="number" min="0" step="0.01" placeholder="0.00" value={form.paidAmount} onChange={(e) => setForm({ ...form, paidAmount: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-            )}
             <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">الضريبة</label><div className="flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2.5"><input id="isTaxInvoice" type="checkbox" checked={form.isTaxInvoice} onChange={(e) => setForm({ ...form, isTaxInvoice: e.target.checked, taxRate: e.target.checked ? "14" : "0" })} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" /><label htmlFor="isTaxInvoice" className="text-sm font-medium text-slate-700">فاتورة ضريبية</label>{form.isTaxInvoice && <span className="inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-700">14%</span>}</div></div>
             {form.isTaxInvoice && <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">{t("sales.taxRate")}</label><input type="number" min="0" step="0.01" placeholder={t("sales.taxRate")} value={form.taxRate} onChange={(e) => setForm({ ...form, taxRate: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>}
+            <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">{t("sales.discount")}</label><div className="flex gap-2"><input type="number" placeholder={t("sales.discount")} value={form.discount} onChange={(e) => setForm({ ...form, discount: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" /><select value={form.discountType} onChange={(e) => setForm({ ...form, discountType: e.target.value })} className="min-w-[7rem] rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="FIXED">{t("sales.discountTypeFixed")}</option><option value="PERCENTAGE">{t("sales.discountTypePercent")}</option></select></div></div>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">{t("sales.discount")}</label><div className="flex gap-2"><input type="number" placeholder={t("sales.discount")} value={form.discount} onChange={(e) => setForm({ ...form, discount: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" /><select value={form.discountType} onChange={(e) => setForm({ ...form, discountType: e.target.value })} className="min-w-[7rem] rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"><option value="FIXED">{t("sales.discountTypeFixed")}</option><option value="PERCENTAGE">{t("sales.discountTypePercent")}</option></select></div></div>
+          {/* طريقة الدفع وشروط السداد - إبراز الحساب الآجل والمدفوع والمتبقي */}
+          <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <Wallet size={16} className="text-blue-600" />
+                طريقة الدفع وشروط السداد
+              </h3>
+              <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                form.paymentMethod === "CASH" ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-900"
+              }`}>
+                {form.paymentMethod === "CASH" ? "سداد نقدي (فوري)" : "دفع آجل (على الحساب)"}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="space-y-1.5">
+                <label className="block text-sm font-medium text-slate-700">طريقة الدفع <span className="text-red-500">*</span></label>
+                <select
+                  value={form.paymentMethod === "CREDIT" ? "CREDIT" : form.paymentMethod}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setForm({ ...form, paymentMethod: val, paidAmount: val === "CASH" ? "" : form.paidAmount });
+                  }}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="CASH">{PAYMENT_METHOD_LABELS.CASH} (نقدًا بالكامل)</option>
+                  <option value="CREDIT">{PAYMENT_METHOD_LABELS.CREDIT} (دفع آجل)</option>
+                </select>
+              </div>
+
+              {form.paymentMethod === "CASH" ? (
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-slate-700">المبلغ المدفوع</label>
+                  <div className="flex items-center justify-between rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2.5 text-sm font-bold text-emerald-800">
+                    <span>سداد نقدي كامل:</span>
+                    <span>{liveSalesTotals.netPayable.toLocaleString("ar-EG")} ج.م</span>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-slate-700">
+                      قيمة المدفوع من الآجل (المقدم) <span className="text-xs text-slate-400 font-normal">— إن وجد</span>
+                    </label>
+                    <div className="flex gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setForm({ ...form, paidAmount: "0" })}
+                        className="text-[11px] font-medium text-amber-700 hover:underline"
+                      >
+                        بدون مقدم (0)
+                      </button>
+                      <span className="text-slate-300">|</span>
+                      <button
+                        type="button"
+                        onClick={() => setForm({ ...form, paidAmount: String(liveSalesTotals.netPayable) })}
+                        className="text-[11px] font-medium text-blue-700 hover:underline"
+                      >
+                        سداد كامل
+                      </button>
+                    </div>
+                  </div>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0 = آجل بالكامل بدون دفع مقدم"
+                    value={form.paidAmount}
+                    onChange={(e) => setForm({ ...form, paidAmount: e.target.value })}
+                    className={`w-full rounded-lg border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 ${
+                      liveSalesTotals.isOverpaid
+                        ? "border-red-400 bg-red-50 text-red-900 focus:border-red-500 focus:ring-red-400"
+                        : "border-gray-300 bg-white focus:border-blue-500 focus:ring-blue-500"
+                    }`}
+                  />
+                  {liveSalesTotals.isOverpaid && (
+                    <p className="text-xs font-medium text-red-600">
+                      ⚠️ تنبيه: المبلغ المدفوع ({liveSalesTotals.paid.toLocaleString("ar-EG")} ج.م) أكبر من صافي الفاتورة ({liveSalesTotals.netPayable.toLocaleString("ar-EG")} ج.م)!
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {form.paymentMethod !== "CASH" && (
+              <div className="rounded-xl border border-amber-300 bg-amber-50/70 p-3.5 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center sm:text-start">
+                  <div className="rounded-lg bg-white/80 p-2.5 border border-amber-200">
+                    <span className="text-xs text-slate-500 block">إجمالي الفاتورة المستحق</span>
+                    <span className="text-sm font-bold text-slate-900">{liveSalesTotals.netPayable.toLocaleString("ar-EG")} ج.م</span>
+                  </div>
+                  <div className="rounded-lg bg-white/80 p-2.5 border border-amber-200">
+                    <span className="text-xs text-slate-500 block">المدفوع مقدماً من الآجل</span>
+                    <span className="text-sm font-bold text-emerald-700">{liveSalesTotals.paid.toLocaleString("ar-EG")} ج.م</span>
+                  </div>
+                  <div className="rounded-lg bg-amber-100 p-2.5 border border-amber-300">
+                    <span className="text-xs text-amber-800 font-medium block">المتبقي آجل (دين على العميل)</span>
+                    <span className="text-base font-extrabold text-amber-950">{liveSalesTotals.remaining.toLocaleString("ar-EG")} ج.م</span>
+                  </div>
+                </div>
+                <p className="mt-2 text-xs text-amber-800 leading-relaxed">
+                  ℹ️ سيتم ترحيل المبلغ المتبقي (<strong>{liveSalesTotals.remaining.toLocaleString("ar-EG")} ج.م</strong>) إلى حساب مديونية العميل كدين آجل، وسيتم تسجيل أي مقدم تم دفعه الآن كسداد فوري.
+                </p>
+              </div>
+            )}
           </div>
 
           {(formMode === "tradeIn" || itemRows.some(row => row.tradeIn && row.tradeIn.value)) && (
@@ -1062,26 +1255,52 @@ export default function SalesPage() {
               <SearchableSelect value={interForm.engineerId} onChange={(v) => setInterForm({ ...interForm, engineerId: v })} options={engineers.map((engineer) => ({ value: engineer.id, label: engineer.name }))} placeholder="المهندس (اختياري)" />
             </div>
             <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-slate-700">{t("sales.interCompanyPayment")} ({t("sales.toCompany")})</label>
-              <select value={interForm.internalPaymentMethod === "CASH" ? "CASH" : "CREDIT"} onChange={(e) => setInterForm({ ...interForm, internalPaymentMethod: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <option value="CREDIT">{PAYMENT_METHOD_LABELS.CREDIT}</option>
-                <option value="CASH">{PAYMENT_METHOD_LABELS.CASH}</option>
-              </select>
-            </div>
-            <div className="space-y-1.5">
               <label className="block text-sm font-medium text-slate-700">{t("sales.paymentMethod")} ({t("sales.customer")})</label>
-              <select value={interForm.paymentMethod === "CASH" ? "CASH" : "CREDIT"} onChange={(e) => setInterForm({ ...interForm, paymentMethod: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <select value={interForm.paymentMethod === "CASH" ? "CASH" : "CREDIT"} onChange={(e) => setInterForm({ ...interForm, paymentMethod: e.target.value, paidAmount: e.target.value === "CASH" ? "" : interForm.paidAmount })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
                 <option value="CASH">{PAYMENT_METHOD_LABELS.CASH}</option>
                 <option value="CREDIT">{PAYMENT_METHOD_LABELS.CREDIT}</option>
               </select>
             </div>
             <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-slate-700">المبلغ المدفوع من العميل (اختياري — للدفع الجزئي)</label>
-              <input type="number" min="0" step="0.01" value={interForm.paidAmount} onChange={(e) => setInterForm({ ...interForm, paidAmount: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <label className="block text-sm font-medium text-slate-700">قيمة المدفوع من العميل {interForm.paymentMethod !== "CASH" ? "(المقدم من الآجل)" : ""}</label>
+              {interForm.paymentMethod === "CASH" ? (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm font-bold text-emerald-800">
+                  {liveInterTotals.customerTotal.toLocaleString("ar-EG")} ج.م — نقداً كامل
+                </div>
+              ) : (
+                <input type="number" min="0" step="0.01" placeholder="0 = آجل بالكامل" value={interForm.paidAmount} onChange={(e) => setInterForm({ ...interForm, paidAmount: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              )}
+              {interForm.paymentMethod !== "CASH" && (
+                <div className="flex justify-between text-xs text-amber-800 bg-amber-50 rounded-lg p-2 border border-amber-200">
+                  <span>إجمالي: <b>{liveInterTotals.customerTotal.toLocaleString("ar-EG")} ج.م</b></span>
+                  <span>مدفوع: <b>{liveInterTotals.custPaid.toLocaleString("ar-EG")} ج.م</b></span>
+                  <span>المتبقي آجل: <b className="text-amber-950 font-bold">{liveInterTotals.custRemaining.toLocaleString("ar-EG")} ج.م</b></span>
+                </div>
+              )}
             </div>
             <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-slate-700">المبلغ المدفوع في البيع الداخلي (اختياري — للدفع الجزئي)</label>
-              <input type="number" min="0" step="0.01" value={interForm.internalPaidAmount} onChange={(e) => setInterForm({ ...interForm, internalPaidAmount: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <label className="block text-sm font-medium text-slate-700">{t("sales.interCompanyPayment")} ({t("sales.toCompany")})</label>
+              <select value={interForm.internalPaymentMethod === "CASH" ? "CASH" : "CREDIT"} onChange={(e) => setInterForm({ ...interForm, internalPaymentMethod: e.target.value, internalPaidAmount: e.target.value === "CASH" ? "" : interForm.internalPaidAmount })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="CREDIT">{PAYMENT_METHOD_LABELS.CREDIT}</option>
+                <option value="CASH">{PAYMENT_METHOD_LABELS.CASH}</option>
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-slate-700">المسدد في البيع الداخلي {interForm.internalPaymentMethod !== "CASH" ? "(المقدم من الآجل)" : ""}</label>
+              {interForm.internalPaymentMethod === "CASH" ? (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2.5 text-sm font-bold text-emerald-800">
+                  {liveInterTotals.internalTotal.toLocaleString("ar-EG")} ج.م — نقداً كامل
+                </div>
+              ) : (
+                <input type="number" min="0" step="0.01" placeholder="0 = آجل بالكامل" value={interForm.internalPaidAmount} onChange={(e) => setInterForm({ ...interForm, internalPaidAmount: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              )}
+              {interForm.internalPaymentMethod !== "CASH" && (
+                <div className="flex justify-between text-xs text-indigo-800 bg-indigo-50 rounded-lg p-2 border border-indigo-200">
+                  <span>إجمالي: <b>{liveInterTotals.internalTotal.toLocaleString("ar-EG")} ج.م</b></span>
+                  <span>مسدد: <b>{liveInterTotals.intPaid.toLocaleString("ar-EG")} ج.م</b></span>
+                  <span>المتبقي آجل: <b className="text-indigo-950 font-bold">{liveInterTotals.intRemaining.toLocaleString("ar-EG")} ج.م</b></span>
+                </div>
+              )}
             </div>
             <div className="space-y-1.5">
               <label className="block text-sm font-medium text-slate-700">{t("sales.total")}</label>
@@ -1228,8 +1447,50 @@ export default function SalesPage() {
               {viewingOrder.salesCategory && <div><span className="text-xs font-medium text-gray-500">{t("sales.category")}</span><p className="mt-1 text-sm text-slate-900">{viewingOrder.salesCategory.name}</p></div>}
               <div><span className="text-xs font-medium text-gray-500">{t("sales.total")}</span><p className="mt-1 text-sm font-semibold text-slate-900">{viewingOrder.total.toLocaleString()}</p></div>
               <div><span className="text-xs font-medium text-gray-500">{t("sales.discount")}</span><p className="mt-1 text-sm text-slate-900">{viewingOrder.discount > 0 ? `${viewingOrder.discount} (${viewingOrder.discountType === "FIXED" ? t("sales.discountTypeFixed") : t("sales.discountTypePercent")})` : "-"}</p></div>
-              <div><span className="text-xs font-medium text-gray-500">{t("sales.paymentMethod")}</span><p className="mt-1 text-sm text-slate-900">{PAYMENT_METHOD_LABELS[viewingOrder.paymentMethod] || viewingOrder.paymentMethod}</p></div>
+              <div><span className="text-xs font-medium text-gray-500">{t("sales.paymentMethod")}</span><p className="mt-1 text-sm font-medium text-slate-900">{PAYMENT_METHOD_LABELS[viewingOrder.paymentMethod] || viewingOrder.paymentMethod}</p></div>
               <div><span className="text-xs font-medium text-gray-500">{t("sales.paymentStatus")}</span><p className="mt-1"><span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${paymentStatusColors[viewingOrder.paymentStatus] || ""}`}>{PAYMENT_STATUS_LABELS[viewingOrder.paymentStatus] || viewingOrder.paymentStatus}</span></p></div>
+              {(() => {
+                const isCash = viewingOrder.paymentMethod === "CASH";
+                const total = viewingOrder.total || 0;
+                const tradeIn = viewingOrder.tradeInTotal || 0;
+                const net = Math.max(0, total - tradeIn);
+                const paid = Number(viewingOrder.paidAmount ?? (isCash ? net : 0));
+                const remaining = Math.max(0, Math.round((net - paid) * 100) / 100);
+                return (
+                  <div className="md:col-span-2 rounded-xl border border-slate-200 bg-slate-50 p-3.5 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-bold text-slate-700">
+                      <span>تفاصيل السداد والآجل للفاتورة</span>
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs ${
+                        isCash || remaining <= 0 ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-900"
+                      }`}>
+                        {isCash ? "نقدًا (مسدد كامل)" : remaining <= 0 ? "آجل (مسدد بالكامل)" : "آجل (غير مسدد بالكامل)"}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                      <div className="bg-white p-2 rounded-lg border border-slate-200">
+                        <span className="text-slate-500 block">الإجمالي:</span>
+                        <span className="font-bold text-slate-900">{total.toLocaleString("ar-EG")} ج.م</span>
+                      </div>
+                      {tradeIn > 0 && (
+                        <div className="bg-white p-2 rounded-lg border border-amber-200 text-amber-700">
+                          <span className="block">خصم استبدال:</span>
+                          <span className="font-bold">-{tradeIn.toLocaleString("ar-EG")} ج.م</span>
+                        </div>
+                      )}
+                      <div className="bg-white p-2 rounded-lg border border-emerald-200 text-emerald-800">
+                        <span className="block">المبلغ المدفوع:</span>
+                        <span className="font-bold">{paid.toLocaleString("ar-EG")} ج.م</span>
+                      </div>
+                      <div className={`p-2 rounded-lg border font-bold ${
+                        remaining <= 0 ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-amber-100 border-amber-300 text-amber-950"
+                      }`}>
+                        <span className="block text-[11px] font-normal">المتبقي آجل:</span>
+                        <span>{remaining <= 0 ? "0 ج.م (خالص)" : `${remaining.toLocaleString("ar-EG")} ج.م`}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
               <div><span className="text-xs font-medium text-gray-500">{t("common.date")}</span><p className="mt-1 text-sm text-slate-900"><DateTimeCell value={viewingOrder.orderDate || viewingOrder.createdAt} /></p></div>
               {viewingOrder.engineer && <div><span className="text-xs font-medium text-gray-500">المهندس</span><p className="mt-1 text-sm text-slate-900">{viewingOrder.engineer.name}</p></div>}
               {viewingOrder.notes && <div className="md:col-span-2"><span className="text-xs font-medium text-gray-500">{t("common.notes")}</span><p className="mt-1 text-sm text-slate-900">{viewingOrder.notes}</p></div>}
@@ -1275,6 +1536,15 @@ export default function SalesPage() {
                 </div>
               </div>
             )}
+            <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => window.open(`/api/invoices?type=sale&id=${viewingOrder.id}`, "_blank")}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-2 text-xs font-semibold text-white hover:bg-blue-700 shadow-xs"
+              >
+                <Printer size={14} /> طباعة الفاتورة والريسيت
+              </button>
+            </div>
           </div>
         </FormModal>
       )}
@@ -1356,7 +1626,33 @@ export default function SalesPage() {
                         )}
                       </td>
                       <td className="px-4 py-3 text-sm">{order.discount > 0 ? `${order.discount} (${order.discountType === "FIXED" ? t("sales.discountTypeFixed") : t("sales.discountTypePercent")})` : "-"}</td>
-                      <td className="px-4 py-3 text-sm">{PAYMENT_METHOD_LABELS[order.paymentMethod] || order.paymentMethod}</td>
+                      <td className="px-4 py-3 text-sm">
+                        {(() => {
+                          const isCash = order.paymentMethod === "CASH";
+                          const total = order.total || 0;
+                          const tradeIn = order.tradeInTotal || 0;
+                          const net = Math.max(0, total - tradeIn);
+                          const paid = Number(order.paidAmount ?? (isCash ? net : 0));
+                          const remaining = Math.max(0, Math.round((net - paid) * 100) / 100);
+                          const isSettled = isCash || remaining <= 0;
+                          return (
+                            <div className="space-y-0.5">
+                              <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                                isSettled ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-900"
+                              }`}>
+                                {PAYMENT_METHOD_LABELS[order.paymentMethod] || order.paymentMethod}
+                                {isSettled ? " — مسدد" : ""}
+                              </span>
+                              {!isSettled && (
+                                <div className="text-[11px] font-medium text-amber-800">
+                                  <span>متبقي: {remaining.toLocaleString("ar-EG")} ج.م</span>
+                                  {paid > 0 && <span className="text-gray-400 block text-[10px]">مدفوع: {paid.toLocaleString("ar-EG")} ج.م</span>}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </td>
                       <td className="px-4 py-3">
                         <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${paymentStatusColors[order.paymentStatus] || ""}`}>
                           {PAYMENT_STATUS_LABELS[order.paymentStatus] || order.paymentStatus}

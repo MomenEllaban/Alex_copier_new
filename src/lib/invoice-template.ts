@@ -99,12 +99,12 @@ const STR: Record<InvoiceLang, Labels> = {
     printInvoice: "🖨️ طباعة الفاتورة", printReceipt: "🖨️ طباعة الريسيت",
     printDate: "تاريخ الطباعة", thanks: "شكراً لتعاملكم معنا",
     items: "الأصناف", number: "رقم",
-    paySummary: "ملخص الدفع", invTotal: "إجمالي الفاتورة", paidCash: "تم دفع نقداً",
-    dueCredit: "المتبقي أجل", settled: "الحالة", settledState: "خالص",
-    account: "حساب العميل", totalOwed: "المستحق عليه", lastPayment: "آخر دفعة",
+    paySummary: "ملخص وسداد الفاتورة", invTotal: "إجمالي الفاتورة", paidCash: "المبلغ المدفوع (المقدم)",
+    dueCredit: "المتبقي آجل", settled: "الحالة", settledState: "خالص (مسدد بالكامل)",
+    account: "كشف الحساب", totalOwed: "المستحق", lastPayment: "آخر دفعة",
     noPayments: "لا توجد دفعات", addedDebt: "أضافت للمديونية",
     currency: "ج.م",
-    payCash: "كاش", payCredit: "أجل", payPartial: "جزئي", payOverdue: "متأخر",
+    payCash: "نقدًا", payCredit: "آجل", payPartial: "جزئي", payOverdue: "متأخر",
   },
   en: {
     customer: "Customer", supplier: "Supplier", party: "Party",
@@ -115,9 +115,9 @@ const STR: Record<InvoiceLang, Labels> = {
     printInvoice: "🖨️ Print Invoice", printReceipt: "🖨️ Print Receipt",
     printDate: "Print date", thanks: "Thank you for your business",
     items: "Items", number: "No.",
-    paySummary: "Payment", invTotal: "Invoice total", paidCash: "Paid cash",
+    paySummary: "Payment Summary", invTotal: "Invoice total", paidCash: "Paid amount",
     dueCredit: "Balance due", settled: "Status", settledState: "Settled",
-    account: "Customer account", totalOwed: "Balance owed", lastPayment: "Last payment",
+    account: "Account balance", totalOwed: "Balance owed", lastPayment: "Last payment",
     noPayments: "No payments", addedDebt: "Added to debt",
     currency: "EGP",
     payCash: "Cash", payCredit: "Credit", payPartial: "Partial", payOverdue: "Overdue",
@@ -235,6 +235,7 @@ export function generateInvoiceHtml(data: InvoiceData): string {
   const payCol = showPay
     ? `<div><h3>${L.paySummary}</h3>
       <div class="kv"><span>${L.invTotal}</span><b>${money(data.total, c)}</b></div>
+      <div class="kv"><span>${L.payMethod}</span><b>${esc(pm || (data.paymentMethod === "CASH" ? L.payCash : L.payCredit))}</b></div>
       <div class="kv"><span>${L.paidCash}</span><b>${money(paid, c)}</b></div>
       <div class="kv"><span>${L.dueCredit}</span><b class="${due > 0 ? "due" : "ok"}">${due > 0 ? money(due, c) : L.settledState}</b></div></div>`
     : pm || ps
@@ -350,14 +351,15 @@ export function generateInvoiceHtml(data: InvoiceData): string {
 
   <div class="bottom">
     <div class="side">
-      ${showDebt ? `<div class="box debt"><h4>${L.account}</h4>
-        <div class="r"><span>${L.totalOwed}</span><b>${money(debt, c)}</b></div>
+      ${showDebt ? `<div class="box debt"><h4>${data.type === "purchase" ? (c.lang === "en" ? "Supplier Account" : "حساب المورد") : L.account}</h4>
+        ${debt > 0 ? `<div class="r"><span>${data.type === "purchase" ? (c.lang === "en" ? "Balance Due" : "المستحق له") : L.totalOwed}</span><b>${money(debt, c)}</b></div>` : ""}
         <div class="r"><span>${L.lastPayment}</span><b>${lastPay}</b></div>
         ${added > 0 ? `<div class="r"><span>${L.addedDebt}</span><b class="due">+${money(added, c)}</b></div>` : ""}
       </div>` : ""}
-      ${showPay && due > 0 ? `<div class="box pay"><h4>${L.paySummary}</h4>
+      ${showPay ? `<div class="box pay"><h4>${L.paySummary} — ${esc(pm || (data.paymentMethod === "CASH" ? L.payCash : L.payCredit))}</h4>
+        <div class="r"><span>${L.invTotal}</span><b>${money(data.total, c)}</b></div>
         <div class="r"><span>${L.paidCash}</span><b>${money(paid, c)}</b></div>
-        <div class="r"><span>${L.dueCredit}</span><b class="due">${money(due, c)}</b></div>
+        <div class="r"><span>${L.dueCredit}</span><b class="${due > 0 ? "due" : "ok"}">${due > 0 ? money(due, c) : L.settledState}</b></div>
       </div>` : ""}
       ${data.notes ? `<div class="notes"><b>${L.notes}:</b> ${esc(data.notes)}</div>` : ""}
     </div>
@@ -481,6 +483,7 @@ export function generateReceiptHtml(data: InvoiceData, width: ReceiptWidth = 80)
     <div class="r grand"><span>${L.total}</span><span>${money(data.total, c)}</span></div>
   </div>
   ${showPay ? `<div class="pay">
+    <div class="r"><span>${L.payMethod}</span><b>${esc(pm || (data.paymentMethod === "CASH" ? L.payCash : L.payCredit))}</b></div>
     <div class="r"><span>${L.paidCash}</span><span>${money(paid, c)}</span></div>
     <div class="r due"><span>${L.dueCredit}</span><span>${due > 0 ? money(due, c) : L.settledState}</span></div>
   </div>` : ""}

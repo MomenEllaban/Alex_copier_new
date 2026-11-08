@@ -136,6 +136,22 @@ export async function GET(request: Request) {
 
       const subtotal = items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 
+      const pm = (order.paymentMethod as string) || "CREDIT";
+      const paidAmount = Number(order.paidAmount ?? (pm === "CASH" ? order.total : 0));
+      const dueAmount = Math.max(0, Number(order.total) - paidAmount);
+
+      const [mainWarehouse, lastPayment] = await Promise.all([
+        prisma.warehouse.findFirst({
+          where: { companyId: order.companyId, isMain: true },
+          select: { name: true },
+        }),
+        prisma.supplierPayment.findFirst({
+          where: { supplierId: order.supplierId },
+          orderBy: { paymentDate: "desc" },
+          select: { amount: true, paymentDate: true },
+        }),
+      ]);
+
       invoiceData = {
         type: "purchase",
         id: order.id,
@@ -153,6 +169,15 @@ export async function GET(request: Request) {
         taxRate: 0,
         taxAmount: 0,
         total: order.total,
+        paymentMethod: pm,
+        paymentStatus: order.paymentStatus || (dueAmount <= 0 ? "PAID" : paidAmount > 0 ? "PARTIAL" : "PENDING"),
+        paidAmount,
+        dueAmount,
+        warehouseName: mainWarehouse?.name || undefined,
+        customerLastPayment: lastPayment
+          ? { amount: Number(lastPayment.amount), date: lastPayment.paymentDate.toISOString() }
+          : undefined,
+        invoiceAddedDebt: pm === "CASH" ? 0 : dueAmount,
         notes: order.notes || undefined,
       };
     } else if (type === "contract") {

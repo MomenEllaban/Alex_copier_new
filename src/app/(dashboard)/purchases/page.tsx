@@ -341,6 +341,72 @@ export default function PurchasesPage() {
     };
   }, [itemRows]);
 
+  const livePurchaseTotals = useMemo(() => {
+    const total = orderTotals.grandTotal;
+    const isCredit = form.paymentMethod !== "CASH";
+    const paidInput = isCredit
+      ? form.paidAmount === "" ? 0 : parseFloat(form.paidAmount) || 0
+      : total;
+    const safePaid = Math.max(0, paidInput);
+    const remaining = Math.max(0, Math.round((total - safePaid) * 100) / 100);
+    const isOverpaid = isCredit && safePaid > total;
+    return {
+      total,
+      paid: safePaid,
+      remaining,
+      isOverpaid,
+      isCredit,
+    };
+  }, [orderTotals.grandTotal, form.paymentMethod, form.paidAmount]);
+
+  const livePurchaseIcTotals = useMemo(() => {
+    const customerSubtotal = interRows.reduce((sum, row) => {
+      const q = parseFloat(row.quantity) || 0;
+      const p = parseFloat(row.customerPrice) || 0;
+      return sum + (q > 0 && p >= 0 ? q * p : 0);
+    }, 0);
+    const internalSubtotal = interRows.reduce((sum, row) => {
+      const q = parseFloat(row.quantity) || 0;
+      const p = parseFloat(row.internalPrice) || 0;
+      return sum + (q > 0 && p >= 0 ? q * p : 0);
+    }, 0);
+
+    const discVal = parseFloat(interForm.discount) || 0;
+    const custDiscount = Math.min(discVal, customerSubtotal);
+    const custTaxable = Math.max(0, customerSubtotal - custDiscount);
+    const safeTaxRate = interForm.isTaxInvoice ? 14 : parseFloat(interForm.taxRate) || 0;
+    const custTax = (custTaxable * Math.max(0, safeTaxRate)) / 100;
+    const customerTotal = Math.round((custTaxable + custTax) * 100) / 100;
+    const internalTotal = Math.round(internalSubtotal * 100) / 100;
+
+    const custIsCredit = interForm.paymentMethod !== "CASH";
+    const custPaidInput = custIsCredit
+      ? interForm.paidAmount === "" ? 0 : parseFloat(interForm.paidAmount) || 0
+      : customerTotal;
+    const custPaid = Math.max(0, custPaidInput);
+    const custRemaining = Math.max(0, Math.round((customerTotal - custPaid) * 100) / 100);
+
+    const intIsCredit = interForm.internalPaymentMethod !== "CASH";
+    const intPaidInput = intIsCredit
+      ? interForm.internalPaidAmount === "" ? 0 : parseFloat(interForm.internalPaidAmount) || 0
+      : internalTotal;
+    const intPaid = Math.max(0, intPaidInput);
+    const intRemaining = Math.max(0, Math.round((internalTotal - intPaid) * 100) / 100);
+
+    return {
+      customerTotal,
+      custPaid,
+      custRemaining,
+      custIsCredit,
+      custOverpaid: custIsCredit && custPaid > customerTotal,
+      internalTotal,
+      intPaid,
+      intRemaining,
+      intIsCredit,
+      intOverpaid: intIsCredit && intPaid > internalTotal,
+    };
+  }, [interRows, interForm.discount, interForm.isTaxInvoice, interForm.taxRate, interForm.paymentMethod, interForm.paidAmount, interForm.internalPaymentMethod, interForm.internalPaidAmount]);
+
   const editingLocked = editingId ? orders.find((o) => o.id === editingId)?.status === "RECEIVED" : false;
 
   const openEditOrder = (order: PurchaseOrder) => {
@@ -536,8 +602,19 @@ export default function PurchasesPage() {
               )}
             </div>
           </div>
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4">
-            <h3 className="mb-3 text-sm font-semibold text-emerald-900">الدفع للمورد</h3>
+          <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <Wallet size={16} className="text-purple-600" />
+                الدفع وشروط السداد للمورد
+              </h3>
+              <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                form.paymentMethod === "CASH" ? "bg-emerald-100 text-emerald-800" : "bg-purple-100 text-purple-900"
+              }`}>
+                {form.paymentMethod === "CASH" ? "نقدًا (سداد فوري)" : "آجل (على الحساب)"}
+              </span>
+            </div>
+
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div className="space-y-1.5">
                 <label className="block text-sm font-medium text-slate-700">طريقة الدفع <span className="text-red-500">*</span></label>
@@ -550,34 +627,84 @@ export default function PurchasesPage() {
                   className={inputClass}
                   required
                 >
-                  <option value="CASH">نقدًا (مدفوع الآن)</option>
+                  <option value="CASH">نقدًا (مدفوع الآن بالكامل)</option>
                   <option value="CREDIT">آجل (على الحساب)</option>
                 </select>
               </div>
-              <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-slate-700">المبلغ المدفوع (ج.م)</label>
-                {form.paymentMethod === "CASH" ? (
-                  <div className="rounded-lg border border-emerald-200 bg-white px-3 py-2.5 text-sm font-bold text-emerald-700">
-                    {orderTotals.grandTotal.toLocaleString("ar-EG")} ج.م — سداد نقدي كامل
+
+              {form.paymentMethod === "CASH" ? (
+                <div className="space-y-1.5">
+                  <label className="block text-sm font-medium text-slate-700">المبلغ المدفوع للمورد</label>
+                  <div className="flex items-center justify-between rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2.5 text-sm font-bold text-emerald-800">
+                    <span>سداد نقدي كامل:</span>
+                    <span>{livePurchaseTotals.total.toLocaleString("ar-EG")} ج.م</span>
                   </div>
-                ) : (
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-sm font-medium text-slate-700">
+                      قيمة المدفوع من الآجل (المقدم للمورد) <span className="text-xs text-slate-400 font-normal">— إن وجد</span>
+                    </label>
+                    <div className="flex gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, paidAmount: "0" }))}
+                        className="text-[11px] font-medium text-purple-700 hover:underline"
+                      >
+                        بدون مقدم (0)
+                      </button>
+                      <span className="text-slate-300">|</span>
+                      <button
+                        type="button"
+                        onClick={() => setForm((f) => ({ ...f, paidAmount: String(livePurchaseTotals.total) }))}
+                        className="text-[11px] font-medium text-emerald-700 hover:underline"
+                      >
+                        سداد كامل
+                      </button>
+                    </div>
+                  </div>
                   <input
                     type="number"
                     min="0"
                     step="0.01"
-                    placeholder="0 = آجل بالكامل"
+                    placeholder="0 = آجل بالكامل بدون دفع مقدم"
                     value={form.paidAmount}
                     onChange={(e) => setForm((f) => ({ ...f, paidAmount: e.target.value }))}
-                    className={inputClass}
+                    className={`${inputClass} ${
+                      livePurchaseTotals.isOverpaid ? "border-red-400 bg-red-50 text-red-900" : ""
+                    }`}
                   />
-                )}
-              </div>
+                  {livePurchaseTotals.isOverpaid && (
+                    <p className="text-xs font-medium text-red-600">
+                      ⚠️ تنبيه: المبلغ المدفوع ({livePurchaseTotals.paid.toLocaleString("ar-EG")} ج.م) أكبر من إجمالي أمر الشراء ({livePurchaseTotals.total.toLocaleString("ar-EG")} ج.م)!
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
-            <p className="mt-2 text-xs text-slate-600">
-              {form.paymentMethod === "CASH"
-                ? "سيتم تسجيل الفاتورة كمدفوعة نقدًا وإنشاء سداد تلقائي في تقارير الموردين."
-                : "سيظهر الرصيد كمستحق للمورد (آجل) ويمكن تسجيل دفعات السداد لاحقًا من صفحة أرصدة الموردين."}
-            </p>
+
+            {form.paymentMethod !== "CASH" && (
+              <div className="rounded-xl border border-purple-200 bg-purple-50/70 p-3.5 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center sm:text-start">
+                  <div className="rounded-lg bg-white/80 p-2.5 border border-purple-200">
+                    <span className="text-xs text-slate-500 block">إجمالي أمر الشراء</span>
+                    <span className="text-sm font-bold text-slate-900">{livePurchaseTotals.total.toLocaleString("ar-EG")} ج.م</span>
+                  </div>
+                  <div className="rounded-lg bg-white/80 p-2.5 border border-purple-200">
+                    <span className="text-xs text-slate-500 block">المدفوع مقدماً للمورد</span>
+                    <span className="text-sm font-bold text-emerald-700">{livePurchaseTotals.paid.toLocaleString("ar-EG")} ج.م</span>
+                  </div>
+                  <div className="rounded-lg bg-purple-100 p-2.5 border border-purple-300">
+                    <span className="text-xs text-purple-800 font-medium block">المتبقي للمورد (آجل مستحق)</span>
+                    <span className="text-base font-extrabold text-purple-950">{livePurchaseTotals.remaining.toLocaleString("ar-EG")} ج.م</span>
+                  </div>
+                </div>
+                <p className="mt-2 text-xs text-purple-800 leading-relaxed">
+                  ℹ️ سيتم قيد المبلغ المتبقي (<strong>{livePurchaseTotals.remaining.toLocaleString("ar-EG")} ج.م</strong>) في كشف حساب المورد كدين آجل مستحق، وسيتم إنشاء حركة سداد تلقائية لأي مبلغ مقدم تم دفعه الآن.
+                </p>
+              </div>
+            )}
           </div>
           <div className="space-y-1.5">
             <label className="block text-sm font-medium text-slate-700">{t("common.notes")}</label>
@@ -793,11 +920,16 @@ export default function PurchasesPage() {
                         const isCashSettled = pm === "CASH" || due <= 0;
                         return (
                           <div className="space-y-0.5">
-                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${isCashSettled ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-800"}`}>
+                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${isCashSettled ? "bg-emerald-100 text-emerald-700" : "bg-purple-100 text-purple-900"}`}>
                               {PAYMENT_METHOD_LABELS[pm] || (pm === "CASH" ? "نقدًا" : "آجل")}
-                              {isCashSettled ? " — مدفوع" : ""}
+                              {isCashSettled ? " — مسدد" : ""}
                             </span>
-                            {!isCashSettled && <div className="text-[11px] text-amber-700">متبقي {due.toLocaleString("ar-EG")} ج.م</div>}
+                            {!isCashSettled && (
+                              <div className="text-[11px] font-medium text-purple-800">
+                                <span>متبقي: {due.toLocaleString("ar-EG")} ج.م</span>
+                                {paid > 0 && <span className="text-gray-400 block text-[10px]">مدفوع: {paid.toLocaleString("ar-EG")} ج.م</span>}
+                              </div>
+                            )}
                           </div>
                         );
                       })()}
@@ -965,8 +1097,27 @@ export default function PurchasesPage() {
                 <tfoot className="bg-slate-50">
                   <tr>
                     <td colSpan={3} className="px-3 py-2 text-end text-sm font-medium text-slate-700">{t("purchases.total")}</td>
-                    <td className="px-3 py-2 text-sm font-bold text-slate-900">{viewingOrder.total.toLocaleString()}</td>
+                    <td className="px-3 py-2 text-sm font-bold text-slate-900">{viewingOrder.total.toLocaleString("ar-EG")} ج.م</td>
                   </tr>
+                  {(() => {
+                    const pm = viewingOrder.paymentMethod || "CREDIT";
+                    const paid = Number(viewingOrder.paidAmount ?? (pm === "CASH" ? viewingOrder.total : 0));
+                    const due = Math.max(0, (viewingOrder.total || 0) - paid);
+                    return (
+                      <>
+                        <tr>
+                          <td colSpan={3} className="px-3 py-1.5 text-end text-xs font-medium text-emerald-700">المبلغ المدفوع للمورد</td>
+                          <td className="px-3 py-1.5 text-xs font-bold text-emerald-800">{paid.toLocaleString("ar-EG")} ج.م</td>
+                        </tr>
+                        <tr>
+                          <td colSpan={3} className="px-3 py-1.5 text-end text-xs font-medium text-purple-700">المتبقي للمورد (آجل مستحق)</td>
+                          <td className={`px-3 py-1.5 text-xs font-bold ${due > 0 ? "text-purple-950 font-extrabold" : "text-emerald-700"}`}>
+                            {due > 0 ? `${due.toLocaleString("ar-EG")} ج.م` : "0 ج.م (خالص)"}
+                          </td>
+                        </tr>
+                      </>
+                    );
+                  })()}
                 </tfoot>
               </table>
             </div>
@@ -1116,26 +1267,52 @@ export default function PurchasesPage() {
                 </select>
               </div>
               <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-slate-700">{t("sales.paymentMethod")}</label>
-                <select value={interForm.paymentMethod} onChange={(e) => setInterForm({ ...interForm, paymentMethod: e.target.value })} className={inputClass}>
+                <label className="block text-sm font-medium text-slate-700">{t("sales.paymentMethod")} ({t("sales.customer")})</label>
+                <select value={interForm.paymentMethod} onChange={(e) => setInterForm({ ...interForm, paymentMethod: e.target.value, paidAmount: e.target.value === "CASH" ? "" : interForm.paidAmount })} className={inputClass}>
                   <option value="CREDIT">{t("sales.credit")}</option>
                   <option value="CASH">{t("sales.cash")}</option>
                 </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="block text-sm font-medium text-slate-700">قيمة المدفوع من العميل {interForm.paymentMethod !== "CASH" ? "(المقدم من الآجل)" : ""}</label>
+                {interForm.paymentMethod === "CASH" ? (
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800">
+                    {livePurchaseIcTotals.customerTotal.toLocaleString("ar-EG")} ج.م — نقداً كامل
+                  </div>
+                ) : (
+                  <input type="number" min="0" step="0.01" placeholder="0 = آجل بالكامل" value={interForm.paidAmount} onChange={(e) => setInterForm({ ...interForm, paidAmount: e.target.value })} className={inputClass} />
+                )}
+                {interForm.paymentMethod !== "CASH" && (
+                  <div className="flex justify-between text-xs text-amber-800 bg-amber-50 rounded-lg p-2 border border-amber-200">
+                    <span>إجمالي: <b>{livePurchaseIcTotals.customerTotal.toLocaleString("ar-EG")} ج.م</b></span>
+                    <span>مدفوع: <b>{livePurchaseIcTotals.custPaid.toLocaleString("ar-EG")} ج.م</b></span>
+                    <span>المتبقي: <b>{livePurchaseIcTotals.custRemaining.toLocaleString("ar-EG")} ج.م</b></span>
+                  </div>
+                )}
               </div>
               <div className="space-y-1.5">
                 <label className="block text-sm font-medium text-slate-700">{t("purchases.internalPaymentMethod")}</label>
-                <select value={interForm.internalPaymentMethod} onChange={(e) => setInterForm({ ...interForm, internalPaymentMethod: e.target.value })} className={inputClass}>
+                <select value={interForm.internalPaymentMethod} onChange={(e) => setInterForm({ ...interForm, internalPaymentMethod: e.target.value, internalPaidAmount: e.target.value === "CASH" ? "" : interForm.internalPaidAmount })} className={inputClass}>
                   <option value="CREDIT">{t("sales.credit")}</option>
                   <option value="CASH">{t("sales.cash")}</option>
                 </select>
               </div>
               <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-slate-700">{t("sales.paidAmount")}</label>
-                <input type="number" value={interForm.paidAmount} onChange={(e) => setInterForm({ ...interForm, paidAmount: e.target.value })} className={inputClass} />
-              </div>
-              <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-slate-700">{t("purchases.internalPaidAmount")}</label>
-                <input type="number" value={interForm.internalPaidAmount} onChange={(e) => setInterForm({ ...interForm, internalPaidAmount: e.target.value })} className={inputClass} />
+                <label className="block text-sm font-medium text-slate-700">المسدد في البيع الداخلي {interForm.internalPaymentMethod !== "CASH" ? "(المقدم من الآجل)" : ""}</label>
+                {interForm.internalPaymentMethod === "CASH" ? (
+                  <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-bold text-emerald-800">
+                    {livePurchaseIcTotals.internalTotal.toLocaleString("ar-EG")} ج.م — نقداً كامل
+                  </div>
+                ) : (
+                  <input type="number" min="0" step="0.01" placeholder="0 = آجل بالكامل" value={interForm.internalPaidAmount} onChange={(e) => setInterForm({ ...interForm, internalPaidAmount: e.target.value })} className={inputClass} />
+                )}
+                {interForm.internalPaymentMethod !== "CASH" && (
+                  <div className="flex justify-between text-xs text-purple-800 bg-purple-50 rounded-lg p-2 border border-purple-200">
+                    <span>إجمالي: <b>{livePurchaseIcTotals.internalTotal.toLocaleString("ar-EG")} ج.م</b></span>
+                    <span>مسدد: <b>{livePurchaseIcTotals.intPaid.toLocaleString("ar-EG")} ج.م</b></span>
+                    <span>المتبقي: <b>{livePurchaseIcTotals.intRemaining.toLocaleString("ar-EG")} ج.م</b></span>
+                  </div>
+                )}
               </div>
             </div>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
