@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { AddFormBoundary, useAutoAddForm } from "@/hooks/useAutoAddForm";
 import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
@@ -145,6 +145,22 @@ const getProductTierPrice = (product: Product | undefined, tier: string) => {
   return product?.retailPrice ?? product?.wholesalePrice ?? 0;
 };
 
+const TIER_ORDER = ["newCustomer", "legacyCustomer", "jumlaMachines", "jumlaParts", "sectori", "engineer"];
+
+/**
+ * Recover the price tier a saved line was sold at, so editing an invoice does
+ * not relabel every line "new customer". When the price matches no tier (a
+ * manually agreed price) the line is shown as a free price instead.
+ */
+const matchPriceTier = (product: Product | undefined, unitPrice: number): string => {
+  if (!product) return "newCustomer";
+  for (const tier of TIER_ORDER) {
+    const tierPrice = getProductTierPrice(product, tier);
+    if (tierPrice > 0 && Math.abs(tierPrice - unitPrice) < 0.01) return tier;
+  }
+  return "custom";
+};
+
 type OrderKind = "regular" | "tradeIn" | "inter";
 
 const orderKind = (order: SalesOrder): OrderKind => {
@@ -209,6 +225,8 @@ export default function SalesPage() {
   const [interRows, setInterRows] = useState<InterItemRow[]>([{ productId: "", quantity: "", internalPrice: "", customerPrice: "", costPrice: "" }]);
   const [showProductModal, setShowProductModal] = useState(false);
   const [activeProductRowIdx, setActiveProductRowIdx] = useState<number | null>(null);
+  const itemRowsRef = useRef<HTMLDivElement | null>(null);
+  const pendingRowFocus = useRef<number | null>(null);
   const [isIntercompanyProductAdd, setIsIntercompanyProductAdd] = useState(false);
   const [tradeInProduct, setTradeInProduct] = useState<{ name: string; brand: string; condition: string; value: string; serialNumber: string }>({ name: "", brand: "", condition: "", value: "", serialNumber: "" });
 
@@ -346,6 +364,21 @@ export default function SalesPage() {
     });
   };
 
+  // The product picker shows the invoice company's products, plus any product
+  // already on the invoice so editing old orders never loses a line.
+  const rowProductOptions = useMemo(() => {
+    const selected = new Set(itemRows.map((row) => row.productId).filter(Boolean));
+    const seen = new Set<string>();
+    return products
+      .filter((product) => product.companyId === form.companyId || selected.has(product.id))
+      .filter((product) => {
+        if (seen.has(product.id)) return false;
+        seen.add(product.id);
+        return true;
+      })
+      .map((product) => ({ value: product.id, label: product.name }));
+  }, [products, form.companyId, itemRows]);
+
   const exportSales = () => ({
     headers: [
       t("sales.orderNumber"),
@@ -416,14 +449,38 @@ export default function SalesPage() {
 
   useAutoAddForm(() => setShowForm(true));
 
+  const defaultTier = COMPANY_ORDER_TIERS[form.companyId] || "newCustomer";
+  const makeBlankItemRow = (priceTier: string): ItemRow => ({ productId: "", quantity: "", unitPrice: "", discount: "", priceTier });
+
+  const addItemRow = () => {
+    // A new line follows the tier of the invoice's last priced line, so adding
+    // an item to an existing sale keeps the same pricing instead of resetting
+    // to "new customer".
+    const lastTier = [...itemRows].reverse().find((row) => row.productId)?.priceTier;
+    const tier = lastTier && lastTier !== "custom" ? lastTier : defaultTier;
+    pendingRowFocus.current = itemRows.length;
+    setItemRows([...itemRows, makeBlankItemRow(tier)]);
+  };
+
+  // Scroll the line the user just added into view and focus its product picker.
+  useEffect(() => {
+    const index = pendingRowFocus.current;
+    if (index === null) return;
+    pendingRowFocus.current = null;
+    const rowEl = itemRowsRef.current?.querySelector<HTMLElement>(`[data-sales-item-row="${index}"]`);
+    rowEl?.scrollIntoView({ behavior: "smooth", block: "center" });
+    rowEl?.querySelector<HTMLElement>('[role="combobox"]')?.focus();
+  }, [itemRows.length]);
+
   const updateItemRow = (index: number, next: Partial<ItemRow>) => {
     setItemRows((current) => current.map((row, rowIndex) => {
       if (rowIndex !== index) return row;
       const merged = { ...row, ...next };
       const productChanged = next.productId !== undefined && next.productId !== row.productId;
       const tierChanged = next.priceTier !== undefined && next.priceTier !== row.priceTier;
+      const priceProvided = next.unitPrice !== undefined;
       // auto-fill price only when product or tier changes — never while typing price/qty
-      if ((productChanged || tierChanged) && merged.productId) {
+      if ((productChanged || tierChanged) && merged.productId && !priceProvided) {
         const selectedProduct = products.find((product) => product.id === merged.productId);
         if (selectedProduct) {
           if (merged.priceTier === "custom") {
@@ -528,14 +585,17 @@ export default function SalesPage() {
     });
     setItemRows(
       order.items.length > 0
-        ? order.items.map((item) => ({
-            productId: item.productId,
-            quantity: String(item.quantity),
-            unitPrice: String(item.unitPrice),
-            discount: String(item.discount),
-            priceTier: "newCustomer",
-          }))
-        : [{ productId: "", quantity: "", unitPrice: "", discount: "", priceTier: "newCustomer" }]
+        ? order.items.map((item) => {
+            const product = products.find((p) => p.id === item.productId);
+            return {
+              productId: item.productId,
+              quantity: String(item.quantity),
+              unitPrice: String(item.unitPrice),
+              discount: String(item.discount),
+              priceTier: matchPriceTier(product, item.unitPrice),
+            };
+          })
+        : [makeBlankItemRow(COMPANY_ORDER_TIERS[order.companyId] || "newCustomer")]
     );
     loadPriceHistory(
       order.items.map((item) => item.productId),
@@ -601,33 +661,52 @@ export default function SalesPage() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    const items = itemRows
-      .filter(row => row.productId && row.quantity && row.unitPrice)
-      .map(row => { 
-        const useTopLevel = formMode === "tradeIn" && tradeInProduct.name && tradeInProduct.value;
-        const tradeIn = useTopLevel ? {
-          name: tradeInProduct.name,
-          brand: tradeInProduct.brand || undefined,
-          condition: tradeInProduct.condition || undefined,
-          value: Number(tradeInProduct.value) || 0,
-          serialNumber: tradeInProduct.serialNumber || undefined,
-        } : row.tradeIn && row.tradeIn.name && row.tradeIn.value ? {
-          name: row.tradeIn.name,
-          brand: row.tradeIn.brand || undefined,
-          condition: row.tradeIn.condition || undefined,
-          value: Number(row.tradeIn.value) || 0,
-          serialNumber: row.tradeIn.serialNumber || undefined,
-        } : undefined;
-        return {
-          productId: row.productId, 
-          quantity: Number(row.quantity), 
-          unitPrice: Number(row.unitPrice), 
-          discount: Number(row.discount) || 0, 
-          priceTier: row.priceTier,
-          tradeIn,
-        };
-      });
-    if (!items.length) { toastError(t("errors.INVALID_SALE_ITEMS")); return; }
+    // Empty leftover rows are ignored, but a half-filled line must be fixed
+    // rather than silently dropped from the saved invoice.
+    const completeRows: ItemRow[] = [];
+    for (let index = 0; index < itemRows.length; index++) {
+      const row = itemRows[index];
+      if (!row.productId && !row.quantity.trim() && !row.unitPrice.trim() && !row.discount.trim()) continue;
+      const quantity = Number(row.quantity);
+      const unitPrice = Number(row.unitPrice);
+      const valid =
+        Boolean(row.productId) &&
+        Number.isInteger(quantity) &&
+        quantity > 0 &&
+        row.unitPrice.trim() !== "" &&
+        Number.isFinite(unitPrice) &&
+        unitPrice >= 0;
+      if (!valid) {
+        toastError(`${t("sales.incompleteRow")} ${index + 1}`);
+        return;
+      }
+      completeRows.push(row);
+    }
+    if (!completeRows.length) { toastError(t("errors.INVALID_SALE_ITEMS")); return; }
+    const items = completeRows.map(row => {
+      const useTopLevel = formMode === "tradeIn" && tradeInProduct.name && tradeInProduct.value;
+      const tradeIn = useTopLevel ? {
+        name: tradeInProduct.name,
+        brand: tradeInProduct.brand || undefined,
+        condition: tradeInProduct.condition || undefined,
+        value: Number(tradeInProduct.value) || 0,
+        serialNumber: tradeInProduct.serialNumber || undefined,
+      } : row.tradeIn && row.tradeIn.name && row.tradeIn.value ? {
+        name: row.tradeIn.name,
+        brand: row.tradeIn.brand || undefined,
+        condition: row.tradeIn.condition || undefined,
+        value: Number(row.tradeIn.value) || 0,
+        serialNumber: row.tradeIn.serialNumber || undefined,
+      } : undefined;
+      return {
+        productId: row.productId,
+        quantity: Number(row.quantity),
+        unitPrice: Number(row.unitPrice),
+        discount: Number(row.discount) || 0,
+        priceTier: row.priceTier,
+        tradeIn,
+      };
+    });
     const safeTaxRate = form.isTaxInvoice ? 14 : (parseFloat(form.taxRate) || 0);
     const payload = {
       ...form,
@@ -667,7 +746,7 @@ export default function SalesPage() {
       return;
     }
     setForm({ companyId: "", customerId: "", engineerId: "", categoryId: "", orderType: "MACHINE_SALE", paymentMethod: "CASH", isTaxInvoice: false, discount: "", discountType: "FIXED", taxRate: "0", notes: "", paidAmount: "" });
-    setItemRows([{ productId: "", quantity: "", unitPrice: "", discount: "", priceTier: "newCustomer" }]);
+    setItemRows([makeBlankItemRow("newCustomer")]);
     setTradeInProduct({ name: "", brand: "", condition: "", value: "", serialNumber: "" });
     setEditingId(null);
     setFormMode("regular");
@@ -1039,8 +1118,11 @@ export default function SalesPage() {
           <div className="space-y-1.5"><label className="block text-sm font-medium text-slate-700">{t("common.notes")}</label><textarea placeholder={t("common.notes")} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" rows={2} /></div>
 
           <div className="rounded-xl border border-gray-200 bg-slate-50 p-4">
-            <div className="mb-4 flex items-center justify-between"><h3 className="text-sm font-semibold text-slate-700">{t("sales.items")}</h3><button type="button" onClick={() => setItemRows([...itemRows, { productId: "", quantity: "", unitPrice: "", discount: "", priceTier: "newCustomer" }])} className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800"><Plus size={16} />{t("purchases.addRow")}</button></div>
-            <div className="space-y-3">{itemRows.map((row, index) => {
+            <div className="mb-4 flex items-center justify-between"><h3 className="text-sm font-semibold text-slate-700">{t("sales.items")}</h3><button type="button" onClick={addItemRow} className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800"><Plus size={16} />{t("purchases.addRow")}</button></div>
+            {!form.companyId && (
+              <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">{t("sales.selectCompanyFirst")}</p>
+            )}
+            <div ref={itemRowsRef} className="space-y-3">{itemRows.map((row, index) => {
               const selectedProduct = products.find((product) => product.id === row.productId);
               // The API deducts from the SELECTED company's main warehouse, so the
               // number shown here must be that company's stock — not the global
@@ -1055,7 +1137,7 @@ export default function SalesPage() {
               const phLoading = row.productId ? Boolean(priceHistoryLoading[row.productId]) : false;
               const lastSaleTierLabel = ph?.lastSaleTier && PRICE_TIER_LABELS[ph.lastSaleTier] ? PRICE_TIER_LABELS[ph.lastSaleTier] : null;
               return (
-                <div key={index}>
+                <div key={index} data-sales-item-row={index}>
                   <div className="rounded-lg border border-gray-200 bg-white p-4">
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1.3fr_1fr_1fr_1fr_1fr_auto]">
                       <div>
@@ -1063,24 +1145,16 @@ export default function SalesPage() {
                           label={t("sales.product")}
                           value={row.productId}
                           onChange={(v) => updateItemRow(index, { productId: v, priceTier: row.priceTier || "newCustomer" })}
-                          options={companyProducts(form.companyId).map((product) => ({ value: product.id, label: product.name }))}
-                          placeholder={t("purchases.selectProduct")}
-                          required
+                          options={rowProductOptions}
+                          placeholder={form.companyId ? t("purchases.selectProduct") : t("sales.selectCompanyFirstShort")}
                           onCustomAdd={() => {
+                            if (!form.companyId) { toastError(t("sales.selectCompany")); return; }
                             setActiveProductRowIdx(index);
                             setIsIntercompanyProductAdd(false);
                             setShowProductModal(true);
                           }}
                           quickAddTitle="إضافة منتج جديد"
                           quickAddFields={[
-                            {
-                              key: "companyId",
-                              label: "الشركة",
-                              type: "select",
-                              required: true,
-                              options: companies.map((c) => ({ value: c.id, label: c.name })),
-                              colSpan: 2,
-                            },
                             { key: "name", label: "اسم المنتج", required: true, colSpan: 2 },
                             {
                               key: "productType",
@@ -1099,14 +1173,18 @@ export default function SalesPage() {
                             { key: "purchasePrice", label: "سعر الشراء", type: "number", placeholder: "0.00", colSpan: 1 },
                           ]}
                           quickAddDefaults={{
-                            companyId: form.companyId || (companies[0]?.id ?? ""),
+                            companyId: form.companyId,
                             productType: "SPARE_PART",
                           }}
                           quickAddEndpoint="/api/products"
                           notifyEntities={["products", "inventory"]}
                           onQuickAddSuccess={(item) => {
                             setProducts((prev) => (prev.some((p) => p.id === item.id) ? prev : [...prev, item]));
-                            updateItemRow(index, { productId: item.id, priceTier: row.priceTier || "newCustomer" });
+                            // The new product is not in this render's `products`
+                            // yet, so price it directly from the created record.
+                            const tier = row.priceTier || defaultTier;
+                            const price = getProductTierPrice(item as Product, tier === "custom" ? defaultTier : tier);
+                            updateItemRow(index, { productId: item.id, priceTier: tier, unitPrice: String(price) });
                             toastSuccess("تمت إضافة المنتج واختياره بنجاح");
                           }}
                         />
@@ -1130,11 +1208,11 @@ export default function SalesPage() {
                       </div>
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("sales.qty")}</label>
-                        <input type="number" min="1" required value={row.quantity} onChange={(e) => updateItemRow(index, { quantity: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        <input type="number" min="1" value={row.quantity} onChange={(e) => updateItemRow(index, { quantity: e.target.value })} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" />
                       </div>
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("sales.unitPrice")}{row.priceTier === "custom" && <span className="ms-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">حر</span>}</label>
-                        <input type="number" min="0" step="0.01" required value={row.unitPrice} onChange={(e) => updateItemRow(index, { unitPrice: e.target.value })} placeholder={row.priceTier === "custom" ? "اكتب السعر بحرية" : undefined} className={`w-full rounded-lg border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 ${row.priceTier === "custom" ? "border-amber-400 bg-amber-50/50 focus:border-amber-500 focus:ring-amber-500" : "border-gray-300 focus:border-blue-500 focus:ring-blue-500"}`} />
+                        <input type="number" min="0" step="0.01" value={row.unitPrice} onChange={(e) => updateItemRow(index, { unitPrice: e.target.value })} placeholder={row.priceTier === "custom" ? "اكتب السعر بحرية" : undefined} className={`w-full rounded-lg border px-3 py-2.5 text-sm focus:outline-none focus:ring-2 ${row.priceTier === "custom" ? "border-amber-400 bg-amber-50/50 focus:border-amber-500 focus:ring-amber-500" : "border-gray-300 focus:border-blue-500 focus:ring-blue-500"}`} />
                       </div>
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("sales.discount")}</label>
@@ -1746,9 +1824,12 @@ export default function SalesPage() {
             if (isIntercompanyProductAdd) {
               updateInterRow(activeProductRowIdx, { productId: newProduct.id });
             } else {
+              const tier = itemRows[activeProductRowIdx]?.priceTier || defaultTier;
+              const price = getProductTierPrice(newProduct, tier === "custom" ? defaultTier : tier);
               updateItemRow(activeProductRowIdx, {
                 productId: newProduct.id,
-                priceTier: itemRows[activeProductRowIdx]?.priceTier || "newCustomer",
+                priceTier: tier,
+                unitPrice: String(price),
               });
             }
           }

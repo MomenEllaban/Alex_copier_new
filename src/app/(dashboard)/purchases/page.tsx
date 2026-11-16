@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AddFormBoundary, useAutoAddForm } from "@/hooks/useAutoAddForm";
 import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
@@ -29,7 +29,7 @@ interface Supplier { id: string; name: string; }
 interface Company { id: string; name: string; }
 interface Customer { id: string; name: string; }
 interface Product {
-  id: string; name: string;
+  id: string; name: string; companyId?: string;
   pricingTiers?: Record<string, number>; wholesalePrice?: number | null; retailPrice?: number | null; purchasePrice?: number | null;
 }
 interface PurchaseItem { id: string; productId: string; quantity: number; unitPrice: number; product: Product; }
@@ -150,6 +150,8 @@ export default function PurchasesPage() {
   const [showProductModal, setShowProductModal] = useState(false);
   const [activeProductRowIdx, setActiveProductRowIdx] = useState<number | null>(null);
   const [isIntercompanyProductAdd, setIsIntercompanyProductAdd] = useState(false);
+  const itemRowsRef = useRef<HTMLDivElement | null>(null);
+  const pendingRowFocus = useRef<number | null>(null);
 
   const fetchData = async () => {
     try {
@@ -241,16 +243,44 @@ export default function PurchasesPage() {
     ]),
   });
 
-  const addRow = () => setItemRows([...itemRows, { productId: "", quantity: "", unitPrice: "" }]);
+  const addRow = () => {
+    pendingRowFocus.current = itemRows.length;
+    setItemRows([...itemRows, { productId: "", quantity: "", unitPrice: "" }]);
+  };
   const removeRow = (index: number) => { if (itemRows.length > 1) setItemRows(itemRows.filter((_, i) => i !== index)); };
+
+  // Bring the freshly added line into view and put the cursor on its product
+  // picker — with a long invoice the new empty row was easy to miss.
+  useEffect(() => {
+    const index = pendingRowFocus.current;
+    if (index === null) return;
+    pendingRowFocus.current = null;
+    const rowEl = itemRowsRef.current?.querySelector<HTMLElement>(`[data-purchase-item-row="${index}"]`);
+    rowEl?.scrollIntoView({ behavior: "smooth", block: "center" });
+    rowEl?.querySelector<HTMLElement>('[role="combobox"]')?.focus();
+  }, [itemRows.length]);
+
   const updateRow = (index: number, field: keyof ItemRow, value: string) => {
     const updated = [...itemRows];
-    updated[index] = { ...updated[index], [field]: value };
+    const row = { ...updated[index], [field]: value };
+    // Picking a product resets the price to that product's card price; the
+    // price history below then upgrades it to what was actually paid last time.
+    if (field === "productId") {
+      const product = products.find((p) => p.id === value);
+      const lastPrice = priceHistory[value]?.lastPurchasePrice;
+      row.unitPrice =
+        typeof lastPrice === "number" && lastPrice > 0
+          ? String(lastPrice)
+          : product?.purchasePrice != null && product.purchasePrice > 0
+            ? String(product.purchasePrice)
+            : "";
+    }
+    updated[index] = row;
     setItemRows(updated);
-    if (field === "productId" && value) loadPriceHistory([value], form.companyId);
+    if (field === "productId" && value) loadPriceHistory([value], form.companyId, true);
   };
 
-  const loadPriceHistory = (productIds: string[], companyId: string) => {
+  const loadPriceHistory = (productIds: string[], companyId: string, refreshAutoPrice = false) => {
     const missing = productIds.filter((id) => id && !priceHistory[id]);
     if (missing.length === 0) return;
     setPriceHistoryLoading((prev) => {
@@ -265,7 +295,23 @@ export default function PurchasesPage() {
     })
       .then((res) => res.json().catch(() => null))
       .then((data) => {
-        if (data?.prices) setPriceHistory((prev) => ({ ...prev, ...data.prices }));
+        if (!data?.prices) return;
+        const prices = data.prices as Record<string, PriceHistory>;
+        setPriceHistory((prev) => ({ ...prev, ...prices }));
+        // Upgrade auto-filled prices to the last real purchase price; keep
+        // anything the user typed by hand.
+        setItemRows((current) =>
+          current.map((row) => {
+            if (!row.productId) return row;
+            const last = prices[row.productId]?.lastPurchasePrice;
+            if (typeof last !== "number" || last <= 0) return row;
+            const product = products.find((p) => p.id === row.productId);
+            const cardPrice = product?.purchasePrice != null && product.purchasePrice > 0 ? String(product.purchasePrice) : "";
+            // Only upgrade a price we filled in ourselves, never a typed one.
+            if (row.unitPrice && !(refreshAutoPrice && row.unitPrice === cardPrice)) return row;
+            return { ...row, unitPrice: String(last) };
+          })
+        );
       })
       .catch(() => {})
       .finally(() => {
@@ -281,10 +327,27 @@ export default function PurchasesPage() {
     e.preventDefault();
     if (!form.companyId) { toastError(t("purchases.selectCompany")); return; }
     if (!form.supplierId) { toastError(t("purchases.selectSupplier")); return; }
-    const items = itemRows
-      .filter((r) => r.productId && r.quantity && r.unitPrice)
-      .map((r) => ({ productId: r.productId, quantity: parseInt(r.quantity), unitPrice: parseFloat(r.unitPrice) }))
-      .filter((it) => Number.isFinite(it.quantity) && it.quantity > 0 && Number.isFinite(it.unitPrice) && it.unitPrice >= 0);
+    // Ignore rows the user left completely empty, but refuse to silently drop a
+    // half-filled line: save the invoice exactly as it is shown on screen.
+    const items: { productId: string; quantity: number; unitPrice: number }[] = [];
+    for (let index = 0; index < itemRows.length; index++) {
+      const row = itemRows[index];
+      if (!row.productId && !row.quantity.trim() && !row.unitPrice.trim()) continue;
+      const quantity = Number(row.quantity);
+      const unitPrice = parseFloat(row.unitPrice);
+      const valid =
+        Boolean(row.productId) &&
+        Number.isInteger(quantity) &&
+        quantity > 0 &&
+        row.unitPrice.trim() !== "" &&
+        Number.isFinite(unitPrice) &&
+        unitPrice >= 0;
+      if (!valid) {
+        toastError(`${t("purchases.incompleteRow")} ${index + 1}`);
+        return;
+      }
+      items.push({ productId: row.productId, quantity, unitPrice });
+    }
     if (items.length === 0) { toastError(t("purchases.addItemsFirst")); return; }
     const computedTotal = items.reduce((s, it) => s + it.quantity * it.unitPrice, 0);
     const paidAmountPayload =
@@ -333,6 +396,15 @@ export default function PurchasesPage() {
       grandTotal: lines.reduce((s, l) => s + l.lineTotal, 0),
     };
   }, [itemRows]);
+
+  // A purchase can only bring in the selected company's products; keep lines
+  // that already exist on a legacy order selectable so editing them still works.
+  const productOptions = useMemo(() => {
+    const selected = new Set(itemRows.map((row) => row.productId).filter(Boolean));
+    return products
+      .filter((product) => product.companyId === form.companyId || selected.has(product.id))
+      .map((product) => ({ value: product.id, label: product.name }));
+  }, [products, form.companyId, itemRows]);
 
   const livePurchaseTotals = useMemo(() => {
     const total = orderTotals.grandTotal;
@@ -713,7 +785,10 @@ export default function PurchasesPage() {
             {editingReceived && (
               <p className="mb-3 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-medium text-sky-700">{t("purchases.receivedEditHint")}</p>
             )}
-            <div className="space-y-3">
+            {!form.companyId && (
+              <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">{t("purchases.selectCompanyFirst")}</p>
+            )}
+            <div ref={itemRowsRef} className="space-y-3">
               {itemRows.map((row, idx) => {
                 const ph = row.productId ? priceHistory[row.productId] : undefined;
                 const phLoading = row.productId ? Boolean(priceHistoryLoading[row.productId]) : false;
@@ -722,30 +797,23 @@ export default function PurchasesPage() {
                 const price = parseFloat(row.unitPrice);
                 const lineTotal = Number.isFinite(qty) && Number.isFinite(price) && qty > 0 && price >= 0 ? qty * price : 0;
                 return (
-                  <div key={idx} className="rounded-lg border border-gray-200 bg-white p-4">
+                  <div key={idx} data-purchase-item-row={idx} className="rounded-lg border border-gray-200 bg-white p-4">
                     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_110px_140px_140px_auto]">
                       <div>
                         <SelectWithAdd
                           label={t("sales.product")}
                           value={row.productId}
                           onChange={(v) => updateRow(idx, "productId", v)}
-                          options={products.map((p) => ({ value: p.id, label: p.name }))}
-                          placeholder={t("purchases.selectProduct")}
+                          options={productOptions}
+                          placeholder={form.companyId ? t("purchases.selectProduct") : t("purchases.selectCompanyFirstShort")}
                           onCustomAdd={() => {
+                            if (!form.companyId) { toastError(t("purchases.selectCompany")); return; }
                             setActiveProductRowIdx(idx);
                             setIsIntercompanyProductAdd(false);
                             setShowProductModal(true);
                           }}
                           quickAddTitle="إضافة منتج جديد"
                           quickAddFields={[
-                            {
-                              key: "companyId",
-                              label: "الشركة",
-                              type: "select",
-                              required: true,
-                              options: companies.map((c) => ({ value: c.id, label: c.name })),
-                              colSpan: 2,
-                            },
                             { key: "name", label: "اسم المنتج", required: true, colSpan: 2 },
                             {
                               key: "productType",
@@ -764,7 +832,7 @@ export default function PurchasesPage() {
                             { key: "retailPrice", label: "سعر القطاعي", type: "number", placeholder: "0.00", colSpan: 1 },
                           ]}
                           quickAddDefaults={{
-                            companyId: form.companyId || (companies[0]?.id ?? ""),
+                            companyId: form.companyId,
                             productType: "SPARE_PART",
                           }}
                           quickAddEndpoint="/api/products"
