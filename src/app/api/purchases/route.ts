@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
 import { findOrCreateMainWarehouse, receivePurchaseIntoStock } from "@/lib/stock-movement-helper";
+import { normalizePurchaseItems } from "@/lib/purchase-items";
 import { traceError } from "@/lib/prisma-errors";
 
 export async function GET() {
@@ -125,12 +126,19 @@ export async function POST(request: Request) {
     }
         const body = await request.json();
     const { items, paymentMethod: rawPaymentMethod, paidAmount: rawPaidAmount, ...data } = body;
+    const itemsProvided = Array.isArray(items);
+    const normalizedItems = itemsProvided ? normalizePurchaseItems(items) : null;
+    if (itemsProvided && (!normalizedItems || normalizedItems.length === 0)) {
+      return NextResponse.json(
+        { error: "بنود أمر الشراء غير صالحة — تأكد من المنتج والكمية والسعر", code: "INVALID_ITEMS" },
+        { status: 400 }
+      );
+    }
 
-    const total = items?.reduce(
-      (sum: number, item: { quantity: number; unitPrice: number }) =>
-        sum + item.quantity * item.unitPrice,
+    const total = (normalizedItems ?? []).reduce(
+      (sum, item) => sum + item.quantity * item.unitPrice,
       0
-    ) ?? 0;
+    );
 
     const companyId = typeof data.companyId === "string" ? data.companyId : "";
     const supplierId = typeof data.supplierId === "string" ? data.supplierId : "";
@@ -147,14 +155,11 @@ export async function POST(request: Request) {
     if (supplierId && !supplier) {
       return NextResponse.json({ error: "المورد غير موجود", code: "SUPPLIER_NOT_FOUND" }, { status: 400 });
     }
-    if (Array.isArray(items) && items.length > 0) {
-      const ids = items.map((item: { productId: string }) => item.productId).filter(Boolean);
-      const distinct = new Set(ids);
-      if (distinct.size > 0) {
-        const found = await prisma.product.count({ where: { id: { in: ids } } });
-        if (found !== distinct.size) {
-          return NextResponse.json({ error: "منتج غير موجود في سجل المنتجات", code: "PRODUCT_NOT_FOUND" }, { status: 400 });
-        }
+    if (normalizedItems && normalizedItems.length > 0) {
+      const distinct = new Set(normalizedItems.map((item) => item.productId));
+      const found = await prisma.product.count({ where: { id: { in: [...distinct] } } });
+      if (found !== distinct.size) {
+        return NextResponse.json({ error: "منتج غير موجود في سجل المنتجات", code: "PRODUCT_NOT_FOUND" }, { status: 400 });
       }
     }
 
@@ -172,9 +177,9 @@ export async function POST(request: Request) {
           paymentMethod: payment.paymentMethod,
           paymentStatus: payment.paymentStatus,
           paidAmount: payment.paidAmount,
-          ...(items && {
+          ...(normalizedItems && {
             items: {
-              create: items.map((item: { productId: string; quantity: number; unitPrice: number }) => ({
+              create: normalizedItems.map((item) => ({
                 productId: item.productId,
                 quantity: item.quantity,
                 unitPrice: item.unitPrice,

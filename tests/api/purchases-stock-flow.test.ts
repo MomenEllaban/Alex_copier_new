@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => {
     warehouse: { findFirst: vi.fn(), create: vi.fn() },
     warehouseInventory: { findUnique: vi.fn(), update: vi.fn(), create: vi.fn(), upsert: vi.fn() },
     stockMovement: { create: vi.fn(), findMany: vi.fn(), deleteMany: vi.fn() },
+    supplierPayment: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn(), deleteMany: vi.fn() },
     purchaseOrder: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
     $transaction: vi.fn(),
   };
@@ -42,6 +43,7 @@ describe("purchase order stock integration flow", () => {
     mocks.db.supplier.findUnique.mockResolvedValue({ id: "sup1", name: "Supplier 1" });
     mocks.db.product.count.mockResolvedValue(1);
     mocks.db.warehouse.findFirst.mockResolvedValue({ id: "wh_main_co1", companyId: "co1", isMain: true });
+    mocks.db.supplierPayment.findUnique.mockResolvedValue(null);
   });
 
   it("POST /api/purchases with RECEIVED immediately posts stock and updates purchase price", async () => {
@@ -54,6 +56,7 @@ describe("purchase order stock integration flow", () => {
       items: [{ productId: "p1", quantity: 5, unitPrice: 100 }],
     };
     mocks.db.purchaseOrder.create.mockResolvedValue(createdPo);
+    mocks.db.purchaseOrder.findUnique.mockResolvedValue(createdPo);
     mocks.db.warehouseInventory.findUnique.mockResolvedValue({ quantity: 10 });
 
     const payload = {

@@ -98,13 +98,6 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
   MIXED: "مختلط",
 };
 
-const PAYMENT_STATUS_LABELS: Record<string, string> = {
-  PENDING: "غير مسدد",
-  PARTIAL: "مسدد جزئيًا",
-  PAID: "مدفوع",
-  OVERDUE: "متأخر",
-};
-
 export default function PurchasesPage() {
   const { t, dir } = useI18n();
   const { canAct } = usePermissions();
@@ -288,28 +281,22 @@ export default function PurchasesPage() {
     e.preventDefault();
     if (!form.companyId) { toastError(t("purchases.selectCompany")); return; }
     if (!form.supplierId) { toastError(t("purchases.selectSupplier")); return; }
-    // Received orders have their items frozen (stock already posted) — header-only edit.
-    const locked = editingId && orders.find((o) => o.id === editingId)?.status === "RECEIVED";
-    const items = locked
-      ? []
-      : itemRows
-          .filter((r) => r.productId && r.quantity && r.unitPrice)
-          .map((r) => ({ productId: r.productId, quantity: parseInt(r.quantity), unitPrice: parseFloat(r.unitPrice) }))
-          .filter((it) => Number.isFinite(it.quantity) && it.quantity > 0 && Number.isFinite(it.unitPrice) && it.unitPrice >= 0);
-    if (!locked && items.length === 0) { toastError(t("purchases.addItemsFirst")); return; }
+    const items = itemRows
+      .filter((r) => r.productId && r.quantity && r.unitPrice)
+      .map((r) => ({ productId: r.productId, quantity: parseInt(r.quantity), unitPrice: parseFloat(r.unitPrice) }))
+      .filter((it) => Number.isFinite(it.quantity) && it.quantity > 0 && Number.isFinite(it.unitPrice) && it.unitPrice >= 0);
+    if (items.length === 0) { toastError(t("purchases.addItemsFirst")); return; }
     const computedTotal = items.reduce((s, it) => s + it.quantity * it.unitPrice, 0);
     const paidAmountPayload =
       form.paymentMethod === "CASH"
-        ? (locked ? (orders.find((o) => o.id === editingId)?.total ?? 0) : computedTotal)
+        ? computedTotal
         : (form.paidAmount === "" ? 0 : Number(form.paidAmount));
     setSaving(true);
     try {
       const orderDateIso = form.orderDate
         ? new Date(`${form.orderDate}T12:00:00.000Z`).toISOString()
         : new Date().toISOString();
-      const payload = editingId
-        ? { ...form, orderDate: orderDateIso, paidAmount: paidAmountPayload, ...(locked ? {} : { items }) }
-        : { ...form, orderDate: orderDateIso, paidAmount: paidAmountPayload, items };
+      const payload = { ...form, orderDate: orderDateIso, paidAmount: paidAmountPayload, items };
       const url = editingId ? `/api/purchases/${editingId}` : "/api/purchases";
       const method = editingId ? "PUT" : "POST";
       const res = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
@@ -413,7 +400,7 @@ export default function PurchasesPage() {
     };
   }, [interRows, interForm.discount, interForm.isTaxInvoice, interForm.taxRate, interForm.paymentMethod, interForm.paidAmount, interForm.internalPaymentMethod, interForm.internalPaidAmount]);
 
-  const editingLocked = editingId ? orders.find((o) => o.id === editingId)?.status === "RECEIVED" : false;
+  const editingReceived = editingId ? orders.find((o) => o.id === editingId)?.status === "RECEIVED" : false;
 
   const openEditOrder = (order: PurchaseOrder) => {
     setEditingId(order.id);
@@ -721,12 +708,10 @@ export default function PurchasesPage() {
           <div className="rounded-xl border border-gray-200 bg-slate-50 p-4">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-slate-700">{t("purchases.items")}</h3>
-              {!editingLocked && (
-                <button type="button" onClick={addRow} className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800"><Plus size={16} />{t("purchases.addRow")}</button>
-              )}
+              <button type="button" onClick={addRow} className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-800"><Plus size={16} />{t("purchases.addRow")}</button>
             </div>
-            {editingLocked && (
-              <p className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700">{t("purchases.itemsLockedHint")}</p>
+            {editingReceived && (
+              <p className="mb-3 rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-medium text-sky-700">{t("purchases.receivedEditHint")}</p>
             )}
             <div className="space-y-3">
               {itemRows.map((row, idx) => {
@@ -746,7 +731,6 @@ export default function PurchasesPage() {
                           onChange={(v) => updateRow(idx, "productId", v)}
                           options={products.map((p) => ({ value: p.id, label: p.name }))}
                           placeholder={t("purchases.selectProduct")}
-                          disabled={editingLocked}
                           onCustomAdd={() => {
                             setActiveProductRowIdx(idx);
                             setIsIntercompanyProductAdd(false);
@@ -805,17 +789,17 @@ export default function PurchasesPage() {
                       </div>
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("purchases.quantity")}</label>
-                        <input type="number" placeholder={t("purchases.quantity")} value={row.quantity} onChange={(e) => updateRow(idx, "quantity", e.target.value)} disabled={editingLocked} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-400" min="1" />
+                        <input type="number" placeholder={t("purchases.quantity")} value={row.quantity} onChange={(e) => updateRow(idx, "quantity", e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-400" min="1" />
                       </div>
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("purchases.unitPrice")}</label>
-                        <input type="number" placeholder={t("purchases.unitPrice")} value={row.unitPrice} onChange={(e) => updateRow(idx, "unitPrice", e.target.value)} disabled={editingLocked} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-400" min="0" step="0.01" />
+                        <input type="number" placeholder={t("purchases.unitPrice")} value={row.unitPrice} onChange={(e) => updateRow(idx, "unitPrice", e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 disabled:text-gray-400" min="0" step="0.01" />
                       </div>
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-700">{t("purchases.lineTotal")}</label>
                         <p className="rounded-lg bg-slate-100 px-3 py-2.5 text-sm font-bold text-slate-800">{lineTotal > 0 ? `${lineTotal.toLocaleString()} ج.م` : "—"}</p>
                       </div>
-                      {!editingLocked && itemRows.length > 1 && <button type="button" onClick={() => removeRow(idx)} className="mt-7 inline-flex h-11 w-11 items-center justify-center self-start rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100">×</button>}
+                      {itemRows.length > 1 && <button type="button" onClick={() => removeRow(idx)} className="mt-7 inline-flex h-11 w-11 items-center justify-center self-start rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100">×</button>}
                     </div>
                     {row.productId && (
                       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg bg-blue-50/60 px-3 py-2">

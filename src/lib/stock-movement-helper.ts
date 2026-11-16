@@ -271,6 +271,127 @@ export async function receivePurchaseIntoStock(
 }
 
 /**
+ * Move one product's balance by `delta`, guarding reversals against a negative
+ * balance exactly like the rest of the purchasing flow does.
+ */
+async function changeInventoryQuantity(
+  tx: InventoryTx,
+  warehouseId: string,
+  productId: string,
+  delta: number,
+): Promise<void> {
+  if (delta === 0) return;
+  const existing = await tx.warehouseInventory.findUnique({
+    where: { warehouseId_productId: { warehouseId, productId } },
+    select: { quantity: true },
+  });
+  const available = existing?.quantity ?? 0;
+
+  if (delta < 0) {
+    const needed = -delta;
+    if (available < needed) {
+      throw new Error(`INSUFFICIENT_STOCK:${productId}`);
+    }
+    await tx.warehouseInventory.update({
+      where: { warehouseId_productId: { warehouseId, productId } },
+      data: { quantity: available - needed },
+    });
+    return;
+  }
+
+  await tx.warehouseInventory.upsert({
+    where: { warehouseId_productId: { warehouseId, productId } },
+    update: { quantity: available + delta },
+    create: { warehouseId, productId, quantity: delta },
+  });
+}
+
+export interface PurchaseEditStockArgs {
+  purchaseOrderId: string;
+  /** Warehouse the original receipt landed in. */
+  oldWarehouseId: string;
+  /** Warehouse the edited lines belong to (same unless the company changed). */
+  newWarehouseId: string;
+  oldItems: PurchaseStockItem[];
+  newItems: PurchaseStockItem[];
+  /** Refresh Product.purchasePrice from the edited line prices. */
+  refreshPrices?: boolean;
+}
+
+/**
+ * Keep stock in step with an edit of an already-RECEIVED purchase order.
+ *
+ * Only the difference between the old and new lines is applied, so a price-only
+ * edit never touches inventory, and changing 10 → 12 adds exactly 2. A reduction
+ * that the warehouse can no longer cover (goods already sold) is refused rather
+ * than pushed below zero, matching every other reversal in the system.
+ *
+ * The order's PURCHASE_IN movements are rewritten to the current lines so a later
+ * cancel/delete reverses exactly what the invoice says today — no stale receipt
+ * left behind for the reversal to subtract twice.
+ */
+export async function syncPurchaseStockAfterEdit(
+  tx: InventoryTx,
+  args: PurchaseEditStockArgs,
+): Promise<void> {
+  const oldTotals = totalByProduct(args.oldItems);
+  const newTotals = totalByProduct(args.newItems);
+  const warehouseChanged = args.oldWarehouseId !== args.newWarehouseId;
+  const productIds = new Set([...oldTotals.keys(), ...newTotals.keys()]);
+
+  let linesChanged = warehouseChanged;
+  for (const productId of productIds) {
+    if ((oldTotals.get(productId) ?? 0) !== (newTotals.get(productId) ?? 0)) {
+      linesChanged = true;
+      break;
+    }
+  }
+
+  if (linesChanged) {
+    for (const productId of productIds) {
+      const oldQty = oldTotals.get(productId) ?? 0;
+      const newQty = newTotals.get(productId) ?? 0;
+      if (warehouseChanged) {
+        await changeInventoryQuantity(tx, args.oldWarehouseId, productId, -oldQty);
+        await changeInventoryQuantity(tx, args.newWarehouseId, productId, newQty);
+      } else {
+        await changeInventoryQuantity(tx, args.newWarehouseId, productId, newQty - oldQty);
+      }
+    }
+
+    await tx.stockMovement.deleteMany({
+      where: { purchaseOrderId: args.purchaseOrderId, movementType: "PURCHASE_IN" },
+    });
+    for (const [productId, quantity] of newTotals) {
+      if (quantity <= 0) continue;
+      await tx.stockMovement.create({
+        data: {
+          warehouseId: args.newWarehouseId,
+          productId,
+          quantity,
+          movementType: "PURCHASE_IN",
+          purchaseOrderId: args.purchaseOrderId,
+          referenceId: args.purchaseOrderId,
+          notes: `تعديل أمر شراء ${args.purchaseOrderId.slice(0, 8)} — الكمية الحالية ${quantity}`,
+        },
+      });
+    }
+  }
+
+  if (args.refreshPrices) {
+    const priceByProduct = new Map<string, number>();
+    for (const item of args.newItems) {
+      if (typeof item.unitPrice === "number" && item.unitPrice > 0) {
+        priceByProduct.set(item.productId, item.unitPrice);
+      }
+    }
+    for (const [productId, purchasePrice] of priceByProduct) {
+      await tx.product.update({ where: { id: productId }, data: { purchasePrice } });
+    }
+  }
+}
+
+/**
  * Atomic un-receive (cancelling a received purchase order): removes the exact
  * quantity that was received from the warehouse (guarded — never negative),
  * records an ADJUSTMENT movement and deletes the original PURCHASE_IN movements

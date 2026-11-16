@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
-import { findOrCreateMainWarehouse, receivePurchaseIntoStock, reversePurchaseFromStock } from "@/lib/stock-movement-helper";
+import { findOrCreateMainWarehouse, receivePurchaseIntoStock, reversePurchaseFromStock, syncPurchaseStockAfterEdit } from "@/lib/stock-movement-helper";
+import { normalizePurchaseItems } from "@/lib/purchase-items";
 import { traceError } from "@/lib/prisma-errors";
 
 const PAYMENT_METHOD_VALUES = new Set(["CASH", "CREDIT", "INSTALLMENT", "MIXED"]);
+
+type PurchaseTx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 
 function normalizePurchasePayment(input: {
   paymentMethod?: unknown;
@@ -35,7 +38,7 @@ function normalizePurchasePayment(input: {
   return { paymentMethod, paymentStatus, paidAmount };
 }
 
-async function syncPurchasePayment(tx: any, po: { id: string; supplierId: string; companyId: string; orderDate: Date | string | null; total: number; paymentMethod: string; paidAmount: number; status: string }) {
+async function syncPurchasePayment(tx: PurchaseTx, po: { id: string; supplierId: string; companyId: string; orderDate: Date | string | null; total: number; paymentMethod: string; paidAmount: number; status: string }) {
   const existing = await tx.supplierPayment.findUnique({ where: { purchaseOrderId: po.id } }).catch(() => null);
   const active = po.status !== "CANCELLED" && po.status !== "DRAFT";
   const amount = active ? Math.max(0, Math.min(Number(po.paidAmount) || 0, Number(po.total) || 0)) : 0;
@@ -98,13 +101,20 @@ export async function PUT(
     const { id } = await params;
     const existing = await prisma.purchaseOrder.findUnique({
       where: { id },
-      select: { id: true, companyId: true, supplierId: true, status: true, total: true, orderDate: true, paymentMethod: true, paymentStatus: true, paidAmount: true, items: { select: { productId: true, quantity: true } } },
+      select: { id: true, companyId: true, supplierId: true, status: true, total: true, orderDate: true, paymentMethod: true, paymentStatus: true, paidAmount: true, items: { select: { productId: true, quantity: true, unitPrice: true } } },
     });
     if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
     const body = await request.json();
     const { items, paymentMethod: rawPaymentMethod, paidAmount: rawPaidAmount, ...data } = body;
     const itemsProvided = Array.isArray(items);
+    const normalizedItems = itemsProvided ? normalizePurchaseItems(items) : null;
+    if (itemsProvided && (!normalizedItems || normalizedItems.length === 0)) {
+      return NextResponse.json(
+        { error: "بنود أمر الشراء غير صالحة — تأكد من المنتج والكمية والسعر", code: "INVALID_ITEMS" },
+        { status: 400 }
+      );
+    }
     const nextStatus =
       typeof data.status === "string" && data.status
         ? (data.status as "DRAFT" | "CONFIRMED" | "RECEIVED" | "CANCELLED")
@@ -122,11 +132,11 @@ export async function PUT(
         return NextResponse.json({ error: "المورد غير موجود", code: "SUPPLIER_NOT_FOUND" }, { status: 400 });
       }
     }
-    if (itemsProvided && items.length > 0) {
-      const ids = items.map((item: { productId: string }) => item.productId).filter(Boolean);
+    if (normalizedItems && normalizedItems.length > 0) {
+      const ids = normalizedItems.map((item) => item.productId);
       const distinct = new Set(ids);
       if (distinct.size > 0) {
-        const found = await prisma.product.count({ where: { id: { in: ids } } });
+        const found = await prisma.product.count({ where: { id: { in: [...distinct] } } });
         if (found !== distinct.size) {
           return NextResponse.json({ error: "منتج غير موجود في سجل المنتجات", code: "PRODUCT_NOT_FOUND" }, { status: 400 });
         }
@@ -134,25 +144,12 @@ export async function PUT(
     }
 
     const companyId = typeof data.companyId === "string" && data.companyId ? data.companyId : existing.companyId;
-    const supplierId = typeof data.supplierId === "string" && data.supplierId ? data.supplierId : existing.supplierId;
     if (nextStatus === "RECEIVED" && !companyId) {
       return NextResponse.json({ error: "الشركة مطلوبة عند استلام أمر الشراء", code: "COMPANY_REQUIRED_FOR_RECEIVE" }, { status: 400 });
     }
 
-    // بمجرد الاستلام تكون البنود مثبّتة — يُمنع تعديلها.
-    if (existing.status === "RECEIVED" && itemsProvided) {
-      return NextResponse.json(
-        { error: "لا يمكن تعديل بنود أمر شراء تم استلامه — احذف الأمر أو عكس الاستلام أولاً", code: "ITEMS_LOCKED_AFTER_RECEIVE" },
-        { status: 400 }
-      );
-    }
-
-    const total = itemsProvided
-      ? items.reduce(
-          (sum: number, item: { quantity: number; unitPrice: number }) =>
-            sum + item.quantity * item.unitPrice,
-          0
-        ) ?? 0
+    const total = normalizedItems
+      ? normalizedItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0)
       : undefined;
 
     const paymentProvided = rawPaymentMethod !== undefined || rawPaidAmount !== undefined || total !== undefined;
@@ -180,11 +177,11 @@ export async function PUT(
           ...(data.notes !== undefined ? { notes: data.notes } : {}),
           ...(total !== undefined ? { total } : {}),
           ...(payment ? { paymentMethod: payment.paymentMethod, paymentStatus: payment.paymentStatus, paidAmount: payment.paidAmount } : {}),
-          ...(itemsProvided
+          ...(normalizedItems
             ? {
                 items: {
                   deleteMany: {},
-                  create: items.map((item: { productId: string; quantity: number; unitPrice: number }) => ({
+                  create: normalizedItems.map((item) => ({
                     productId: item.productId,
                     quantity: item.quantity,
                     unitPrice: item.unitPrice,
@@ -207,21 +204,32 @@ export async function PUT(
         companyId: updated.companyId,
         orderDate: updated.orderDate,
         total: updated.total,
-        paymentMethod: (updated as any).paymentMethod || "CREDIT",
-        paidAmount: (updated as any).paidAmount ?? 0,
+        paymentMethod: updated.paymentMethod || "CREDIT",
+        paidAmount: updated.paidAmount ?? 0,
         status: updated.status,
       });
 
+      if (wasReceived && becomesReceived) {
+        // The order is already in stock: apply only the difference between the
+        // old and new lines (a price-only edit touches no inventory at all).
+        const oldWarehouse = await findOrCreateMainWarehouse(tx, existing.companyId);
+        const newWarehouse = companyId === existing.companyId ? oldWarehouse : await findOrCreateMainWarehouse(tx, companyId);
+        await syncPurchaseStockAfterEdit(tx, {
+          purchaseOrderId: id,
+          oldWarehouseId: oldWarehouse.id,
+          newWarehouseId: newWarehouse.id,
+          oldItems: existing.items,
+          newItems: normalizedItems ?? existing.items,
+          refreshPrices: Boolean(normalizedItems),
+        });
+      }
+
       if (becomesReceived && !wasReceived) {
         const warehouse = await findOrCreateMainWarehouse(tx, companyId);
-        const withItems = await tx.purchaseOrder.findUnique({
-          where: { id },
-          select: { items: { select: { productId: true, quantity: true, unitPrice: true } } },
-        });
         await receivePurchaseIntoStock(tx, {
           purchaseOrderId: id,
           warehouseId: warehouse.id,
-          items: withItems?.items ?? [],
+          items: normalizedItems ?? existing.items,
         });
       }
 
@@ -238,7 +246,7 @@ export async function PUT(
     return NextResponse.json(po);
   } catch (error: unknown) {
     if (error instanceof Error && error.message.startsWith("INSUFFICIENT_STOCK")) {
-      return NextResponse.json({ error: "الكمية المتاحة في المخزون لا تكفي للعكس — لا يُسمح برصيد سالب", code: "INSUFFICIENT_STOCK" }, { status: 409 });
+      return NextResponse.json({ error: "الكمية المتاحة في المخزون لا تكفي لهذا التعديل — لا يُسمح برصيد سالب", code: "INSUFFICIENT_STOCK" }, { status: 409 });
     }
     return NextResponse.json({ error: "Failed to update purchase order" }, { status: traceError("[purchases:PUT] update failed", error) });
   }
@@ -266,11 +274,11 @@ export async function DELETE(
     });
     return NextResponse.json({ message: "Deleted" });
   } catch (error: unknown) {
-    if (error && typeof error === "object" && "code" in error && (error as any).code === "P2025") {
+    if (error && typeof error === "object" && "code" in error && error.code === "P2025") {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     if (error instanceof Error && error.message.startsWith("INSUFFICIENT_STOCK")) {
-      return NextResponse.json({ error: "الكمية المتاحة في المخزون لا تكفي للعكس — لا يُسمح برصيد سالب", code: "INSUFFICIENT_STOCK" }, { status: 409 });
+      return NextResponse.json({ error: "الكمية المتاحة في المخزون لا تكفي لهذا التعديل — لا يُسمح برصيد سالب", code: "INSUFFICIENT_STOCK" }, { status: 409 });
     }
     return NextResponse.json({ error: "Failed" }, { status: 500 });
   }

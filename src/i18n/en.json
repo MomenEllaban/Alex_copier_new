@@ -636,7 +636,7 @@
     "itemsCount": "Items count",
     "grandTotal": "Order total",
     "addItemsFirst": "Add at least one row with a valid product, quantity and price",
-    "itemsLockedHint": "Items are locked because this order was received into stock — header fields only can be edited",
+    "receivedEditHint": "This order is already received — changing items or quantities automatically updates stock, inventory movements and reports.",
     "stats": {
       "totalOrders": "Total Purchase Orders",
       "totalValue": "Total Purchases",
@@ -1406,7 +1406,7 @@
     "INVALID_PRICING_TIERS": "Tier prices are invalid",
     "INVALID_QUANTITY": "Quantity must be a positive whole number",
     "INVALID_RETURN_TYPE": "Return type is invalid",
-    "ITEMS_LOCKED_AFTER_RECEIVE": "Items of a received purchase order cannot be edited. Delete the order or reverse the receipt first",
+    "INVALID_ITEMS": "Purchase order items are invalid — check the product, quantity and price",
     "MACHINE_NOT_FOUND": "Machine not found",
     "NOT_FOUND": "Not found",
     "NOT_INTERCOMPANY": "This order is not an intercompany sale",
