@@ -15,43 +15,58 @@ export async function GET() {
       );
     }
 
-    const purchases = await prisma.purchaseOrder.findMany({
-      include: {
-        supplier: true,
-        company: true,
-        items: {
-          include: { product: true },
+    const [purchases, intercompanyRows] = await Promise.all([
+      prisma.purchaseOrder.findMany({
+        include: {
+          supplier: true,
+          company: true,
+          items: {
+            include: { product: true },
+          },
+          invoices: true,
         },
-        invoices: true,
-      },
-      orderBy: { createdAt: "desc" },
-    });
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.interCompanyInvoice.findMany({
+        include: {
+          fromCompany: { select: { id: true, name: true } },
+          toCompany: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+    ]);
 
-    const salesOrders = await prisma.salesOrder.findMany({
-      where: { id: { in: (await prisma.interCompanyInvoice.findMany({ select: { salesOrderId: true } })).filter(x => x.salesOrderId).map(x => x.salesOrderId!) } },
-      select: {
-        id: true,
-        orderType: true,
-        paymentMethod: true,
-        paidAmount: true,
-        taxRate: true,
-        discount: true,
-        discountType: true,
-        notes: true,
-        engineer: { select: { id: true, name: true } },
-        customer: { select: { id: true, name: true } },
-        items: { include: { product: true } },
-      },
-    });
+    const salesOrderIds = Array.from(
+      new Set(
+        intercompanyRows
+          .map((inv) => inv.salesOrderId)
+          .filter((id): id is string => typeof id === "string" && id.length > 0)
+      )
+    );
 
-    const intercompany = await prisma.interCompanyInvoice.findMany({
-      include: {
-        fromCompany: true,
-        toCompany: true,
-      },
-      orderBy: { createdAt: "desc" },
-    }).then((rows) => rows.map((inv) => {
-      const so = salesOrders.find((s) => s.id === inv.salesOrderId);
+    const salesOrders = salesOrderIds.length
+      ? await prisma.salesOrder.findMany({
+          where: { id: { in: salesOrderIds } },
+          select: {
+            id: true,
+            orderType: true,
+            paymentMethod: true,
+            paidAmount: true,
+            taxRate: true,
+            discount: true,
+            discountType: true,
+            notes: true,
+            engineer: { select: { id: true, name: true } },
+            customer: { select: { id: true, name: true } },
+            items: { include: { product: true } },
+          },
+        })
+      : [];
+
+    const salesOrderMap = new Map(salesOrders.map((so) => [so.id, so]));
+
+    const intercompany = intercompanyRows.map((inv) => {
+      const so = inv.salesOrderId ? salesOrderMap.get(inv.salesOrderId) : undefined;
       return {
         ...inv,
         items: so?.items ?? [],
@@ -64,11 +79,14 @@ export async function GET() {
         discount: so?.discount,
         discountType: so?.discountType,
       };
-    }));
+    });
 
     return NextResponse.json({ orders: purchases, intercompany });
   } catch (error) {
-    return NextResponse.json({ error: "Failed to fetch purchases" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch purchases" },
+      { status: traceError("[purchases:GET] fetch failed", error) }
+    );
   }
 }
 

@@ -1,4 +1,4 @@
-﻿-- AlterTable: add payment tracking to purchase orders (fixes unspecified payment method; supports cash/credit + supplier settlements)
+-- AlterTable: add payment tracking to purchase orders (fixes unspecified payment method; supports cash/credit + supplier settlements)
 ALTER TABLE "PurchaseOrder" ADD COLUMN "paymentMethod" "PaymentMethod" NOT NULL DEFAULT 'CREDIT';
 ALTER TABLE "PurchaseOrder" ADD COLUMN "paymentStatus" "PaymentStatus" NOT NULL DEFAULT 'PENDING';
 ALTER TABLE "PurchaseOrder" ADD COLUMN "paidAmount" DOUBLE PRECISION NOT NULL DEFAULT 0;
