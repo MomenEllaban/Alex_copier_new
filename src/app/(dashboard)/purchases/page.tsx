@@ -23,6 +23,7 @@ import { DateTimeCell } from "@/components/DateTimeCell";
 import RefreshButton from "@/components/RefreshButton";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { notifyDataChanged } from "@/lib/data-events";
+import { usePermissions } from "@/components/PermissionsProvider";
 
 interface Supplier { id: string; name: string; }
 interface Company { id: string; name: string; }
@@ -106,6 +107,11 @@ const PAYMENT_STATUS_LABELS: Record<string, string> = {
 
 export default function PurchasesPage() {
   const { t, dir } = useI18n();
+  const { canAct } = usePermissions();
+  const canAddOrder = canAct("purchases", "add");
+  const canEditOrder = canAct("purchases", "edit");
+  const canDeleteOrder = canAct("purchases", "delete");
+  const canEditIntercompany = canAct("sales", "edit");
   const confirmAction = useConfirm();
   const { success: toastSuccess, error: toastError } = useToast();
   const [orders, setOrders] = useState<PurchaseOrder[]>([]);
@@ -534,7 +540,9 @@ export default function PurchasesPage() {
           <p className="text-xs font-medium tracking-[0.2em] text-sky-600 uppercase">ERP</p>
           <h1 className="mt-1 text-xl font-bold text-slate-900 sm:text-2xl lg:text-3xl">{t("purchases.title")}</h1>
         </div>
-        <button onClick={openCreateOrder} className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"><Plus size={16} />{t("purchases.addOrder")}</button>
+        {canAddOrder && (
+          <button onClick={openCreateOrder} className="inline-flex items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-700"><Plus size={16} />{t("purchases.addOrder")}</button>
+        )}
       </div>
 
       <StatsCards
@@ -941,13 +949,17 @@ export default function PurchasesPage() {
                         <button onClick={() => setViewingOrder(order)} className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-2 text-xs font-medium text-blue-600 transition hover:bg-blue-100" title={t("common.view")}>
                           <Eye size={14} />
                         </button>
-                        <button onClick={() => openEditOrder(order)} className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-2 text-xs font-medium text-sky-600 transition hover:bg-sky-100" title={t("common.edit")}>
-                          <Pencil size={14} />
-                        </button>
+                        {canEditOrder && (
+                          <button onClick={() => openEditOrder(order)} className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-2 text-xs font-medium text-sky-600 transition hover:bg-sky-100" title={t("common.edit")}>
+                            <Pencil size={14} />
+                          </button>
+                        )}
                         <PrintMenu type="purchase" id={order.id} />
-                        <button onClick={() => handleDelete(order.id)} className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-2 text-xs font-medium text-red-600 transition hover:bg-red-100" title={t("common.delete")}>
-                          <Trash2 size={14} />
-                        </button>
+                        {canDeleteOrder && (
+                          <button onClick={() => handleDelete(order.id)} className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-red-50 px-2.5 py-2 text-xs font-medium text-red-600 transition hover:bg-red-100" title={t("common.delete")}>
+                            <Trash2 size={14} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -1014,9 +1026,11 @@ export default function PurchasesPage() {
                         <button onClick={() => setViewingIc(ic)} className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-2 text-xs font-medium text-blue-600 transition hover:bg-blue-100" title={t("common.view")}>
                           <Eye size={14} />
                         </button>
-                        <button onClick={() => openEditIc(ic)} className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-2 text-xs font-medium text-indigo-600 transition hover:bg-indigo-100" title={t("common.edit")}>
-                          <Pencil size={14} />
-                        </button>
+                        {canEditIntercompany && (
+                          <button onClick={() => openEditIc(ic)} className="inline-flex items-center gap-1 rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-2 text-xs font-medium text-indigo-600 transition hover:bg-indigo-100" title={t("common.edit")}>
+                            <Pencil size={14} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -1129,7 +1143,9 @@ export default function PurchasesPage() {
             )}
             <div className="flex flex-wrap justify-end gap-2">
               <button onClick={() => window.open(`/api/invoices?type=purchase&id=${viewingOrder.id}`, "_blank")} className="inline-flex items-center gap-1 rounded-lg bg-purple-600 px-3 py-2 text-sm font-semibold text-white hover:bg-purple-700"><Printer size={15} />طباعة</button>
-              <button onClick={() => { const o = viewingOrder; setViewingOrder(null); openEditOrder(o); }} className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"><Pencil size={15} />{t("common.edit")}</button>
+              {canEditOrder && (
+                <button onClick={() => { const o = viewingOrder; setViewingOrder(null); openEditOrder(o); }} className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700"><Pencil size={15} />{t("common.edit")}</button>
+              )}
             </div>
           </div>
         </FormModal>
@@ -1195,7 +1211,9 @@ export default function PurchasesPage() {
               </table>
             </div>
             <div className="flex flex-wrap justify-end gap-2">
-              <button onClick={() => { setViewingIc(null); openEditIc(viewingIc); }} className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"><Pencil size={15} />{t("common.edit")}</button>
+              {canEditIntercompany && (
+                <button onClick={() => { setViewingIc(null); openEditIc(viewingIc); }} className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-700"><Pencil size={15} />{t("common.edit")}</button>
+              )}
             </div>
           </div>
         </FormModal>
