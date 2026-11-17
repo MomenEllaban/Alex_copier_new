@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Printer, Download, Receipt, Package, FileText, CheckCircle2, ArrowDownLeft, ArrowUpRight, Wallet } from "lucide-react";
+import { Printer, Download, Receipt, Package, FileText, CheckCircle2, ArrowDownLeft, ArrowUpRight, Wallet, Pencil, Trash2, Link2 } from "lucide-react";
 import { useI18n } from "@/i18n/context";
 import FormModal from "@/components/FormModal";
 import { exportRowsToCsv } from "@/lib/csv";
@@ -24,6 +24,8 @@ interface Props {
   returns: PurchaseReturnLite[];
   payments?: SupplierPaymentLite[];
   onRecordPayment?: (supplierId: string) => void;
+  onEditPayment?: (payment: SupplierPaymentLite) => void;
+  onDeletePayment?: (payment: SupplierPaymentLite) => void;
 }
 
 export default function SupplierStatementModal({
@@ -36,6 +38,8 @@ export default function SupplierStatementModal({
   returns,
   payments,
   onRecordPayment,
+  onEditPayment,
+  onDeletePayment,
 }: Props) {
   const { t, locale } = useI18n();
   const [activeTab, setActiveTab] = useState<"ledger" | "invoices">("ledger");
@@ -44,6 +48,8 @@ export default function SupplierStatementModal({
 
   const statement = buildSupplierStatement(supplierId, orders, returns, supplierName, payments);
   const invoiceDetails = getJumlaSupplierInvoices(supplierName);
+  const paymentById = new Map((statement.payments || []).map((p) => [p.id, p]));
+  const showActions = Boolean(onEditPayment || onDeletePayment);
 
   const dateFmt = (v: string) => {
     try {
@@ -235,39 +241,84 @@ export default function SupplierStatementModal({
                     <th className="px-3 py-3 text-end font-bold text-emerald-700">مدين (مسدد)</th>
                     <th className="px-3 py-3 text-end font-bold text-blue-700">دائن (مستحق)</th>
                     <th className="px-3 py-3 text-end font-bold text-amber-800">الرصيد التراكمي</th>
+                    {showActions && <th className="px-3 py-3 text-center font-bold">{t("common.actions")}</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white">
-                  {statement.entries.map((e, idx) => (
-                    <tr key={`${e.id}-${idx}`} className="hover:bg-slate-50/80 transition">
-                      <td className="whitespace-nowrap px-3 py-2.5 font-medium text-slate-700">
-                        {dateFmt(e.date)}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-center font-bold font-mono text-slate-900">
-                        {e.docNumber || "—"}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2.5">
-                        <span
-                          className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold ${badgeColor(
-                            e.docType,
-                            e.debit,
-                          )}`}
-                        >
-                          {e.docType || (e.kind === "PURCHASE" ? "فاتورة مشتريات" : "مرتجع")}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2.5 text-slate-700 max-w-xs">{e.label}</td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-end font-bold text-emerald-700">
-                        {e.debit > 0 ? `${e.debit.toLocaleString("ar-EG")} ج.م` : "—"}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-end font-bold text-blue-700">
-                        {e.credit > 0 ? `${e.credit.toLocaleString("ar-EG")} ج.م` : "—"}
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-end font-black text-amber-800">
-                        {e.runningBalance.toLocaleString("ar-EG")} ج.م
-                      </td>
-                    </tr>
-                  ))}
+                  {statement.entries.map((e, idx) => {
+                    const payment = paymentById.get(e.id);
+                    const canEdit = Boolean(payment && onEditPayment);
+                    const canDelete = Boolean(payment && onDeletePayment);
+                    return (
+                      <tr key={`${e.id}-${idx}`} className="hover:bg-slate-50/80 transition">
+                        <td className="whitespace-nowrap px-3 py-2.5 font-medium text-slate-700">
+                          {dateFmt(e.date)}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-center font-bold font-mono text-slate-900">
+                          {e.docNumber || "—"}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5">
+                          <span
+                            className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold ${badgeColor(
+                              e.docType,
+                              e.debit,
+                            )}`}
+                          >
+                            {e.docType || (e.kind === "PURCHASE" ? "فاتورة مشتريات" : "مرتجع")}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 text-slate-700 max-w-xs">
+                          <span>{e.label}</span>
+                          {payment?.purchaseOrderId && (
+                            <span
+                              className="ms-1 inline-flex items-center gap-0.5 rounded bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700 align-middle"
+                              title={`${t("payments.linkedInvoice")}: ${payment.purchaseOrderId}`}
+                            >
+                              <Link2 size={10} />
+                              {t("payments.linked")}
+                            </span>
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-end font-bold text-emerald-700">
+                          {e.debit > 0 ? `${e.debit.toLocaleString("ar-EG")} ج.م` : "—"}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-end font-bold text-blue-700">
+                          {e.credit > 0 ? `${e.credit.toLocaleString("ar-EG")} ج.م` : "—"}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2.5 text-end font-black text-amber-800">
+                          {e.runningBalance.toLocaleString("ar-EG")} ج.م
+                        </td>
+                        {showActions && (
+                          <td className="whitespace-nowrap px-2 py-2.5 text-center">
+                            {payment && (canEdit || canDelete) && (
+                              <div className="flex items-center justify-center gap-1">
+                                {canEdit && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onEditPayment?.(payment)}
+                                    className="rounded-md border border-blue-200 bg-blue-50 p-1.5 text-blue-700 transition hover:bg-blue-100"
+                                    title={t("payments.edit")}
+                                  >
+                                    <Pencil size={13} />
+                                  </button>
+                                )}
+                                {canDelete && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onDeletePayment?.(payment)}
+                                    className="rounded-md border border-red-200 bg-red-50 p-1.5 text-red-600 transition hover:bg-red-100"
+                                    title={t("payments.delete")}
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })}
                 </tbody>
                 <tfoot className="sticky bottom-0 z-10 bg-slate-100 font-bold text-slate-900 border-t-2 border-slate-300">
                   <tr>
@@ -283,6 +334,7 @@ export default function SupplierStatementModal({
                     <td className="px-3 py-2.5 text-end font-black text-amber-900">
                       {statement.balance.toLocaleString("ar-EG")} ج.م
                     </td>
+                    {showActions && <td className="px-2 py-2.5" />}
                   </tr>
                 </tfoot>
               </table>

@@ -61,6 +61,7 @@ export interface SupplierPaymentLite {
   id: string;
   supplierId: string;
   companyId?: string | null;
+  purchaseOrderId?: string | null;
   amount: number;
   paymentDate: string | Date;
   paymentMethod?: string;

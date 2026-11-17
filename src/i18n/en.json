@@ -1451,7 +1451,11 @@
     "DATE_INVALID": "Invalid entry date",
     "FUTURE_DATE_NOT_ALLOWED": "An entry cannot be dated in the future",
     "BOOK_NOT_FOUND": "Day not found",
-    "CATEGORY_COMPANY_MISMATCH": "This category does not belong to the selected company"
+    "CATEGORY_COMPANY_MISMATCH": "This category does not belong to the selected company",
+    "PAYMENT_NOT_FOUND": "Payment not found",
+    "PAYMENT_LOCKED": "This payment comes from under-account credit and is managed by the invoice",
+    "EXCEEDS_INVOICE_TOTAL": "The amount exceeds the total of the linked purchase invoice",
+    "EXCEEDS_ORDER_LIMIT": "The amount exceeds the remaining balance of the linked invoice"
   },
   "statement": {
     "title": "Customer Statement",
@@ -1487,6 +1491,32 @@
     "settlementOut": "Payment to customer",
     "tradeIn": "Trade-in value",
     "generatedFor": "Statement for"
+  },
+  "payments": {
+    "title": "Payments",
+    "history": "Payment history",
+    "recordTitle": "Record payment",
+    "editTitle": "Edit payment",
+    "edit": "Edit payment",
+    "delete": "Delete payment",
+    "deleteTitle": "Delete payment",
+    "deleteConfirm": "The payment will be deleted and its effect on the balance and linked invoices reverted. Are you sure?",
+    "deleteLinkedConfirm": "This payment is linked to a purchase invoice. Deleting it will reopen the invoice as unpaid. Are you sure?",
+    "deleteCustomerConfirm": "The payment will be deleted, the amount returned to the customer's balance, and linked invoices updated. Are you sure?",
+    "linkedInvoice": "Linked to an invoice",
+    "linkedInvoiceHint": "Editing the amount or deleting this payment will update the linked purchase invoice status automatically.",
+    "locked": "Locked",
+    "lockedHint": "This row comes from under-account credit — it is managed by the invoice and cannot be edited or deleted here.",
+    "none": "No payments recorded",
+    "recorded": "Payment recorded successfully",
+    "updated": "Payment updated successfully",
+    "deleted": "Payment deleted successfully",
+    "saveEdit": "Save changes",
+    "updating": "Saving...",
+    "editHint": "Changing the amount redistributes it across the customer's balance and linked invoices automatically.",
+    "status": "Status",
+    "linked": "Linked",
+    "unlinked": "Not linked"
   },
   "engineerStatement": {
     "title": "Engineer Statement",

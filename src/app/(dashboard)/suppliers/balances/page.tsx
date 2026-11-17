@@ -12,6 +12,9 @@ import PrinterLoader from "@/components/PrinterLoader";
 import RefreshButton from "@/components/RefreshButton";
 import SupplierStatementModal from "@/components/SupplierStatementModal";
 import RecordSupplierPaymentModal, { type SupplierForPayment } from "@/components/RecordSupplierPaymentModal";
+import { useConfirm, useToast } from "@/components/UIProvider";
+import { usePermissions } from "@/components/PermissionsProvider";
+import { apiErrorMessage } from "@/lib/api-client";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import type { PurchaseOrderLite, PurchaseReturnLite, SupplierPaymentLite } from "@/lib/supplier-statement";
 
@@ -41,6 +44,9 @@ interface Company {
 
 export default function SupplierBalancesPage() {
   const { t, dir, locale } = useI18n();
+  const { canAct } = usePermissions();
+  const confirmAction = useConfirm();
+  const { success: toastSuccess, error: toastError } = useToast();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [orders, setOrders] = useState<PurchaseOrderLite[]>([]);
@@ -52,6 +58,7 @@ export default function SupplierBalancesPage() {
   const [page, setPage] = useState(1);
   const [statementId, setStatementId] = useState<string | null>(null);
   const [paymentSupplier, setPaymentSupplier] = useState<SupplierForPayment | null>(null);
+  const [editingPayment, setEditingPayment] = useState<SupplierPaymentLite | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const PAGE_SIZE = 10;
 
@@ -130,6 +137,40 @@ export default function SupplierBalancesPage() {
 
   const dateFmt = (v: string | null | undefined) =>
     v ? new Date(v).toLocaleDateString(locale === "ar" ? "ar-EG" : "en-GB") : "—";
+
+  const canRecordPayment = canAct("suppliers", "add");
+  const canEditPayment = canAct("suppliers", "edit");
+  const canDeletePayment = canAct("suppliers", "delete");
+
+  const openPaymentModal = (supplier: Supplier, payment?: SupplierPaymentLite) => {
+    setEditingPayment(payment ?? null);
+    setPaymentSupplier(supplier);
+    setShowPaymentModal(true);
+  };
+
+  const handleDeletePayment = async (payment: SupplierPaymentLite) => {
+    const confirmed = await confirmAction({
+      title: t("payments.deleteTitle"),
+      message: t(payment.purchaseOrderId ? "payments.deleteLinkedConfirm" : "payments.deleteConfirm"),
+      confirmLabel: t("common.delete"),
+    });
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`/api/suppliers/${payment.supplierId}/payments/${payment.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        toastError(apiErrorMessage(data, t));
+        return;
+      }
+      toastSuccess(t("payments.deleted"));
+      await refresh();
+    } catch {
+      toastError(t("common.error"));
+    }
+  };
 
   const getExport = () => ({
     headers: [
@@ -315,16 +356,15 @@ export default function SupplierBalancesPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1">
-                          <button
-                            onClick={() => {
-                              setPaymentSupplier(supplier);
-                              setShowPaymentModal(true);
-                            }}
-                            className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
-                            title="تسجيل دفعة سداد"
-                          >
-                            <Wallet size={14} />تسجيل دفعة
-                          </button>
+                          {canRecordPayment && (
+                            <button
+                              onClick={() => openPaymentModal(supplier)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                              title={t("payments.recordTitle")}
+                            >
+                              <Wallet size={14} />{t("payments.recordTitle")}
+                            </button>
+                          )}
                           <button
                             onClick={() => setStatementId(supplier.id)}
                             className="inline-flex items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2.5 py-1.5 text-xs font-semibold text-sky-700 transition hover:bg-sky-100"
@@ -433,16 +473,22 @@ export default function SupplierBalancesPage() {
         </div>
       </div>
 
+      {showPaymentModal && (
       <RecordSupplierPaymentModal
+        key={`${paymentSupplier?.id ?? "none"}-${editingPayment?.id ?? "new"}`}
         open={showPaymentModal}
         onClose={() => {
           setShowPaymentModal(false);
           setPaymentSupplier(null);
+          setEditingPayment(null);
         }}
         supplier={paymentSupplier}
         companies={companies}
+        payment={editingPayment}
+        canDelete={canDeletePayment}
         onSuccess={refresh}
       />
+      )}
 
       {statementSupplier && (
         <SupplierStatementModal
@@ -454,13 +500,15 @@ export default function SupplierBalancesPage() {
           orders={orders}
           returns={returns}
           payments={payments}
-          onRecordPayment={(id) => {
+          onRecordPayment={canRecordPayment ? (id) => {
             const s = suppliers.find((x) => x.id === id);
-            if (s) {
-              setPaymentSupplier(s);
-              setShowPaymentModal(true);
-            }
-          }}
+            if (s) openPaymentModal(s);
+          } : undefined}
+          onEditPayment={canEditPayment ? (payment) => {
+            const s = suppliers.find((x) => x.id === payment.supplierId);
+            if (s) openPaymentModal(s, payment);
+          } : undefined}
+          onDeletePayment={canDeletePayment ? handleDeletePayment : undefined}
         />
       )}
     </>

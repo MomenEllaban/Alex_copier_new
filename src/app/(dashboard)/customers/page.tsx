@@ -12,6 +12,7 @@ import ExportButton from "@/components/ExportButton";
 import ImportDialog from "@/components/ImportDialog";
 import PrinterLoader from "@/components/PrinterLoader";
 import { useConfirm, useToast } from "@/components/UIProvider";
+import { usePermissions } from "@/components/PermissionsProvider";
 import { useUrlParams, useSearchWithDefault } from "@/hooks/useUrlParams";
 import { apiErrorMessage } from "@/lib/api-client";
 import FormModal from "@/components/FormModal";
@@ -19,6 +20,7 @@ import SubmitButton from "@/components/SubmitButton";
 import RefreshButton from "@/components/RefreshButton";
 import { useAutoRefresh } from "@/hooks/useAutoRefresh";
 import { notifyDataChanged } from "@/lib/data-events";
+import { isCreditUsedNote } from "@/lib/customer-credit";
 
 interface CustomerLocation {
   id: string;
@@ -31,6 +33,15 @@ interface CustomerLocation {
 }
 
 interface Company { id: string; name: string; nameAr?: string | null; }
+
+interface CustomerPayment {
+  id: string;
+  amount: number;
+  paymentDate: string;
+  notes?: string | null;
+  companyId?: string | null;
+  company?: { id: string; name: string } | null;
+}
 
 interface Customer {
   id: string;
@@ -53,7 +64,7 @@ interface Customer {
   engineer?: { id: string; name: string } | null;
   notes?: string | null;
   locations: CustomerLocation[];
-  payments?: { id: string; amount: number; paymentDate: string; notes?: string | null; company?: { id: string; name: string } | null }[];
+  payments?: CustomerPayment[];
   createdAt: string;
   machines?: { id: string; serialNumber: string; manufacturer?: string | null; model?: string | null; currentStatus: string }[];
   serviceRequests?: { id: string; requestNumber: string; status: string; priority: string; createdAt: string; machine?: { serialNumber: string } | null }[];
@@ -94,6 +105,7 @@ const TYPE_LABELS: Record<string, string> = {
 export default function CustomersPage() {
   const { t, dir } = useI18n();
   const router = useRouter();
+  const { canAct } = usePermissions();
   const confirmAction = useConfirm();
   const { success: toastSuccess, error: toastError } = useToast();
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -121,6 +133,7 @@ export default function CustomersPage() {
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().slice(0, 10));
   const [paymentNotes, setPaymentNotes] = useState("");
   const [paymentCompanyId, setPaymentCompanyId] = useState("");
+  const [editingPayment, setEditingPayment] = useState<CustomerPayment | null>(null);
   const [savingPayment, setSavingPayment] = useState(false);
   const [savingLocation, setSavingLocation] = useState(false);
   const PAGE_SIZE = 10;
@@ -366,12 +379,25 @@ export default function CustomersPage() {
     await openDetails(selected.id);
   };
 
-  const openPaymentModal = (customer: Customer) => {
+  const canRecordPayment = canAct("customers", "add");
+  const canEditPayment = canAct("customers", "edit");
+  const canDeletePayment = canAct("customers", "delete");
+
+  const paymentDateInput = (value: string) => {
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return new Date().toISOString().slice(0, 10);
+    return `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(
+      parsed.getDate(),
+    ).padStart(2, "0")}`;
+  };
+
+  const openPaymentModal = (customer: Customer, payment?: CustomerPayment) => {
     setPaymentCustomer(customer);
-    setPaymentAmount("");
-    setPaymentDate(new Date().toISOString().slice(0, 10));
-    setPaymentNotes("");
-    setPaymentCompanyId("");
+    setEditingPayment(payment ?? null);
+    setPaymentAmount(payment ? String(payment.amount) : "");
+    setPaymentDate(payment ? paymentDateInput(payment.paymentDate) : new Date().toISOString().slice(0, 10));
+    setPaymentNotes(payment?.notes || "");
+    setPaymentCompanyId(payment?.companyId || "");
     setShowPaymentModal(true);
   };
 
@@ -416,20 +442,53 @@ export default function CustomersPage() {
     if (!amt || amt <= 0) { toastError("المبلغ يجب أن يكون أكبر من صفر"); return; }
     setSavingPayment(true);
     try {
-      const res = await fetch(`/api/customers/${paymentCustomer.id}/payments`, {
-        method: "POST",
+      const url = editingPayment
+        ? `/api/customers/${paymentCustomer.id}/payments/${editingPayment.id}`
+        : `/api/customers/${paymentCustomer.id}/payments`;
+      const res = await fetch(url, {
+        method: editingPayment ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount: amt, paymentDate, notes: paymentNotes || undefined, companyId: paymentCompanyId || undefined }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) { toastError(apiErrorMessage(data, t)); return; }
-      toastSuccess("تم تسجيل الدفعة بنجاح");
+      toastSuccess(editingPayment ? t("payments.updated") : t("payments.recorded"));
+      const customerId = paymentCustomer.id;
       setShowPaymentModal(false);
       setPaymentCustomer(null);
+      setEditingPayment(null);
       refresh();
+      if (selected?.id === customerId) await openDetails(customerId);
       notifyDataChanged(["customers", "payments", "sales", "companies", "notifications"]);
     } finally {
       setSavingPayment(false);
+    }
+  };
+
+  const handleDeletePayment = async (customer: Customer, payment: CustomerPayment) => {
+    const confirmed = await confirmAction({
+      title: t("payments.deleteTitle"),
+      message: t("payments.deleteCustomerConfirm"),
+      confirmLabel: t("common.delete"),
+    });
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`/api/customers/${customer.id}/payments/${payment.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) { toastError(apiErrorMessage(data, t)); return; }
+      toastSuccess(t("payments.deleted"));
+      if (editingPayment?.id === payment.id) {
+        setShowPaymentModal(false);
+        setEditingPayment(null);
+      }
+      refresh();
+      if (selected?.id === customer.id) await openDetails(customer.id);
+      notifyDataChanged(["customers", "payments", "sales", "companies", "notifications"]);
+    } catch {
+      toastError(t("common.error"));
     }
   };
 
@@ -606,9 +665,11 @@ export default function CustomersPage() {
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-bold text-amber-800">حساب العميل</h3>
                 <div className="flex gap-2">
-                  <button onClick={() => openPaymentModal(selected)} className="inline-flex items-center gap-1 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-green-700">
-                    تسجيل دفعة
-                  </button>
+                  {canRecordPayment && (
+                    <button onClick={() => openPaymentModal(selected)} className="inline-flex items-center gap-1 rounded-lg bg-green-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-green-700">
+                      {t("payments.recordTitle")}
+                    </button>
+                  )}
                   <button onClick={() => openStatement(selected)} className="inline-flex items-center gap-1 rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-sky-700" title={t("statement.openStatement")}>
                     {t("statement.openStatement")}
                   </button>
@@ -659,16 +720,50 @@ export default function CustomersPage() {
               )}
               {selected.payments && selected.payments.length > 0 && (
                 <div>
-                  <h4 className="text-xs font-semibold text-amber-700 mb-2">سجل الدفعات ({selected.payments.length})</h4>
+                  <h4 className="text-xs font-semibold text-amber-700 mb-2">{t("payments.history")} ({selected.payments.length})</h4>
                   <div className="max-h-40 overflow-y-auto space-y-1">
-                    {selected.payments.map((p) => (
-                      <div key={p.id} className="flex items-center justify-between rounded-lg bg-white px-3 py-2 text-xs border border-amber-100">
-                        <span className="text-gray-600">{date(p.paymentDate)}</span>
-                        <span className="font-bold text-green-700">+{p.amount.toLocaleString("ar-EG")} ج.م</span>
-                        {p.company && <span className="text-blue-600 truncate max-w-[100px]">{p.company.name}</span>}
-                        {p.notes && <span className="text-gray-400 truncate max-w-[120px]">{p.notes}</span>}
-                      </div>
-                    ))}
+                    {selected.payments.map((p) => {
+                      const locked = isCreditUsedNote(p.notes);
+                      return (
+                        <div key={p.id} className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-xs border border-amber-100">
+                          <span className="shrink-0 whitespace-nowrap text-gray-600">{date(p.paymentDate)}</span>
+                          <span className="shrink-0 whitespace-nowrap font-bold text-green-700">+{p.amount.toLocaleString("ar-EG")} ج.م</span>
+                          {p.company && <span className="hidden max-w-[100px] truncate text-blue-600 sm:inline">{p.company.name}</span>}
+                          {p.notes && <span className="min-w-0 flex-1 truncate text-gray-400" title={p.notes}>{p.notes}</span>}
+                          {locked && (
+                            <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500" title={t("payments.lockedHint")}>
+                              {t("payments.locked")}
+                            </span>
+                          )}
+                          {!locked && (canEditPayment || canDeletePayment) && (
+                            <div className="flex shrink-0 items-center gap-1">
+                              {canEditPayment && (
+                                <button
+                                  type="button"
+                                  onClick={() => openPaymentModal(selected, p)}
+                                  className="rounded-md border border-blue-200 bg-blue-50 p-1.5 text-blue-700 transition hover:bg-blue-100"
+                                  title={t("payments.edit")}
+                                  aria-label={t("payments.edit")}
+                                >
+                                  <Pencil size={13} />
+                                </button>
+                              )}
+                              {canDeletePayment && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeletePayment(selected, p)}
+                                  className="rounded-md border border-red-200 bg-red-50 p-1.5 text-red-600 transition hover:bg-red-100"
+                                  title={t("payments.delete")}
+                                  aria-label={t("payments.delete")}
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -895,9 +990,11 @@ export default function CustomersPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                        <button onClick={() => openPaymentModal(customer)} className="inline-flex items-center gap-1 rounded-lg border border-green-200 bg-green-50 px-2.5 py-1.5 text-xs font-medium text-green-700 transition hover:bg-green-100" title="تسجيل دفعة">
-                          دفع
-                        </button>
+                        {canRecordPayment && (
+                          <button onClick={() => openPaymentModal(customer)} className="inline-flex items-center gap-1 rounded-lg border border-green-200 bg-green-50 px-2.5 py-1.5 text-xs font-medium text-green-700 transition hover:bg-green-100" title={t("payments.recordTitle")}>
+                            {t("payments.recordTitle")}
+                          </button>
+                        )}
                         <button onClick={() => openTests(customer)} className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-xs font-medium text-violet-700 transition hover:bg-violet-100" title={t("copierTests.customerTestsSubtitle")}>
                           <Camera size={14} />{t("copierTests.title")}
                         </button>
@@ -938,8 +1035,17 @@ export default function CustomersPage() {
         onImported={refresh}
       />
 
-      <FormModal open={showPaymentModal} onClose={() => { setShowPaymentModal(false); setPaymentCustomer(null); }} title={`تسجيل دفعة — ${paymentCustomer?.name || ""}`}>
+      <FormModal
+        open={showPaymentModal}
+        onClose={() => { setShowPaymentModal(false); setPaymentCustomer(null); setEditingPayment(null); }}
+        title={editingPayment ? `${t("payments.editTitle")} — ${paymentCustomer?.name || ""}` : `${t("payments.recordTitle")} — ${paymentCustomer?.name || ""}`}
+      >
         <form onSubmit={handleRecordPayment} className="space-y-4">
+          {editingPayment && (
+            <p className="rounded-lg border border-blue-200 bg-blue-50 p-2.5 text-xs text-blue-700">
+              {t("payments.editHint")}
+            </p>
+          )}
           {paymentCustomer && paymentCustomer.totalDebt > 0 && (
             <div className="rounded-lg bg-gray-50 p-3 text-sm">
               <div className="flex justify-between"><span className="text-gray-500">الدين الكلي:</span><span className="font-medium">{paymentCustomer.totalDebt.toLocaleString("ar-EG")} ج.م</span></div>
@@ -965,7 +1071,8 @@ export default function CustomersPage() {
             <input type="number" min="0.01" step="0.01" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="0.00" required />
             {paymentCustomer && paymentAmount && (
               (() => {
-                const after = paymentCustomer.remainingDebt - parseFloat(paymentAmount || "0");
+                const remainingBefore = paymentCustomer.remainingDebt + (editingPayment ? Number(editingPayment.amount) || 0 : 0);
+                const after = remainingBefore - parseFloat(paymentAmount || "0");
                 if (after > 0) {
                   return <p className="text-xs text-gray-500">المتبقي بعد الدفع: {after.toLocaleString("ar-EG")} ج.م</p>;
                 }
@@ -989,9 +1096,23 @@ export default function CustomersPage() {
             <label className="block text-sm font-medium text-slate-700">ملاحظات</label>
             <input type="text" value={paymentNotes} onChange={(e) => setPaymentNotes(e.target.value)} className="w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="اختياري" />
           </div>
-          <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row sm:justify-end">
-            <button type="button" onClick={() => { setShowPaymentModal(false); setPaymentCustomer(null); }} className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">{t("common.cancel")}</button>
-            <SubmitButton loading={savingPayment} label="تسجيل الدفعة" loadingLabel={t("common.saving")} className="bg-green-600 hover:bg-green-700 text-white"><Save size={16} /></SubmitButton>
+          <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              {editingPayment && paymentCustomer && canDeletePayment && (
+                <button
+                  type="button"
+                  onClick={() => handleDeletePayment(paymentCustomer, editingPayment)}
+                  disabled={savingPayment}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-100 disabled:opacity-60"
+                >
+                  <Trash2 size={15} />{t("payments.delete")}
+                </button>
+              )}
+            </div>
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <button type="button" onClick={() => { setShowPaymentModal(false); setPaymentCustomer(null); setEditingPayment(null); }} className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50">{t("common.cancel")}</button>
+              <SubmitButton loading={savingPayment} label={editingPayment ? t("payments.saveEdit") : t("payments.recordTitle")} loadingLabel={editingPayment ? t("payments.updating") : t("common.saving")} className="bg-green-600 hover:bg-green-700 text-white"><Save size={16} /></SubmitButton>
+            </div>
           </div>
         </form>
       </FormModal>

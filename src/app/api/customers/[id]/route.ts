@@ -68,7 +68,10 @@ export async function GET(
         serviceRequests: true,
         machines: true,
         engineer: { select: { id: true, name: true } },
-        payments: { orderBy: { paymentDate: "desc" } },
+        payments: {
+          orderBy: { paymentDate: "desc" },
+          include: { company: { select: { id: true, name: true } } },
+        },
       },
     });
 

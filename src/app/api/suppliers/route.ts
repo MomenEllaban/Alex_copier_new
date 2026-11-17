@@ -26,7 +26,7 @@ export async function GET() {
           orderBy: { createdAt: "desc" },
         },
         payments: {
-          select: { id: true, supplierId: true, companyId: true, amount: true, paymentDate: true, paymentMethod: true, docNumber: true, notes: true, createdAt: true },
+          select: { id: true, supplierId: true, companyId: true, purchaseOrderId: true, amount: true, paymentDate: true, paymentMethod: true, docNumber: true, notes: true, createdAt: true },
           orderBy: { paymentDate: "desc" },
         },
       },

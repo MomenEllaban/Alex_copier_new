@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Save, Wallet, AlertCircle } from "lucide-react";
+import { useState } from "react";
+import { Save, Wallet, AlertCircle, Trash2, Link2 } from "lucide-react";
 import FormModal from "@/components/FormModal";
 import SubmitButton from "@/components/SubmitButton";
-import { useToast } from "@/components/UIProvider";
+import { useConfirm, useToast } from "@/components/UIProvider";
 import { useI18n } from "@/i18n/context";
 import { apiErrorMessage } from "@/lib/api-client";
 import { notifyDataChanged } from "@/lib/data-events";
+import type { SupplierPaymentLite } from "@/lib/supplier-statement";
 
 export interface SupplierForPayment {
   id: string;
@@ -25,6 +26,9 @@ interface Props {
   supplier: SupplierForPayment | null;
   companies: Array<{ id: string; name: string }>;
   onSuccess: () => void;
+  /** When provided the modal edits/deletes this payment instead of creating one. */
+  payment?: SupplierPaymentLite | null;
+  canDelete?: boolean;
 }
 
 const PAYMENT_METHODS = [
@@ -35,42 +39,49 @@ const PAYMENT_METHODS = [
   { value: "أخرى", label: "أخرى" },
 ];
 
+function toDateInput(value: string | Date): string {
+  const d = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(d.getTime())) return new Date().toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
+}
+
 export default function RecordSupplierPaymentModal({
   open,
   onClose,
   supplier,
   companies,
   onSuccess,
+  payment,
+  canDelete = true,
 }: Props) {
   const { t } = useI18n();
   const { success: toastSuccess, error: toastError } = useToast();
+  const confirmAction = useConfirm();
 
-  const [amount, setAmount] = useState("");
-  const [paymentDate, setPaymentDate] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("كاش");
-  const [docNumber, setDocNumber] = useState("");
-  const [notes, setNotes] = useState("");
-  const [companyId, setCompanyId] = useState("");
+  const [amount, setAmount] = useState(() => (payment ? String(payment.amount) : ""));
+  const [paymentDate, setPaymentDate] = useState(() =>
+    payment ? toDateInput(payment.paymentDate) : new Date().toISOString().slice(0, 10),
+  );
+  const [paymentMethod, setPaymentMethod] = useState(() => payment?.paymentMethod || "كاش");
+  const [docNumber, setDocNumber] = useState(() => payment?.docNumber || "");
+  const [notes, setNotes] = useState(() => payment?.notes || "");
+  const [companyId, setCompanyId] = useState(() =>
+    payment
+      ? payment.companyId || ""
+      : supplier?.companyId || companies[0]?.id || "",
+  );
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [formError, setFormError] = useState("");
-
-  useEffect(() => {
-    if (open && supplier) {
-      setAmount("");
-      setPaymentDate(new Date().toISOString().slice(0, 10));
-      setPaymentMethod("كاش");
-      setDocNumber("");
-      setNotes("");
-      setCompanyId(supplier.companyId || (companies[0]?.id || ""));
-      setFormError("");
-    }
-  }, [open, supplier, companies]);
 
   if (!open || !supplier) return null;
 
   const currentBalance = supplier.balance ?? 0;
   const numAmount = parseFloat(amount || "0");
-  const newBalance = currentBalance - (isNaN(numAmount) ? 0 : numAmount);
+  const balanceBeforeThisPayment = currentBalance + (payment ? Number(payment.amount) || 0 : 0);
+  const newBalance = balanceBeforeThisPayment - (isNaN(numAmount) ? 0 : numAmount);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,8 +96,11 @@ export default function RecordSupplierPaymentModal({
 
     setSaving(true);
     try {
-      const res = await fetch(`/api/suppliers/${supplier.id}/payments`, {
-        method: "POST",
+      const url = payment
+        ? `/api/suppliers/${supplier.id}/payments/${payment.id}`
+        : `/api/suppliers/${supplier.id}/payments`;
+      const res = await fetch(url, {
+        method: payment ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           amount: numAmount,
@@ -106,7 +120,11 @@ export default function RecordSupplierPaymentModal({
         return;
       }
 
-      toastSuccess(`تم تسجيل دفعة بقيمة ${numAmount.toLocaleString("ar-EG")} ج.م للمورد ${supplier.name} بنجاح`);
+      toastSuccess(
+        payment
+          ? t("payments.updated")
+          : `تم تسجيل دفعة بقيمة ${numAmount.toLocaleString("ar-EG")} ج.م للمورد ${supplier.name} بنجاح`,
+      );
       notifyDataChanged(["suppliers", "purchases", "payments"]);
       onSuccess();
       onClose();
@@ -119,11 +137,47 @@ export default function RecordSupplierPaymentModal({
     }
   };
 
+  const handleDelete = async () => {
+    if (!payment) return;
+    const confirmed = await confirmAction({
+      title: t("payments.deleteTitle"),
+      message: t(
+        payment.purchaseOrderId ? "payments.deleteLinkedConfirm" : "payments.deleteConfirm",
+      ),
+      confirmLabel: t("common.delete"),
+    });
+    if (!confirmed) return;
+
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/suppliers/${supplier.id}/payments/${payment.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        toastError(apiErrorMessage(data, t));
+        return;
+      }
+      toastSuccess(t("payments.deleted"));
+      notifyDataChanged(["suppliers", "purchases", "payments"]);
+      onSuccess();
+      onClose();
+    } catch {
+      toastError(t("common.error"));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <FormModal
       open={open}
       onClose={onClose}
-      title={`تسجيل دفعة سداد للمورد — ${supplier.name}`}
+      title={
+        payment
+          ? `${t("payments.editTitle")} — ${supplier.name}`
+          : `تسجيل دفعة مستلمة للمورد — ${supplier.name}`
+      }
     >
       <form onSubmit={handleSubmit} className="space-y-4 text-xs sm:text-sm">
         {/* Balance Preview Header Card */}
@@ -168,6 +222,16 @@ export default function RecordSupplierPaymentModal({
           )}
         </div>
 
+        {payment?.purchaseOrderId && (
+          <div className="flex items-start gap-2 rounded-lg border border-sky-200 bg-sky-50 p-2.5 text-xs text-sky-800">
+            <Link2 size={15} className="mt-0.5 shrink-0" />
+            <span>
+              {t("payments.linkedInvoice")}: <span className="font-mono">{payment.purchaseOrderId.slice(0, 8)}</span>
+              <span className="mt-1 block text-[11px] text-sky-700">{t("payments.linkedInvoiceHint")}</span>
+            </span>
+          </div>
+        )}
+
         {formError && (
           <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-700">
             <AlertCircle size={15} className="shrink-0" />
@@ -206,6 +270,9 @@ export default function RecordSupplierPaymentModal({
                   {m.label}
                 </option>
               ))}
+              {paymentMethod && !PAYMENT_METHODS.some((m) => m.value === paymentMethod) && (
+                <option value={paymentMethod}>{paymentMethod}</option>
+              )}
             </select>
           </div>
         </div>
@@ -267,23 +334,38 @@ export default function RecordSupplierPaymentModal({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-col-reverse gap-2.5 pt-3 sm:flex-row sm:justify-end border-t border-gray-200">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={saving}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
-          >
-            {t("common.cancel")}
-          </button>
-          <SubmitButton
-            loading={saving}
-            label="تأكيد وتسجيل الدفعة"
-            loadingLabel="جاري التسجيل..."
-            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
-          >
-            <Save size={16} />
-          </SubmitButton>
+        <div className="flex flex-col-reverse gap-2.5 pt-3 sm:flex-row sm:items-center sm:justify-between border-t border-gray-200">
+          <div>
+            {payment && canDelete && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={saving || deleting}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3.5 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100 disabled:opacity-60"
+              >
+                <Trash2 size={15} />
+                {t("payments.delete")}
+              </button>
+            )}
+          </div>
+          <div className="flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving || deleting}
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+            >
+              {t("common.cancel")}
+            </button>
+            <SubmitButton
+              loading={saving || deleting}
+              label={payment ? t("payments.saveEdit") : "تأكيد وتسجيل الدفعة"}
+              loadingLabel={t("payments.updating")}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+            >
+              <Save size={16} />
+            </SubmitButton>
+          </div>
         </div>
       </form>
     </FormModal>

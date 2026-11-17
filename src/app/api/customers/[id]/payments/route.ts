@@ -2,6 +2,26 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
 import { getEffectiveTotal, recalculatePaymentStatus } from "@/lib/payment-status";
+import { ownEngineerId } from "@/lib/engineer-scope";
+
+async function denyForeignCustomer(
+  actor: { id?: string; role?: string } | null,
+  customerId: string,
+) {
+  if ((actor as { role?: string })?.role !== "ENGINEER") return null;
+  const mine = await ownEngineerId((actor as { id?: string })?.id);
+  const customer = await prisma.customer.findUnique({
+    where: { id: customerId },
+    select: { engineerId: true },
+  });
+  if (!mine || customer?.engineerId !== mine) {
+    return NextResponse.json(
+      { error: "هذا العميل غير مسند إليك", code: "CUSTOMER_NOT_ASSIGNED" },
+      { status: 403 },
+    );
+  }
+  return null;
+}
 
 export async function GET(
   request: Request,
@@ -17,6 +37,8 @@ export async function GET(
       );
     }
     const { id } = await params;
+    const denied = await denyForeignCustomer(user, id);
+    if (denied) return denied;
     const payments = await prisma.customerPayment.findMany({
       where: { customerId: id },
       orderBy: { paymentDate: "desc" },
@@ -93,6 +115,8 @@ export async function POST(
       );
     }
     const { id } = await params;
+    const denied = await denyForeignCustomer(actor, id);
+    if (denied) return denied;
     const body = await request.json();
     const { amount, paymentDate, notes, companyId } = body;
 
