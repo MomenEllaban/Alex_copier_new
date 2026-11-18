@@ -640,6 +640,7 @@ model Product {
   sparePartCompatibilities SparePartCompatibility[] @relation("SparePartCompat")
   compatibleMachines       SparePartCompatibility[] @relation("CompatibleMachine")
   machineReplacement       MachineReplacement[]
+  tradeInReturns           TradeInItem[]        @relation("TradeInReturns")
 
   // SKU is unique per company, not globally: two companies may legitimately
   // both stock "A4 toner". The import already rejects a duplicate name within a
@@ -1014,8 +1015,29 @@ model SalesOrder {
   engineer      Engineer?           @relation(fields: [engineerId], references: [id])
   salesCategory SalesCategory?      @relation(fields: [categoryId], references: [id])
   items         SalesOrderItem[]
+  tradeInItems  TradeInItem[]
   installments  Installment[]
   returns       ReturnTransaction[]
+}
+
+/// An item the customer handed over in a trade-in invoice.
+/// Kept on the order (not on a received line) so N returned items can be
+/// exchanged for N received items without an artificial 1:1 pairing.
+model TradeInItem {
+  id            String   @id @default(cuid())
+  salesOrderId  String
+  productId     String
+  quantity      Int      @default(1)
+  unitValue     Float
+  condition     String?
+  serialNumber  String?
+  notes         String?
+  createdAt     DateTime @default(now())
+
+  salesOrder SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  product    Product    @relation("TradeInReturns", fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([salesOrderId])
 }
 
 model SalesOrderItem {

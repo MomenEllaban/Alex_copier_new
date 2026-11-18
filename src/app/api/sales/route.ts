@@ -13,6 +13,13 @@ import {
   deductStockForSale,
 } from "@/lib/stock-movement-helper";
 import { getInventoryPolicy } from "@/lib/services/inventory/inventory-settings-service";
+import {
+  TradeInValidationError,
+  createTradeInItems,
+  legacyTradeIns,
+  parseTradeIns,
+  tradeInCreditTotal,
+} from "@/lib/trade-in-items";
 
 export async function GET() {
   try {
@@ -35,6 +42,7 @@ export async function GET() {
           items: {
             include: { product: true, tradeInProduct: true },
           },
+          tradeInItems: { include: { product: true } },
           installments: true,
         },
         orderBy: { createdAt: "desc" },
@@ -69,7 +77,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: authed ? "Forbidden" : "Unauthorized", code: authed ? "FORBIDDEN" : "UNAUTHORIZED" }, { status: authed ? 403 : 401 });
     }
     const body = await request.json();
-    const { items, installments, ...raw } = body;
+    const { items, installments, tradeIns: rawTradeIns, ...raw } = body;
 
     if (!raw.companyId || !raw.customerId || !raw.orderType || !raw.paymentMethod || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: "بيانات البيع غير مكتملة (عميل وشركة وطريقة دفع وبند واحد على الأقل)", code: "SALE_FIELDS_REQUIRED" }, { status: 400 });
@@ -106,13 +114,24 @@ export async function POST(request: Request) {
     const taxable = subtotal - orderDiscount;
     const total = Math.round((taxable + taxable * Math.max(0, resolvedTaxRate) / 100) * 100) / 100;
 
+    // Returned items are order-level lines, so many of them can be exchanged
+    // for many received lines. Older invoices sent one `tradeIn` per line —
+    // still accepted as a one-unit fallback.
+    let tradeIns;
+    try {
+      tradeIns = parseTradeIns(rawTradeIns);
+      if (tradeIns.length === 0) {
+        tradeIns = legacyTradeIns(items as Array<{ tradeIn?: { name?: string; brand?: string; condition?: string; value?: number; serialNumber?: string } }>);
+      }
+    } catch (error) {
+      if (error instanceof TradeInValidationError) {
+        return NextResponse.json({ error: error.message, code: error.code }, { status: 400 });
+      }
+      throw error;
+    }
     // Trade-in value (قيمة الاستبدال) is customer coverage toward the invoice:
     // it reduces what the customer still owes, exactly like cash.
-    const tradeInVal = items.reduce(
-      (sum: number, item: { tradeIn?: { value?: number } }) =>
-        sum + Math.max(0, Number(item.tradeIn?.value) || 0),
-      0
-    );
+    const tradeInVal = tradeInCreditTotal(tradeIns);
 
     const [company, customer] = await Promise.all([
       prisma.company.findUnique({ where: { id: companyId }, select: { id: true } }),
@@ -235,60 +254,23 @@ export async function POST(request: Request) {
         });
       }
 
-      let tradeInTotal = 0;
+      // Returned items are order-level lines: N returned items can be swapped
+      // for N received lines without pairing them one by one.
+      const tradeInTotal = await createTradeInItems({
+        tx,
+        orderId: order.id,
+        companyId,
+        warehouseId: warehouse.id,
+        orderType,
+        items: tradeIns,
+      });
 
       for (const item of items as {
         productId: string;
         quantity: number;
         unitPrice: number;
         discount?: number;
-        tradeIn?: {
-          name: string;
-          brand?: string;
-          condition?: string;
-          value: number;
-          serialNumber?: string;
-        };
       }[]) {
-        let tradeInProductId: string | undefined;
-
-        if (item.tradeIn && item.tradeIn.value > 0) {
-          const tradeInProduct = await tx.product.create({
-            data: {
-              name: item.tradeIn.name,
-              productType: orderType === "MACHINE_SALE" ? "MACHINE" : "SPARE_PART",
-              companyId,
-              isTradeIn: true,
-              tradeInValue: item.tradeIn.value,
-              brand: item.tradeIn.brand || null,
-              condition: item.tradeIn.condition || null,
-              description: item.tradeIn.serialNumber ? `S/N: ${item.tradeIn.serialNumber}` : null,
-            },
-          });
-          tradeInProductId = tradeInProduct.id;
-          tradeInTotal += item.tradeIn.value;
-
-          if (warehouse) {
-            await tx.warehouseInventory.create({
-              data: {
-                warehouseId: warehouse.id,
-                productId: tradeInProduct.id,
-                quantity: 1,
-              },
-            });
-            await tx.stockMovement.create({
-              data: {
-                warehouseId: warehouse.id,
-                productId: tradeInProduct.id,
-                quantity: 1,
-                movementType: "PURCHASE_IN",
-                referenceId: order.id,
-                notes: `منتج استبدال — ${item.tradeIn.name}`,
-              },
-            });
-          }
-        }
-
         await tx.salesOrderItem.create({
           data: {
             salesOrderId: order.id,
@@ -296,8 +278,6 @@ export async function POST(request: Request) {
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             discount: Math.min(item.discount ?? 0, item.quantity * item.unitPrice),
-            tradeInProductId: tradeInProductId || null,
-            tradeInValue: item.tradeIn?.value || 0,
           },
         });
 
@@ -358,6 +338,7 @@ export async function POST(request: Request) {
           company: true,
           engineer: true,
           items: { include: { product: true, tradeInProduct: true } },
+          tradeInItems: { include: { product: true } },
           installments: true,
         },
       });

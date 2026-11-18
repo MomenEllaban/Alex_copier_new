@@ -13,6 +13,14 @@ import {
   deductStockForSale,
 } from "@/lib/stock-movement-helper";
 import { getInventoryPolicy } from "@/lib/services/inventory/inventory-settings-service";
+import {
+  TradeInValidationError,
+  createTradeInItems,
+  legacyTradeIns,
+  parseTradeIns,
+  removeTradeInItems,
+  tradeInCreditTotal,
+} from "@/lib/trade-in-items";
 
 export async function GET(
   request: Request,
@@ -37,6 +45,7 @@ export async function GET(
         items: {
           include: { product: true, tradeInProduct: true },
         },
+        tradeInItems: { include: { product: true } },
         installments: true,
       },
     });
@@ -63,7 +72,7 @@ export async function PUT(
     }
     const { id } = await params;
     const body = await request.json();
-    const { items, installments, ...raw } = body;
+    const { items, installments, tradeIns: rawTradeIns, ...raw } = body;
 
     if (!raw.companyId || !raw.customerId || !raw.orderType || !raw.paymentMethod || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ error: "بيانات البيع غير مكتملة", code: "SALE_FIELDS_REQUIRED" }, { status: 400 });
@@ -85,6 +94,7 @@ export async function PUT(
         tradeInTotal: true,
         orderDate: true,
         items: { include: { tradeInProduct: true } },
+        tradeInItems: { select: { productId: true } },
         installments: { select: { id: true } },
         returns: { select: { status: true } },
       },
@@ -145,12 +155,22 @@ export async function PUT(
     const taxable = subtotal - orderDiscount;
     const total = Math.round((taxable + taxable * Math.max(0, resolvedTaxRate) / 100) * 100) / 100;
 
+    // Returned items on an edited invoice: order-level lines first, legacy
+    // per-line `tradeIn` only as a fallback for old invoices.
+    let tradeIns;
+    try {
+      tradeIns = parseTradeIns(rawTradeIns);
+      if (tradeIns.length === 0) {
+        tradeIns = legacyTradeIns(items as Array<{ tradeIn?: { name?: string; brand?: string; condition?: string; value?: number; serialNumber?: string } }>);
+      }
+    } catch (error) {
+      if (error instanceof TradeInValidationError) {
+        return NextResponse.json({ error: error.message, code: error.code }, { status: 400 });
+      }
+      throw error;
+    }
     // Trade-in value (قيمة الاستبدال) is customer coverage toward the invoice.
-    const tradeInVal = items.reduce(
-      (sum: number, item: { tradeIn?: { value?: number } }) =>
-        sum + Math.max(0, Number(item.tradeIn?.value) || 0),
-      0
-    );
+    const tradeInVal = tradeInCreditTotal(tradeIns);
 
     // Original debt contribution of this order (to be reversed) — matches the
     // POST forward logic. Unpaid portion adds debt; creditUsed consumed some of
@@ -206,14 +226,12 @@ export async function PUT(
       }
       await tx.stockMovement.deleteMany({ where: { referenceId: id } });
 
-      // 2) Remove original line items + trade-in products
-      const oldTradeInProductIds = existing.items
+      // 2) Remove original line items + every returned-item product
+      const legacyTradeInProductIds = existing.items
         .map((it) => it.tradeInProductId)
         .filter((pid): pid is string => Boolean(pid));
       await tx.salesOrderItem.deleteMany({ where: { salesOrderId: id } });
-      if (oldTradeInProductIds.length > 0) {
-        await tx.product.deleteMany({ where: { id: { in: oldTradeInProductIds } } });
-      }
+      await removeTradeInItems(tx, id, legacyTradeInProductIds);
       // 3) Remove installments (will be recreated if provided)
       if (existing.installments.length > 0) {
         await tx.installment.deleteMany({ where: { salesOrderId: id } });
@@ -349,47 +367,22 @@ export async function PUT(
         });
       }
 
-      // 8) Create new items + trade-in
-      let tradeInTotal = 0;
+      // 8) Create new items + all returned items
+      const tradeInTotal = await createTradeInItems({
+        tx,
+        orderId: id,
+        companyId,
+        warehouseId: warehouse.id,
+        orderType,
+        items: tradeIns,
+      });
+
       for (const item of items as {
         productId: string;
         quantity: number;
         unitPrice: number;
         discount?: number;
-        tradeIn?: { name: string; brand?: string; condition?: string; value: number; serialNumber?: string };
       }[]) {
-        let tradeInProductId: string | undefined;
-        if (item.tradeIn && item.tradeIn.value > 0) {
-          const tradeInProduct = await tx.product.create({
-            data: {
-              name: item.tradeIn.name,
-              productType: orderType === "MACHINE_SALE" ? "MACHINE" : "SPARE_PART",
-              companyId,
-              isTradeIn: true,
-              tradeInValue: item.tradeIn.value,
-              brand: item.tradeIn.brand || null,
-              condition: item.tradeIn.condition || null,
-              description: item.tradeIn.serialNumber ? `S/N: ${item.tradeIn.serialNumber}` : null,
-            },
-          });
-          tradeInProductId = tradeInProduct.id;
-          tradeInTotal += item.tradeIn.value;
-          if (warehouse) {
-            await tx.warehouseInventory.create({
-              data: { warehouseId: warehouse.id, productId: tradeInProduct.id, quantity: 1 },
-            });
-            await tx.stockMovement.create({
-              data: {
-                warehouseId: warehouse.id,
-                productId: tradeInProduct.id,
-                quantity: 1,
-                movementType: "PURCHASE_IN",
-                referenceId: id,
-                notes: `منتج استبدال — ${item.tradeIn.name}`,
-              },
-            });
-          }
-        }
         await tx.salesOrderItem.create({
           data: {
             salesOrderId: id,
@@ -397,8 +390,6 @@ export async function PUT(
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             discount: Math.min(item.discount ?? 0, item.quantity * item.unitPrice),
-            tradeInProductId: tradeInProductId || null,
-            tradeInValue: item.tradeIn?.value || 0,
           },
         });
         if (warehouse) {
@@ -428,6 +419,7 @@ export async function PUT(
           company: true,
           engineer: true,
           items: { include: { product: true, tradeInProduct: true } },
+          tradeInItems: { include: { product: true } },
           installments: true,
         },
       });
@@ -484,6 +476,7 @@ export async function DELETE(
         creditUsed: true,
         tradeInTotal: true,
         items: { select: { id: true, tradeInProductId: true } },
+        tradeInItems: { select: { productId: true } },
         installments: { select: { id: true } },
         returns: { select: { id: true, status: true } },
       },
@@ -537,15 +530,9 @@ export async function DELETE(
         where: { customerId: existing.customerId, notes: { contains: existing.id } },
       });
 
-      // Clean up trade-in products created for this order before deleting it.
-      const tradeInProductIds = existing.items
-        .map((it) => it.tradeInProductId)
-        .filter((pid): pid is string => Boolean(pid));
-      if (tradeInProductIds.length > 0) {
-        await tx.product.deleteMany({ where: { id: { in: tradeInProductIds } } });
-      }
-
-      // Reverse stock movements for this order
+      // Reverse stock movements for this order FIRST. Trade-in products must
+      // not be deleted before this: deleting a Product cascades its movements
+      // away, which would silently skip the PURCHASE_IN reversal.
       const stockMovements = await tx.stockMovement.findMany({
         where: { referenceId: id },
       });
@@ -579,6 +566,13 @@ export async function DELETE(
 
       // Delete stock movements
       await tx.stockMovement.deleteMany({ where: { referenceId: id } });
+
+      // Now safe to delete the returned-item products and their order-level rows.
+      await removeTradeInItems(
+        tx,
+        id,
+        existing.items.map((it) => it.tradeInProductId).filter((pid): pid is string => Boolean(pid))
+      );
 
       // Delete the order (cascades to items, installments, returns via Prisma)
       await tx.salesOrder.delete({ where: { id } });

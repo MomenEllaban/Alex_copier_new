@@ -42,7 +42,8 @@ export async function GET(request: Request) {
           company: true,
           customer: true,
           engineer: true,
-          items: { include: { product: true } },
+          items: { include: { product: true, tradeInProduct: true } },
+          tradeInItems: { include: { product: true } },
         },
       });
       if (!order) {
@@ -63,8 +64,16 @@ export async function GET(request: Request) {
         : Math.min(order.discount, subtotal);
       const taxAmount = order.taxRate > 0 ? ((subtotal - discountAmount) * order.taxRate) / 100 : 0;
 
-      const hasTradeIn = order.tradeInTotal > 0 || order.items.some((it) => it.tradeInProductId);
-      const subType = order.orderType === "SPARE_PART_SALE" ? "SPARE_PART_SALE" : hasTradeIn ? "TRADE_IN" : "MACHINE_SALE";
+      const hasTradeIn = order.tradeInTotal > 0 || order.tradeInItems.length > 0 || order.items.some((it) => it.tradeInProductId);
+      const subType = hasTradeIn ? "TRADE_IN" : order.orderType === "SPARE_PART_SALE" ? "SPARE_PART_SALE" : "MACHINE_SALE";
+
+      // Show every item the customer handed over on the printed invoice.
+      const tradeInLines = order.tradeInItems.map((line) =>
+        `${line.product?.name || "صنف مستبدل"} × ${line.quantity} — ${(line.quantity * line.unitValue).toLocaleString("ar-EG")} ج.م`
+      );
+      for (const legacy of order.items.filter((it) => it.tradeInProduct)) {
+        tradeInLines.push(`${legacy.tradeInProduct!.name} × 1 — ${Number(legacy.tradeInValue || 0).toLocaleString("ar-EG")} ج.م`);
+      }
 
       // T1/T2/T3: payment split, customer account, source warehouse
       const paidAmount = Number(order.paidAmount) || 0;
@@ -113,6 +122,9 @@ export async function GET(request: Request) {
           : undefined,
         invoiceAddedDebt: order.paymentMethod === "CASH" ? 0 : dueAmount,
         notes: order.notes || undefined,
+        extraFields: tradeInLines.length > 0
+          ? tradeInLines.map((value, index) => ({ label: `صنف مستبدل ${index + 1}`, value }))
+          : undefined,
       };
     } else if (type === "purchase") {
       const order = await prisma.purchaseOrder.findUnique({

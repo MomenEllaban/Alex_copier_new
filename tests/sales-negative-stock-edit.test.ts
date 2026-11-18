@@ -98,6 +98,7 @@ function buildTx(work: { inventory: Row[]; movements: Movement[] }) {
       delete: async () => ({ id: ORDER }),
     },
     salesOrderItem: { deleteMany: async () => ({ count: 0 }), create: async () => ({}) },
+    tradeInItem: { findMany: async () => [], deleteMany: async () => ({ count: 0 }), create: async ({ data }: any) => data },
     installment: { deleteMany: async () => ({ count: 0 }) },
     customer: { findUnique: async () => ({ totalDebt: 0, remainingDebt: 0, id: CUSTOMER }), update: async () => ({}) },
     customerLedger: { upsert: async () => ({}) },
