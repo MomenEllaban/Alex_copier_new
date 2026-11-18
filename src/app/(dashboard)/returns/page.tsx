@@ -5,6 +5,7 @@ import { AddFormBoundary, useAutoAddForm } from "@/hooks/useAutoAddForm";
 import { Plus, RotateCcw, Trash2, Pencil, Eye, Save, Undo2, BadgeCheck, Ban } from "lucide-react";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
+import CompanyTabs from "@/components/CompanyTabs";
 import FormModal from "@/components/FormModal";
 import SearchableSelect from "@/components/SearchableSelect";
 import PrintMenu from "@/components/PrintMenu";
@@ -396,6 +397,12 @@ export default function ReturnsPage() {
         ]}
       />
 
+      <CompanyTabs
+        companies={companies}
+        value={companyFilter}
+        onChange={(v) => { setCompanyFilter(v); setPage(1); }}
+      />
+
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-200 p-4 lg:flex-row lg:items-center lg:flex-wrap">
           <div className="w-full lg:flex-1 lg:max-w-80">
@@ -410,13 +417,6 @@ export default function ReturnsPage() {
                 { value: "PURCHASE_RETURN", label: RETURN_TYPE_LABELS.PURCHASE_RETURN },
               ]}
               allLabel={`${t("returns.typeFilter")} — ${t("common.all")}`}
-              className="lg:w-56"
-            />
-            <FilterSelect
-              value={companyFilter}
-              onChange={(v) => { setCompanyFilter(v); setPage(1); }}
-              options={companies.map((c) => ({ value: c.id, label: c.nameAr || c.name }))}
-              allLabel={`${t("common.company")} — ${t("common.all")}`}
               className="lg:w-56"
             />
             <RefreshButton onRefresh={refresh} refreshing={refreshing} />

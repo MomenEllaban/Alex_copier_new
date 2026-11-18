@@ -247,8 +247,8 @@ export async function calculatePayrollRun(options: CalculatePayrollOptions) {
     }
 
     // Social Insurance - disabled: do not deduct from employees
-    let employeeInsuranceAmount = 0;
-    let companyInsuranceAmount = 0;
+    const employeeInsuranceAmount = 0;
+    const companyInsuranceAmount = 0;
 
     // Gross salary
     const grossSalary = Math.round((basicSalary + allowancesAmount + overtimeAmount + bonusesAmount) * 100) / 100;

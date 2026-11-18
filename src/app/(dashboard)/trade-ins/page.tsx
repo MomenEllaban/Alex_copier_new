@@ -5,6 +5,7 @@ import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
+import CompanyTabs from "@/components/CompanyTabs";
 import ExportButton from "@/components/ExportButton";
 import PrinterLoader from "@/components/PrinterLoader";
 import { AddFormBoundary } from "@/hooks/useAutoAddForm";
@@ -277,6 +278,13 @@ export default function TradeInsPage() {
         {t("tradeIns.companyRoutingHint")}
       </p>
 
+      {/* Company tabs */}
+      <CompanyTabs
+        companies={companies}
+        value={companyFilter}
+        onChange={(v) => { setCompanyFilter(v); setPage(1); }}
+      />
+
       {/* Table */}
       <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-200 p-4 md:flex-row md:items-center md:flex-wrap">
@@ -287,13 +295,6 @@ export default function TradeInsPage() {
               placeholder={t("tradeIns.searchPlaceholder")}
             />
           </div>
-          <FilterSelect
-            value={companyFilter}
-            onChange={(v) => { setCompanyFilter(v); setPage(1); }}
-            options={companies.map((c) => ({ value: c.id, label: c.nameAr || c.name }))}
-            allLabel={`${t("tradeIns.holdingCompany")} — ${t("common.all")}`}
-            className="w-full md:w-52"
-          />
           <FilterSelect
             value={conditionFilter}
             onChange={(v) => { setConditionFilter(v); setPage(1); }}

@@ -79,7 +79,44 @@ interface ProductFormModalProps {
     pricingTiers?: Record<string, number | null> | null;
     description?: string | null;
   } | null;
+  // The response shape comes from the products API and is consumed directly by
+  // each caller's own product/option list.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onSuccess: (product: any) => void;
+}
+
+/** Form values are derived once per mount; callers remount via `key` on open. */
+function buildInitialForm(
+  editingProduct: ProductFormModalProps["editingProduct"],
+  initialCompanyId: string | undefined,
+  companies: CompanyOption[]
+): ProductFormData {
+  if (!editingProduct) {
+    return {
+      ...emptyProductForm,
+      companyId: initialCompanyId || (companies[0]?.id ?? ""),
+      pricingTiers: { ...emptyPricingTiers },
+    };
+  }
+  return {
+    id: editingProduct.id,
+    name: editingProduct.name,
+    productType: editingProduct.productType,
+    companyId: editingProduct.companyId,
+    sku: editingProduct.sku || "",
+    egsCode: editingProduct.egsCode || "",
+    purchasePrice: editingProduct.purchasePrice != null ? String(editingProduct.purchasePrice) : "",
+    quantity: "",
+    pricingTiers: {
+      legacyCustomer: editingProduct.pricingTiers?.legacyCustomer != null ? String(editingProduct.pricingTiers.legacyCustomer) : "",
+      newCustomer: editingProduct.pricingTiers?.newCustomer != null ? String(editingProduct.pricingTiers.newCustomer) : "",
+      jumlaMachines: editingProduct.pricingTiers?.jumlaMachines != null ? String(editingProduct.pricingTiers.jumlaMachines) : "",
+      jumlaParts: editingProduct.pricingTiers?.jumlaParts != null ? String(editingProduct.pricingTiers.jumlaParts) : "",
+      sectori: editingProduct.pricingTiers?.sectori != null ? String(editingProduct.pricingTiers.sectori) : "",
+      engineer: editingProduct.pricingTiers?.engineer != null ? String(editingProduct.pricingTiers.engineer) : "",
+    },
+    description: editingProduct.description || "",
+  };
 }
 
 export default function ProductFormModal({
@@ -91,41 +128,11 @@ export default function ProductFormModal({
   onSuccess,
 }: ProductFormModalProps) {
   const { t } = useI18n();
-  const [form, setForm] = useState<ProductFormData>(emptyProductForm);
+  const [form, setForm] = useState<ProductFormData>(() =>
+    buildInitialForm(editingProduct, initialCompanyId, companies)
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (!open) return;
-    if (editingProduct) {
-      setForm({
-        id: editingProduct.id,
-        name: editingProduct.name,
-        productType: editingProduct.productType,
-        companyId: editingProduct.companyId,
-        sku: editingProduct.sku || "",
-        egsCode: editingProduct.egsCode || "",
-        purchasePrice: editingProduct.purchasePrice != null ? String(editingProduct.purchasePrice) : "",
-        quantity: "",
-        pricingTiers: {
-          legacyCustomer: editingProduct.pricingTiers?.legacyCustomer != null ? String(editingProduct.pricingTiers.legacyCustomer) : "",
-          newCustomer: editingProduct.pricingTiers?.newCustomer != null ? String(editingProduct.pricingTiers.newCustomer) : "",
-          jumlaMachines: editingProduct.pricingTiers?.jumlaMachines != null ? String(editingProduct.pricingTiers.jumlaMachines) : "",
-          jumlaParts: editingProduct.pricingTiers?.jumlaParts != null ? String(editingProduct.pricingTiers.jumlaParts) : "",
-          sectori: editingProduct.pricingTiers?.sectori != null ? String(editingProduct.pricingTiers.sectori) : "",
-          engineer: editingProduct.pricingTiers?.engineer != null ? String(editingProduct.pricingTiers.engineer) : "",
-        },
-        description: editingProduct.description || "",
-      });
-    } else {
-      setForm({
-        ...emptyProductForm,
-        companyId: initialCompanyId || (companies[0]?.id ?? ""),
-        pricingTiers: { ...emptyPricingTiers },
-      });
-    }
-    setError("");
-  }, [open, editingProduct, initialCompanyId, companies]);
 
   // Handle escape key
   useEffect(() => {

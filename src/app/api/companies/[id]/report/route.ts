@@ -217,9 +217,9 @@ export async function GET(
     const totalPurchasesCount = payablePurchases.length;
     // Cash paid out for purchases: actual paid amount (cash purchases / partial upfront payments).
     const cashForPurchases = payablePurchases.reduce((sum, o) => {
-      const paid = (o as any).paidAmount;
+      const paid = o.paidAmount;
       if (typeof paid === "number") return sum + Math.max(0, Math.min(paid, o.total || 0));
-      return sum + ((o as any).paymentMethod === "CASH" ? (o.total || 0) : 0);
+      return sum + (o.paymentMethod === "CASH" ? (o.total || 0) : 0);
     }, 0);
 
     // ─────────────────────────────────────────────────────────

@@ -7,6 +7,7 @@ import { useAutoAddForm } from "@/hooks/useAutoAddForm";
 import PrinterLoader from "@/components/PrinterLoader";
 import SearchInput from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
+import CompanyTabs from "@/components/CompanyTabs";
 import Pagination from "@/components/Pagination";
 import FormModal from "@/components/FormModal";
 import SubmitButton from "@/components/SubmitButton";
@@ -252,22 +253,6 @@ function EmployeesContent() {
     };
   }, [employees]);
 
-  const companyBreakdown = useMemo(() => {
-    return companies
-      .map((company) => {
-        const list = employees.filter((e) => e.companyId === company.id);
-        const totalSalary = list.reduce((sum, e) => sum + (e.baseSalary || 0), 0);
-        return {
-          id: company.id,
-          name: company.name,
-          count: list.length,
-          totalSalary,
-        };
-      })
-      .filter((item) => item.count > 0 || companyFilter)
-      .sort((a, b) => b.count - a.count);
-  }, [companies, employees, companyFilter]);
-
   if (loading) return <PrinterLoader label={t("hr.employees.loading")} />;
 
   return (
@@ -319,40 +304,11 @@ function EmployeesContent() {
         ]}
       />
 
-      {companyBreakdown.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {companyBreakdown.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => {
-                setCompanyFilter((current) => (current === item.id ? "" : item.id));
-                setPage(1);
-              }}
-              className={`flex items-center justify-between rounded-xl border px-4 py-3 text-start shadow-sm transition ${
-                companyFilter === item.id
-                  ? "border-blue-500 bg-blue-50/70 ring-1 ring-blue-200"
-                  : "border-gray-100 bg-white hover:border-blue-200 hover:bg-blue-50/40"
-              }`}
-            >
-              <div>
-                <p className="text-sm font-semibold text-gray-900">{item.name}</p>
-                <p className="text-xs text-gray-500">
-                  {item.count.toLocaleString("en-US")} {locale === "ar" ? "موظف" : "employees"}
-                </p>
-              </div>
-              <div className="text-end">
-                <p className="text-sm font-bold text-emerald-700">
-                  {item.totalSalary.toLocaleString("en-US")} {t("hr.currency")}
-                </p>
-                <p className="text-xs text-gray-400">
-                  {locale === "ar" ? "إجمالي الرواتب" : "Total salaries"}
-                </p>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
+      <CompanyTabs
+        companies={companies}
+        value={companyFilter}
+        onChange={(v) => { setCompanyFilter(v); setPage(1); }}
+      />
 
       {/* Search & Filters */}
       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -371,12 +327,6 @@ function EmployeesContent() {
             { label: t("hr.employees.statusSuspended"), value: "SUSPENDED" },
             { label: t("hr.employees.statusTerminated"), value: "TERMINATED" },
           ]}
-        />
-        <FilterSelect
-          value={companyFilter}
-          onChange={(v) => { setCompanyFilter(v); setPage(1); }}
-          allLabel={locale === "ar" ? "كل الشركات" : "All companies"}
-          options={companies.map((c) => ({ label: c.name, value: c.id }))}
         />
       </div>
 

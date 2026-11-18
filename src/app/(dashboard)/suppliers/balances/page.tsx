@@ -6,7 +6,7 @@ import { ArrowRight, Printer, FileText, Wallet, Building2 } from "lucide-react";
 import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
-import FilterSelect from "@/components/FilterSelect";
+import CompanyTabs from "@/components/CompanyTabs";
 import ExportButton from "@/components/ExportButton";
 import PrinterLoader from "@/components/PrinterLoader";
 import RefreshButton from "@/components/RefreshButton";
@@ -284,19 +284,18 @@ export default function SupplierBalancesPage() {
           </div>
         </div>
 
+        <CompanyTabs
+          companies={companies}
+          value={companyFilter}
+          onChange={(v) => { setCompanyFilter(v); setPage(1); }}
+        />
+
         {/* Search & Filters (No-Print) */}
         <div className="no-print rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-col gap-3 border-b border-slate-200 p-4 md:flex-row md:items-center md:flex-wrap">
             <div className="w-full md:w-80 md:flex-none">
               <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder={t("suppliers.searchPlaceholder")} />
             </div>
-            <FilterSelect
-              value={companyFilter}
-              onChange={(v) => { setCompanyFilter(v); setPage(1); }}
-              options={companies.map((c) => ({ value: c.id, label: c.name }))}
-              allLabel={`${t("common.company")} — ${t("common.all")}`}
-              className="md:w-44"
-            />
             {hasActiveFilters && (
               <button onClick={resetFilters} className="text-sm text-gray-500 underline hover:text-gray-700">
                 {t("common.resetFilters")}

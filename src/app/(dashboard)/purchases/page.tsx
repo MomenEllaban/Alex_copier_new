@@ -6,6 +6,7 @@ import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
+import CompanyTabs from "@/components/CompanyTabs";
 import DateRangeFilter, { inDateRange } from "@/components/DateRangeFilter";
 import { Eye, Pencil, Plus, Printer, Save, ShoppingCart, Trash2, Truck, Wallet, X } from "lucide-react";
 import ExportButton from "@/components/ExportButton";
@@ -914,11 +915,16 @@ export default function PurchasesPage() {
       </div>
 
       {tab === "external" ? (
+      <>
+      <CompanyTabs
+        companies={companies}
+        value={companyFilter}
+        onChange={(v) => { setCompanyFilter(v); setPage(1); }}
+      />
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-200 p-4 md:flex-row md:items-center md:flex-wrap">
           <div className="w-full md:w-80 md:flex-none"><SearchInput value={search} onChange={setSearch} placeholder={t("purchases.searchPlaceholder")} /></div>
           <FilterSelect value={statusFilter} onChange={(v) => { setStatusFilter(v); setPage(1); }} options={Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))} allLabel={`${t("common.status")} — ${t("common.all")}`} className="md:w-40" />
-          <FilterSelect value={companyFilter} onChange={(v) => { setCompanyFilter(v); setPage(1); }} options={companies.map((c) => ({ value: c.id, label: c.name }))} allLabel={`${t("common.company")} — ${t("common.all")}`} className="md:w-40" />
           <FilterSelect value={supplierFilter} onChange={(v) => { setSupplierFilter(v); setPage(1); }} options={suppliers.map((s) => ({ value: s.id, label: s.name }))} allLabel={`${t("purchases.supplier")} — ${t("common.all")}`} className="md:w-44" />
           <DateRangeFilter from={dateFrom} to={dateTo} onFromChange={(v) => { setDateFrom(v); setPage(1); }} onToChange={(v) => { setDateTo(v); setPage(1); }} />
           {hasActiveFilters && (
@@ -1022,11 +1028,17 @@ export default function PurchasesPage() {
         )}
         <Pagination currentPage={safePage} totalPages={totalPages} onPageChange={setPage} totalItems={filtered.length} pageSize={PAGE_SIZE} />
       </div>
+      </>
       ) : (
+      <>
+      <CompanyTabs
+        companies={companies}
+        value={icCompanyFilter}
+        onChange={(v) => { setIcCompanyFilter(v); setIcPage(1); }}
+      />
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-200 p-4 md:flex-row md:items-center md:flex-wrap">
           <div className="w-full md:w-80 md:flex-none"><SearchInput value={icSearch} onChange={setIcSearch} placeholder={t("purchases.searchPlaceholder")} /></div>
-          <FilterSelect value={icCompanyFilter} onChange={(v) => { setIcCompanyFilter(v); setIcPage(1); }} options={companies.map((c) => ({ value: c.id, label: c.name }))} allLabel={`${t("purchases.buyerCompany")} — ${t("common.all")}`} className="md:w-44" />
           <DateRangeFilter from={icDateFrom} to={icDateTo} onFromChange={(v) => { setIcDateFrom(v); setIcPage(1); }} onToChange={(v) => { setIcDateTo(v); setIcPage(1); }} />
           {icHasActiveFilters && (
             <button onClick={() => { setIcSearch(""); setIcCompanyFilter(""); setIcDateFrom(""); setIcDateTo(""); setIcPage(1); }} className="text-sm text-gray-500 hover:text-gray-700 underline">
@@ -1095,6 +1107,7 @@ export default function PurchasesPage() {
           <Pagination currentPage={icSafePage} totalPages={icTotalPages} onPageChange={setIcPage} totalItems={icFiltered.length} pageSize={IC_PAGE_SIZE} />
         )}
       </div>
+      </>
       )}
 
       {viewingOrder && (
@@ -1497,6 +1510,7 @@ export default function PurchasesPage() {
       )}
 
       <ProductFormModal
+        key={showProductModal ? "open" : "closed"}
         open={showProductModal}
         onClose={() => {
           setShowProductModal(false);

@@ -32,6 +32,8 @@ export interface SelectWithAddProps {
   quickAddFields?: QuickAddField[];
   quickAddEndpoint?: string;
   quickAddDefaults?: Record<string, string | number | undefined>;
+  // The shape depends on `quickAddEndpoint`; each caller knows its own entity.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onQuickAddSuccess?: (newItem: any) => void;
   selectClassName?: string;
   buttonTitle?: string;

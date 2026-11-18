@@ -6,6 +6,7 @@ import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
+import CompanyTabs from "@/components/CompanyTabs";
 import DateRangeFilter, { inDateRange } from "@/components/DateRangeFilter";
 import { Eye, Pencil, Plus, Receipt, Save, Tags, CalendarDays, Wallet, Trash2, X } from "lucide-react";
 import ExportButton from "@/components/ExportButton";
@@ -334,10 +335,15 @@ export default function FinancePage() {
           )}
         </FormModal>
 
+        <CompanyTabs
+          companies={companies}
+          value={companyFilter}
+          onChange={(v) => { setCompanyFilter(v); setPage(1); }}
+        />
+
         <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-col gap-3 border-b border-slate-200 p-4 md:flex-row md:items-center md:flex-wrap">
             <div className="w-full md:w-80 md:flex-none"><SearchInput value={search} onChange={setSearch} placeholder={t("finance.searchPlaceholder")} /></div>
-            <FilterSelect value={companyFilter} onChange={(v) => { setCompanyFilter(v); setPage(1); }} options={companies.map((c) => ({ value: c.id, label: c.name }))} allLabel={`${t("common.company")} — ${t("common.all")}`} className="md:w-40" />
             <FilterSelect value={categoryFilter} onChange={(v) => { setCategoryFilter(v); setPage(1); }} options={categoryFilterOptions} allLabel={`${t("finance.categoryFilter")} — ${t("common.all")}`} className="md:w-44" />
             <DateRangeFilter from={dateFrom} to={dateTo} onFromChange={(v) => { setDateFrom(v); setPage(1); }} onToChange={(v) => { setDateTo(v); setPage(1); }} />
             {hasActiveFilters && (

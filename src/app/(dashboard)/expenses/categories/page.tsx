@@ -5,7 +5,7 @@ import { signOut } from "next-auth/react";
 import { useI18n } from "@/i18n/context";
 import { useRouter } from "next/navigation";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
-import FilterSelect from "@/components/FilterSelect";
+import CompanyTabs from "@/components/CompanyTabs";
 import Pagination from "@/components/Pagination";
 import { ArrowRight, Pencil, Plus, Save, Trash2, X } from "lucide-react";
 import PrinterLoader from "@/components/PrinterLoader";
@@ -172,10 +172,15 @@ export default function ExpenseCategoriesPage() {
         </form>
       </FormModal>
 
+      <CompanyTabs
+        companies={companies}
+        value={companyFilter}
+        onChange={(v) => { setCompanyFilter(v); setPage(1); }}
+      />
+
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-200 p-4 md:flex-row md:items-center md:flex-wrap">
           <div className="w-full md:w-80 md:flex-none"><SearchInput value={search} onChange={setSearch} placeholder={t("finance.searchCategoryPlaceholder")} /></div>
-          <FilterSelect value={companyFilter} onChange={(v) => { setCompanyFilter(v); setPage(1); }} options={companies.map((c) => ({ value: c.id, label: c.name }))} allLabel={`${t("common.company")} — ${t("common.all")}`} className="md:w-40" />
           <div className="md:ms-auto">
             <RefreshButton onRefresh={refresh} refreshing={refreshing} />
           </div>

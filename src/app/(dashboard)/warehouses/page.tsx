@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
-import FilterSelect from "@/components/FilterSelect";
+import CompanyTabs from "@/components/CompanyTabs";
 import ExportButton from "@/components/ExportButton";
 import { Pencil, Plus, Save, Trash2, Box, ArrowDownToLine, ArrowUpFromLine, Warehouse as WarehouseIcon, Building2, Package } from "lucide-react";
 import PrinterLoader from "@/components/PrinterLoader";
@@ -408,6 +408,12 @@ export default function WarehousesPage() {
         )}
       </FormModal>
 
+      <CompanyTabs
+        companies={companies}
+        value={companyFilter}
+        onChange={(v) => { setCompanyFilter(v); setPage(1); }}
+      />
+
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-200 p-4 md:flex-row md:items-center md:flex-wrap">
           <div className="w-full md:w-80 md:flex-none">
@@ -417,13 +423,6 @@ export default function WarehousesPage() {
               placeholder={`${t("common.search")} ${t("warehouses.title")}`}
             />
           </div>
-          <FilterSelect
-            value={companyFilter}
-            onChange={(v) => { setCompanyFilter(v); setPage(1); }}
-            options={companies.map((c) => ({ value: c.id, label: c.nameAr || c.name }))}
-            allLabel={`${t("warehouses.company")} — ${t("common.all")}`}
-            className="md:w-52"
-          />
           {hasActiveFilters && (
             <button
               onClick={() => { setSearch(""); setCompanyFilter(""); }}

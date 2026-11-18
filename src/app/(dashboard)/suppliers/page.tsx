@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
-import FilterSelect from "@/components/FilterSelect";
+import CompanyTabs from "@/components/CompanyTabs";
 import ExportButton from "@/components/ExportButton";
 import { Eye, FileText, Pencil, Plus, Trash2, Upload, Save, Wallet, Truck, Users, Building2, Printer, Package, Receipt, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import ImportDialog from "@/components/ImportDialog";
@@ -657,6 +657,12 @@ export default function SuppliersPage() {
         })()}
       </FormModal>
 
+      <CompanyTabs
+        companies={companies}
+        value={companyFilter}
+        onChange={(v) => { setCompanyFilter(v); setPage(1); }}
+      />
+
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-200 p-4 md:flex-row md:items-center md:flex-wrap">
         <div className="w-full md:w-80 md:flex-none">
@@ -666,13 +672,6 @@ export default function SuppliersPage() {
             placeholder={t("suppliers.searchPlaceholder")}
           />
         </div>
-        <FilterSelect
-          value={companyFilter}
-          onChange={(v) => { setCompanyFilter(v); setPage(1); }}
-          options={companies.map((c) => ({ value: c.id, label: c.name }))}
-          allLabel={`${t("common.company")} — ${t("common.all")}`}
-          className="md:w-44"
-        />
         {hasActiveFilters && (
           <button onClick={() => { setSearch(""); setCompanyFilter(""); }} className="text-sm text-gray-500 hover:text-gray-700 underline">
             {t("common.resetFilters")}

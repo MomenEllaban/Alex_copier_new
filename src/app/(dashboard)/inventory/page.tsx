@@ -6,6 +6,7 @@ import { useI18n } from "@/i18n/context";
 import Pagination from "@/components/Pagination";
 import SearchInput, { matchesQuery } from "@/components/SearchInput";
 import FilterSelect from "@/components/FilterSelect";
+import CompanyTabs from "@/components/CompanyTabs";
 import ExportButton from "@/components/ExportButton";
 import PrinterLoader from "@/components/PrinterLoader";
 import { useToast } from "@/components/UIProvider";
@@ -78,24 +79,9 @@ export default function InventoryPage() {
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 10;
 
-  const companyMap = companies.reduce<Record<string, string>>((acc, company) => {
-    const normalized = (company.nameAr || company.name || "").toLowerCase();
-    if (normalized.includes("جملة") && normalized.includes("آلات")) acc.jumlaMachines = company.id;
-    if (normalized.includes("جملة") && normalized.includes("قطع")) acc.jumlaParts = company.id;
-    if (normalized.includes("قطاعي") || normalized.includes("قطاعى")) acc.sectori = company.id;
-    return acc;
-  }, {});
-
   const filtered = inventory
     .filter((item) => {
-      const matchesCompany = (() => {
-        if (!companyFilter) return true;
-        const companyId = item.warehouse?.companyId;
-        if (companyFilter === "jumla-both") {
-          return [companyMap.jumlaMachines, companyMap.jumlaParts].includes(companyId || "");
-        }
-        return companyId === companyMap[companyFilter as keyof typeof companyMap];
-      })();
+      const matchesCompany = !companyFilter || item.warehouse?.companyId === companyFilter;
 
       return (
         matchesCompany &&
@@ -341,18 +327,17 @@ export default function InventoryPage() {
         </div>
       )}
 
+      <CompanyTabs
+        companies={companies}
+        value={companyFilter}
+        onChange={(v) => { setCompanyFilter(v); setPage(1); }}
+      />
+
       <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-slate-200 p-4 md:flex-row md:flex-wrap md:items-center">
           <div className="w-full md:w-80 md:flex-none">
             <SearchInput value={search} onChange={setSearchInput} placeholder={`${t("common.search")} ${t("inventory.product")} / SKU...`} />
           </div>
-          <FilterSelect value={companyFilter} onChange={(v) => { setCompanyFilter(v); setPage(1); }} options={[
-            { value: "", label: `الشركة — ${t("common.all")}` },
-            { value: "jumla-machines", label: "شركة جملة الآلات" },
-            { value: "jumla-parts", label: "شركة جملة قطع غيار" },
-            { value: "sectori", label: "شركة قطاعي" },
-            { value: "jumla-both", label: "جملة الآلات + جملة قطع غيار" },
-          ]} allLabel={`الشركة — ${t("common.all")}`} className="md:w-52" />
           <FilterSelect value={warehouseFilter} onChange={(v) => { setWarehouseFilter(v); setPage(1); }} options={warehouses.map((w) => ({ value: w.id, label: w.name }))} allLabel={`${t("inventory.warehouse")} — ${t("common.all")}`} className="md:w-44" />
           <button
             onClick={() => { setNegativeOnly(!negativeOnly); setPage(1); }}
