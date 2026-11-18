@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireRole } from "@/lib/auth-helpers";
@@ -14,7 +15,7 @@ import { isDataResetEnabled } from "@/lib/data-reset";
  * Used by the admin to wipe test data so the financial report can be
  * re-verified from a clean slate. Never exposed outside the GM role.
  */
-export async function POST() {
+async function POST__raw() {
   try {
     // Hard off-switch: this endpoint must never wipe production ledgers by
     // accident. Staying dark (404) also keeps it out of the production API.
@@ -59,3 +60,5 @@ export async function POST() {
     return NextResponse.json({ error: "فشل مسح البيانات" }, { status: 500 });
   }
 }
+
+export const POST = withApiErrors(POST__raw);

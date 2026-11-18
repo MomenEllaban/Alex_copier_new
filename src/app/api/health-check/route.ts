@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireRole } from "@/lib/auth-helpers";
@@ -15,7 +16,7 @@ import { requireAuth, requireRole } from "@/lib/auth-helpers";
  * (`/api/users`, the roles matrix, `/api/dev/reset-transactions`). It stays in
  * IGNORED_ROUTE_PREFIXES; its guard is covered by route-auth-matrix.test.ts.
  */
-export async function GET() {
+async function GET__raw() {
   // Keep the shape of a liveness probe: a signed-in GM gets the counts, and
   // everyone else is told nothing beyond whether they are allowed in.
   const admin = await requireRole("GENERAL_MANAGER");
@@ -79,3 +80,5 @@ export async function GET() {
     );
   }
 }
+
+export const GET = withApiErrors(GET__raw);

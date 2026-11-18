@@ -49,7 +49,9 @@ function handlersOf(file: string, route: string): Handler[] {
   const src = fs.readFileSync(file, "utf8");
   const marks: { verb: string; index: number }[] = [];
   for (const verb of ["GET", ...MUTATING]) {
-    const re = new RegExp(`export\\s+async\\s+function\\s+${verb}\\b`, "g");
+    // Route handlers are either `export async function NAME` or, after the
+    // central error wrapper, `async function NAME__raw` + `export const NAME`.
+    const re = new RegExp(`(?:export\\s+)?async\\s+function\\s+${verb}(?:__raw)?\\b`, "g");
     for (const m of src.matchAll(re)) marks.push({ verb, index: m.index! });
   }
   marks.sort((a, b) => a.index - b.index);

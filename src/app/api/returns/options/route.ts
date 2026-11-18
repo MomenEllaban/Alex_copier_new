@@ -1,9 +1,10 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
 
 /** Dropdown data for the simplified return form, scoped to the chosen company. */
-export async function GET(request: Request) {
+async function GET__raw(request: Request) {
   try {
     const user = await requirePageAccess("returns");
     if (!user) {
@@ -64,3 +65,5 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Failed to load return options" }, { status: 500 });
   }
 }
+
+export const GET = withApiErrors(GET__raw);

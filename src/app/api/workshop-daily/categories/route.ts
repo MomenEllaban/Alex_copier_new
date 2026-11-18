@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireAction } from "@/lib/auth-helpers";
@@ -8,7 +9,7 @@ import { getWorkshopCompany } from "@/lib/workshop-daily";
  * electricity, water… They are the company's own expense categories, so a
  * confirmed outgoing entry posts to the books under the very same category.
  */
-export async function GET(): Promise<NextResponse> {
+async function GET__raw(): Promise<NextResponse> {
   try {
     const actor = await requireAction("workshopDaily", "view");
     if (!actor) {
@@ -35,7 +36,7 @@ export async function GET(): Promise<NextResponse> {
   }
 }
 
-export async function POST(request: Request): Promise<NextResponse> {
+async function POST__raw(request: Request): Promise<NextResponse> {
   try {
     const actor = await requireAction("workshopDaily", "add");
     if (!actor) {
@@ -74,3 +75,6 @@ export async function POST(request: Request): Promise<NextResponse> {
     return NextResponse.json({ error: "Failed to create category" }, { status: 500 });
   }
 }
+
+export const GET = withApiErrors(GET__raw);
+export const POST = withApiErrors(POST__raw);

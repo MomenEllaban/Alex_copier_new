@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireRole } from "@/lib/auth-helpers";
@@ -17,7 +18,7 @@ import { isCompanyResetEnabled, isConfirmationValid } from "@/lib/data-reset";
  * re-testing. Never exposed outside the GM role, and never runs unless the
  * request body carries the company's exact name in `confirm`.
  */
-export async function POST(
+async function POST__raw(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -87,3 +88,5 @@ export async function POST(
     return NextResponse.json({ error: "فشل تصفير بيانات الشركة" }, { status: 500 });
   }
 }
+
+export const POST = withApiErrors(POST__raw);

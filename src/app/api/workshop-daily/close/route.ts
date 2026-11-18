@@ -1,9 +1,10 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireAction } from "@/lib/auth-helpers";
 import { calcTotals, getWorkshopCompany, startOfDay } from "@/lib/workshop-daily";
 
-export async function POST(request: Request) {
+async function POST__raw(request: Request) {
   try {
     const actor = await requireAction("workshopDaily", "close");
     if (!actor) {
@@ -103,3 +104,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to close day" }, { status: 500 });
   }
 }
+
+export const POST = withApiErrors(POST__raw);

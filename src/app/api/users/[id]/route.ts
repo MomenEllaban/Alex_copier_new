@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { hash } from "bcryptjs";
 import { prisma } from "@/lib/prisma";
@@ -6,7 +7,7 @@ import { ROLES } from "@/lib/permissions";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export async function DELETE(
+async function DELETE__raw(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -101,7 +102,7 @@ export async function DELETE(
   }
 }
 
-export async function PUT(
+async function PUT__raw(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -250,3 +251,6 @@ export async function PUT(
     return NextResponse.json({ error: "Failed to update user" }, { status: 500 });
   }
 }
+
+export const PUT = withApiErrors(PUT__raw);
+export const DELETE = withApiErrors(DELETE__raw);

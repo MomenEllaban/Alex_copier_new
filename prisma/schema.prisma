@@ -251,6 +251,29 @@ model Notification {
   @@index([userId, createdAt])
 }
 
+/// A user-reported failure. Lets support fix a problem from a real request ID
+/// instead of guessing from "something went wrong".
+model ErrorReport {
+  id         String   @id @default(cuid())
+  code       String
+  status     String   @default("NEW")
+  messageAr  String
+  messageEn  String
+  hintAr     String?
+  hintEn     String?
+  requestId  String?
+  path       String?
+  action     String?
+  details    String?
+  userId     String?
+  userEmail  String?
+  createdAt  DateTime @default(now())
+  resolvedAt DateTime?
+
+  @@index([status, createdAt])
+  @@index([code, createdAt])
+}
+
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // PHASE 1 - CORE
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•

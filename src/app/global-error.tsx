@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { clientExceptionInfo, reportClientError } from "@/lib/client-errors";
 
 /**
  * Last-resort boundary. It replaces the whole document, so it must render its
@@ -14,6 +15,9 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const [sent, setSent] = useState(false);
+  const info = useMemo(() => clientExceptionInfo(error, "global-error"), [error]);
+
   useEffect(() => {
     console.error("[global] unhandled error:", error);
   }, [error]);
@@ -54,8 +58,11 @@ export default function GlobalError({
           <h1 style={{ fontSize: "1.125rem", fontWeight: "700", margin: "0 0 0.5rem" }}>
             حصل خطأ في التطبيق
           </h1>
-          <p style={{ fontSize: "0.875rem", lineHeight: "1.75", color: "#4b5563", margin: "0 0 1.25rem" }}>
-            حصل خطأ غير متوقع في التطبيق. جرّب تحميل الصفحة تاني، ولو المشكلة فضلت موجودة سجّل خروج وادخل من جديد.
+          <p dir="rtl" style={{ fontSize: "0.875rem", lineHeight: "1.75", color: "#4b5563", margin: "0 0 0.75rem" }}>
+            حصل خطأ غير متوقع في التطبيق. جرّب تحميل الصفحة تاني، ولو المشكلة فضلت موجودة اضغط «إرسال البلاغ».
+          </p>
+          <p dir="ltr" style={{ fontSize: "0.8125rem", lineHeight: "1.7", color: "#6b7280", margin: "0 0 1.25rem", textAlign: "center" }}>
+            An unexpected error interrupted the app. Retry; if it persists, send us the report below.
           </p>
           <div style={{ display: "flex", gap: "0.5rem", justifyContent: "center", flexWrap: "wrap" }}>
             <button
@@ -87,6 +94,24 @@ export default function GlobalError({
               }}
             >
               صفحة الدخول
+            </button>
+            <button
+              onClick={async () => {
+                if (await reportClientError(info)) setSent(true);
+              }}
+              disabled={sent}
+              style={{
+                background: "#eff6ff",
+                color: "#1d4ed8",
+                border: "1px solid #bfdbfe",
+                borderRadius: "0.5rem",
+                padding: "0.5rem 1rem",
+                fontSize: "0.875rem",
+                fontWeight: "600",
+                cursor: "pointer",
+              }}
+            >
+              {sent ? "تم الإرسال ✓" : "إرسال البلاغ / Report"}
             </button>
           </div>
           {error.digest && (

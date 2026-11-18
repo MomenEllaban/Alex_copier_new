@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { hash } from "bcryptjs";
 import { prisma } from "@/lib/prisma";
@@ -7,7 +8,7 @@ import { ownEngineerId } from "@/lib/engineer-scope";
 const OPEN_STATUSES = ["NEW", "ASSIGNED", "VISITED", "REASSIGNED"];
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export async function GET() {
+async function GET__raw() {
   try {
     const actor = await requirePageAccess("engineers");
     if (!actor) {
@@ -52,7 +53,7 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+async function POST__raw(request: Request) {
   try {
     const actor = await requireAction("engineers", "add");
     if (!actor) {
@@ -166,3 +167,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to create engineer" }, { status: 500 });
   }
 }
+
+export const GET = withApiErrors(GET__raw);
+export const POST = withApiErrors(POST__raw);

@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireAnyPage } from "@/lib/auth-helpers";
@@ -24,7 +25,7 @@ type DateFilter = {
  * live from these operational modules — not from a separate accounting table —
  * so a newly created sales/purchase invoice appears here automatically.
  */
-export async function GET(
+async function GET__raw(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -686,3 +687,5 @@ export async function GET(
     return NextResponse.json({ error: "Failed to fetch company report" }, { status: 500 });
   }
 }
+
+export const GET = withApiErrors(GET__raw);

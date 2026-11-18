@@ -1,8 +1,9 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAction } from "@/lib/auth-helpers";
 
-export async function POST(
+async function POST__raw(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -41,3 +42,5 @@ export async function POST(
     return NextResponse.json({ error: "Failed to confirm receipt" }, { status: 500 });
   }
 }
+
+export const POST = withApiErrors(POST__raw);

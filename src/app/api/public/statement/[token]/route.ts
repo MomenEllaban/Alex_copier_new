@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { buildCustomerStatement } from "@/lib/customer-statement";
@@ -7,7 +8,7 @@ import { isStatementTokenExpired } from "@/lib/statement-token";
 // statement token and returns their full account statement. The token is
 // unguessable, expires, and dies the moment a new one is issued — so the data
 // is only reachable by whoever was given the link, and only for 30 days.
-export async function GET(
+async function GET__raw(
   request: Request,
   { params }: { params: Promise<{ token: string }> }
 ) {
@@ -41,3 +42,5 @@ export async function GET(
     return NextResponse.json({ error: "Failed to load statement" }, { status: 500 });
   }
 }
+
+export const GET = withApiErrors(GET__raw);

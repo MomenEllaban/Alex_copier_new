@@ -1,9 +1,10 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireAction } from "@/lib/auth-helpers";
 
 // Locations belong to a customer; service requests and machines reference them.
-export async function POST(
+async function POST__raw(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -49,3 +50,5 @@ export async function POST(
     return NextResponse.json({ error: "Failed to create location", code: "CREATE_FAILED" }, { status: 500 });
   }
 }
+
+export const POST = withApiErrors(POST__raw);

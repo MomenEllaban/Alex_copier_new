@@ -1,9 +1,10 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
 import { traceError } from "@/lib/prisma-errors";
 
-export async function GET() {
+async function GET__raw() {
   try {
     const user = await requirePageAccess("contracts");
     if (!user) {
@@ -31,7 +32,7 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+async function POST__raw(request: Request) {
   try {
     const actor = await requireAction("contracts", "add");
     if (!actor) {
@@ -149,3 +150,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to create contract" }, { status: traceError("[contracts:POST] create failed", error) });
   }
 }
+
+export const GET = withApiErrors(GET__raw);
+export const POST = withApiErrors(POST__raw);

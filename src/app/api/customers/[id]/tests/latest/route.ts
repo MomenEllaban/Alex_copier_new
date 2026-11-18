@@ -1,9 +1,10 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
 import { ownEngineerId } from "@/lib/engineer-scope";
 
-export async function GET(
+async function GET__raw(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -51,3 +52,5 @@ export async function GET(
     return NextResponse.json({ error: "Failed to fetch latest test" }, { status: 500 });
   }
 }
+
+export const GET = withApiErrors(GET__raw);

@@ -1,8 +1,9 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
 
-export async function GET(
+async function GET__raw(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -28,7 +29,7 @@ export async function GET(
   }
 }
 
-export async function POST(
+async function POST__raw(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -85,3 +86,6 @@ export async function POST(
     return NextResponse.json({ error: "Failed to record supplier payment" }, { status: 500 });
   }
 }
+
+export const GET = withApiErrors(GET__raw);
+export const POST = withApiErrors(POST__raw);

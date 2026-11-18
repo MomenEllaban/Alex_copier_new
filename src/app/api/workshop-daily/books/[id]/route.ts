@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireAction } from "@/lib/auth-helpers";
@@ -12,7 +13,7 @@ const TX_INCLUDE = {
  * The entries of one day, for the day list: clicking a day shows what was
  * booked on it, incoming and outgoing alike.
  */
-export async function GET(
+async function GET__raw(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ): Promise<NextResponse> {
@@ -68,3 +69,5 @@ export async function GET(
     return NextResponse.json({ error: "Failed to fetch day details" }, { status: 500 });
   }
 }
+
+export const GET = withApiErrors(GET__raw);

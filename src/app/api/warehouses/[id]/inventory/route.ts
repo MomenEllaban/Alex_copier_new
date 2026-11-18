@@ -1,8 +1,9 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireAnyPage } from "@/lib/auth-helpers";
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+async function GET__raw(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireAnyPage("warehouses", "inventory");
     if (!user) {
@@ -38,3 +39,5 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Failed to fetch warehouse inventory" }, { status: 500 });
   }
 }
+
+export const GET = withApiErrors(GET__raw);

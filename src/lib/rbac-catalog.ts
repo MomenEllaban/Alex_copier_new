@@ -118,6 +118,7 @@ export const EXACT_ROUTE_PAGE: Record<string, Page> = {
   // of what that page shows.
   "trade-ins": "tradeIns",
   "machine-replacements": "tradeIns",
+  "error-reports": "settings",
 };
 
 /** Longest-prefix wins, so `customers/import` resolves before `customers`. */
@@ -143,6 +144,7 @@ export const ROUTE_PREFIX_PAGE: Array<[string, Page]> = [
   ["workshop", "workshop"],
   ["reports", "reports"],
   ["users", "settings"],
+  ["error-reports", "settings"],
   ["hr", "hrDashboard"],
 ];
 

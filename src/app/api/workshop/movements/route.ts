@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePageAccess, requireAction } from "@/lib/auth-helpers";
@@ -17,7 +18,7 @@ const createSchema = z.object({
   performedByName: z.string().optional().nullable(),
 });
 
-export async function GET(request: Request) {
+async function GET__raw(request: Request) {
   try {
     const user = await requirePageAccess("workshop");
     if (!user) {
@@ -90,7 +91,7 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+async function POST__raw(request: Request) {
   try {
     const actor = await requireAction("workshop", "add");
     if (!actor) {
@@ -133,3 +134,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to create movement", details: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
 }
+
+export const GET = withApiErrors(GET__raw);
+export const POST = withApiErrors(POST__raw);

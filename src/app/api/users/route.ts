@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { hash } from "bcryptjs";
 import { prisma } from "@/lib/prisma";
@@ -6,7 +7,7 @@ import { ROLES } from "@/lib/permissions";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export async function GET() {
+async function GET__raw() {
   try {
     const admin = await requireSuperAdmin();
     if (!admin) {
@@ -34,7 +35,7 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+async function POST__raw(request: Request) {
   try {
     const admin = await requireSuperAdmin();
     if (!admin) {
@@ -119,3 +120,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
   }
 }
+
+export const GET = withApiErrors(GET__raw);
+export const POST = withApiErrors(POST__raw);

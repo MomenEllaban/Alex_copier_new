@@ -1,9 +1,10 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
 import { traceError } from "@/lib/prisma-errors";
 
-export async function GET(
+async function GET__raw(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -38,7 +39,7 @@ export async function GET(
   }
 }
 
-export async function PUT(
+async function PUT__raw(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -139,7 +140,7 @@ export async function PUT(
   }
 }
 
-export async function DELETE(
+async function DELETE__raw(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -159,3 +160,7 @@ export async function DELETE(
     return NextResponse.json({ error: "Failed to delete contract" }, { status: 500 });
   }
 }
+
+export const GET = withApiErrors(GET__raw);
+export const PUT = withApiErrors(PUT__raw);
+export const DELETE = withApiErrors(DELETE__raw);

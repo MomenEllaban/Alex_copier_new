@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
@@ -42,7 +43,7 @@ const notificationSchema = z.object({
   metadata: z.record(z.string(), z.any()).optional().nullable(),
 });
 
-export async function GET(request: Request) {
+async function GET__raw(request: Request) {
   try {
     const user = await requirePageAccess("dashboard");
     if (!user) {
@@ -78,7 +79,7 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+async function POST__raw(request: Request) {
   try {
     const user = await requireAuth();
     if (!user) {
@@ -130,7 +131,7 @@ export async function POST(request: Request) {
   }
 }
 
-export async function PATCH(request: Request) {
+async function PATCH__raw(request: Request) {
   try {
     const user = await requireAuth();
     if (!user) {
@@ -152,3 +153,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Failed to update notifications" }, { status: 500 });
   }
 }
+
+export const GET = withApiErrors(GET__raw);
+export const POST = withApiErrors(POST__raw);
+export const PATCH = withApiErrors(PATCH__raw);

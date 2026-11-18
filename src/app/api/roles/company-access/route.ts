@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSuperAdmin, requireAuth } from "@/lib/auth-helpers";
@@ -24,7 +25,7 @@ async function deny() {
  * outside the action matrix: it administers access rather than operating a
  * business page, exactly like the other /api/roles endpoints.
  */
-export async function GET() {
+async function GET__raw() {
   try {
     if (!(await requireSuperAdmin())) return deny();
 
@@ -81,7 +82,7 @@ export async function GET() {
   }
 }
 
-export async function PUT(request: Request) {
+async function PUT__raw(request: Request) {
   try {
     if (!(await requireSuperAdmin())) return deny();
 
@@ -154,3 +155,6 @@ export async function PUT(request: Request) {
     );
   }
 }
+
+export const GET = withApiErrors(GET__raw);
+export const PUT = withApiErrors(PUT__raw);

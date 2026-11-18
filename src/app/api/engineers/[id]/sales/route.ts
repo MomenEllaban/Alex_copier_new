@@ -1,9 +1,10 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireAnyPage } from "@/lib/auth-helpers";
 import { ownEngineerId } from "@/lib/engineer-scope";
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+async function GET__raw(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await requireAnyPage("engineers", "sales");
     if (!user) {
@@ -42,3 +43,5 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Failed to fetch engineer sales" }, { status: 500 });
   }
 }
+
+export const GET = withApiErrors(GET__raw);

@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
@@ -13,7 +14,7 @@ import { Prisma } from "@/generated/prisma/client";
 import { scopedRecord, crossCompanyResponse } from "@/lib/services/hr/company-scope";
 import { companyScopeFilter, resolveCompanyId } from "@/lib/company-scope";
 
-export async function GET(request: Request) {
+async function GET__raw(request: Request) {
   try {
     const actor = await requirePageAccess("hrPayroll");
     if (!actor) {
@@ -91,7 +92,7 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+async function POST__raw(request: Request) {
   try {
     const actor = await requireAction("hrPayroll", "add");
     if (!actor) {
@@ -174,3 +175,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: errorMessage(error, "Failed to process payroll") }, { status: 400 });
   }
 }
+
+export const GET = withApiErrors(GET__raw);
+export const POST = withApiErrors(POST__raw);

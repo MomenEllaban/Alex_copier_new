@@ -1,9 +1,10 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAction, requireAuth } from "@/lib/auth-helpers";
 import { parseCsvRecords, validateRecords } from "@/lib/import-schemas";
 
-export async function POST(request: Request) {
+async function POST__raw(request: Request) {
   try {
     const user = await requireAction("machines", "import");
     if (!user) {
@@ -44,3 +45,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to import machines" }, { status: 500 });
   }
 }
+
+export const POST = withApiErrors(POST__raw);

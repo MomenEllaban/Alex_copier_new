@@ -152,6 +152,7 @@ Top 5 risks right now:
 - **المقترح / Proposal:** one `fail(status, code, message, requestId)` helper; log stack server-side only, return correlation id; structured JSON logs with user/request context; fix the `traceError` misuse.
 - **الملفات / Files:** `src/lib/prisma-errors.ts`, `src/lib/api-client.ts`, `src/app/api/sales/**`, `src/app/api/machines/[id]/replace/route.ts`.
 - **القبول / Acceptance:** no HTTP response contains a filesystem path or stack line.
+- ✅ **تم التنفيذ / Done (2026-11-18):** كتالوج أخطاء ثنائي اللغة، `withApiErrors` على كل الـ routes، رسائل عربية مفصّلة + رقم طلب، نافذة تفاصيل، وزر إرسال بلاغ، وصفحة `/error-reports` للمدير.
 
 ---
 

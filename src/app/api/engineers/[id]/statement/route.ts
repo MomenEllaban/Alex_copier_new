@@ -1,10 +1,11 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireAnyPage } from "@/lib/auth-helpers";
 import { buildEngineerStatement } from "@/lib/engineer-statement";
 import { ownEngineerId } from "@/lib/engineer-scope";
 
-export async function GET(
+async function GET__raw(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -43,3 +44,5 @@ export async function GET(
     return NextResponse.json({ error: "Failed to generate engineer statement" }, { status: 500 });
   }
 }
+
+export const GET = withApiErrors(GET__raw);

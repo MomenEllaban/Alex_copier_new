@@ -1,9 +1,10 @@
+﻿import { errorResponse, withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireAction } from "@/lib/auth-helpers";
 import { recalculatePaymentStatus } from "@/lib/payment-status";
 import { computeCreditSplit, creditUsedNote } from "@/lib/customer-credit";
-import { traceError } from "@/lib/prisma-errors";
+
 import {
   STOCK_BLOCKED,
   STOCK_CONFIRM_REQUIRED,
@@ -56,7 +57,7 @@ function makeInvoiceNumber(): string {
   return `IC-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${Date.now().toString().slice(-5)}`;
 }
 
-export async function POST(request: Request) {
+async function POST__raw(request: Request) {
   try {
     const actor = await requireAction("sales", "add");
     if (!actor) {
@@ -428,7 +429,12 @@ export async function POST(request: Request) {
     if (error instanceof Error && error.message === "WAREHOUSE_NOT_FOUND") {
       return NextResponse.json({ error: "المستودع الرئيسي غير موجود لإحدى الشركتين", code: "WAREHOUSE_NOT_FOUND" }, { status: 400 });
     }
-    const msg = error instanceof Error ? (error.message || error.name || String(error)) : "Failed to create intercompany sale";
-    return NextResponse.json({ error: msg, detail: error instanceof Error ? error.stack : undefined }, { status: traceError("[sales/intercompany:POST] create failed", error) });
+    return errorResponse(error);
   }
 }
+
+export const POST = withApiErrors(POST__raw);
+
+
+
+

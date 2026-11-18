@@ -1,10 +1,11 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
 import { errorMessage } from "@/lib/prisma-errors";
 import { scopedRecord } from "@/lib/services/hr/company-scope";
 
-export async function GET(
+async function GET__raw(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -60,3 +61,5 @@ export async function GET(
     return NextResponse.json({ error: errorMessage(error, "Failed to fetch payroll run details") }, { status: 500 });
   }
 }
+
+export const GET = withApiErrors(GET__raw);

@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePageAccess } from "@/lib/auth-helpers";
@@ -15,7 +16,7 @@ import { traceError } from "@/lib/prisma-errors";
  * returned, which is what the page needs in order to show which company is
  * holding what.
  */
-export async function GET(request: Request) {
+async function GET__raw(request: Request) {
   try {
     const user = await requirePageAccess("tradeIns");
     if (!user) {
@@ -65,3 +66,5 @@ export async function GET(request: Request) {
     );
   }
 }
+
+export const GET = withApiErrors(GET__raw);

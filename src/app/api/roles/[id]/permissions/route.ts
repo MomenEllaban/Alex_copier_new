@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSuperAdmin, requireAuth } from "@/lib/auth-helpers";
@@ -19,7 +20,7 @@ async function deny() {
  * needs all three — pages, their actions, and what this role holds — to render
  * the tree without a second round trip.
  */
-export async function GET(_request: Request, { params }: Params) {
+async function GET__raw(_request: Request, { params }: Params) {
   try {
     if (!(await requireSuperAdmin())) return deny();
 
@@ -92,7 +93,7 @@ export async function GET(_request: Request, { params }: Params) {
  * a system role that could be trimmed would let the last admin lock everyone
  * out, including themselves.
  */
-export async function PUT(request: Request, { params }: Params) {
+async function PUT__raw(request: Request, { params }: Params) {
   try {
     if (!(await requireSuperAdmin())) return deny();
 
@@ -283,3 +284,6 @@ export async function PUT(request: Request, { params }: Params) {
     return NextResponse.json({ error: "Failed to save permissions", code: "UPDATE_FAILED" }, { status: 500 });
   }
 }
+
+export const GET = withApiErrors(GET__raw);
+export const PUT = withApiErrors(PUT__raw);

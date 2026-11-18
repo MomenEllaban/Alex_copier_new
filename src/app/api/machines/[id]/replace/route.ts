@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAction } from "@/lib/auth-helpers";
@@ -18,7 +19,7 @@ import {
  *    replacement target, not scrapped),
  *  - the active companies that can receive the returned machine as stock.
  */
-export async function GET(
+async function GET__raw(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -124,7 +125,7 @@ export async function GET(
  * in that company's warehouse inventory. See `replaceMachine` for the full
  * sequence.
  */
-export async function POST(
+async function POST__raw(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -204,3 +205,6 @@ export async function POST(
     );
   }
 }
+
+export const GET = withApiErrors(GET__raw);
+export const POST = withApiErrors(POST__raw);

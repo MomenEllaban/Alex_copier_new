@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireAction } from "@/lib/auth-helpers";
@@ -70,7 +71,7 @@ async function loadPayment(paymentId: string, customerId: string) {
   return payment && payment.customerId === customerId ? payment : null;
 }
 
-export async function PUT(
+async function PUT__raw(
   request: Request,
   { params }: { params: Promise<{ id: string; paymentId: string }> },
 ) {
@@ -220,7 +221,7 @@ export async function PUT(
   }
 }
 
-export async function DELETE(
+async function DELETE__raw(
   _request: Request,
   { params }: { params: Promise<{ id: string; paymentId: string }> },
 ) {
@@ -302,3 +303,6 @@ export async function DELETE(
     );
   }
 }
+
+export const PUT = withApiErrors(PUT__raw);
+export const DELETE = withApiErrors(DELETE__raw);

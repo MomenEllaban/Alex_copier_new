@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
@@ -5,7 +6,7 @@ import { findOrCreateMainWarehouse, receivePurchaseIntoStock } from "@/lib/stock
 import { normalizePurchaseItems } from "@/lib/purchase-items";
 import { traceError } from "@/lib/prisma-errors";
 
-export async function GET() {
+async function GET__raw() {
   try {
     const user = await requirePageAccess("purchases");
     if (!user) {
@@ -116,7 +117,7 @@ function normalizePurchasePayment(input: {
   return { paymentMethod, paymentStatus, paidAmount };
 }
 
-export async function POST(request: Request) {
+async function POST__raw(request: Request) {
   try {
 
     const actor = await requireAction("purchases", "add");
@@ -241,3 +242,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to create purchase order" }, { status: traceError("[purchases:POST] create failed", error) });
   }
 }
+
+export const GET = withApiErrors(GET__raw);
+export const POST = withApiErrors(POST__raw);

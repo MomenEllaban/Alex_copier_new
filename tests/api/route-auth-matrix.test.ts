@@ -22,6 +22,9 @@ const PUBLIC_BY_DESIGN = new Set([
   "public/engineer-statement/[token]",
 ]);
 
+// Posting an error report must work even for users on a public statement link.
+const PUBLIC_METHODS = new Set(["error-reports:POST"]);
+
 const METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
 
 const guardNames = [
@@ -144,6 +147,12 @@ describe("CODE-AUDIT 2.1 — every API route rejects an anonymous caller", () =>
     }
 
     for (const method of METHODS) {
+      if (PUBLIC_METHODS.has(`${route}:${method}`)) {
+        it(`${method} is intentionally public`, () => {
+          expect(PUBLIC_METHODS.has(`${route}:${method}`)).toBe(true);
+        });
+        continue;
+      }
       it(`${method} refuses an anonymous caller`, async () => {
         const res = await callModule(route, method);
         if (res === undefined) return; // method not exported by this route

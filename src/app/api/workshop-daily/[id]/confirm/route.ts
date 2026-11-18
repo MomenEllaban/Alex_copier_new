@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireRole } from "@/lib/auth-helpers";
@@ -5,7 +6,7 @@ import { WORKSHOP_SOURCE_LABEL, WORKSHOP_UNCATEGORIZED } from "@/lib/workshop-da
 
 const FINANCE_ROLES = ["ACCOUNTANT", "GENERAL_MANAGER", "COMPANY_MANAGER"] as const;
 
-export async function POST(
+async function POST__raw(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -77,3 +78,5 @@ export async function POST(
     return NextResponse.json({ error: "Failed to confirm transaction" }, { status: 500 });
   }
 }
+
+export const POST = withApiErrors(POST__raw);

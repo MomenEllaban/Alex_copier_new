@@ -1,8 +1,9 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import cloudinary from "@/lib/cloudinary";
 import { requireAuth } from "@/lib/auth-helpers";
 
-export async function POST(request: Request) {
+async function POST__raw(request: Request) {
   try {
     const user = await requireAuth();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -32,3 +33,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to upload file" }, { status: 500 });
   }
 }
+
+export const POST = withApiErrors(POST__raw);

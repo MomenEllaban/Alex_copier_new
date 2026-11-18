@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { requireAuth, requireRole } from "@/lib/auth-helpers";
 import { isCompanyResetEnabled, isDataResetEnabled } from "@/lib/data-reset";
@@ -15,7 +16,7 @@ import { isCompanyResetEnabled, isDataResetEnabled } from "@/lib/data-reset";
  *
  * GM-only, same as the resets it describes.
  */
-export async function GET() {
+async function GET__raw() {
   try {
     const admin = await requireRole("GENERAL_MANAGER");
     if (!admin) {
@@ -35,3 +36,5 @@ export async function GET() {
     return NextResponse.json({ error: "فشل قراءة حالة التصفير" }, { status: 500 });
   }
 }
+
+export const GET = withApiErrors(GET__raw);

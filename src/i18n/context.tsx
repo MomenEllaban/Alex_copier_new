@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useCallback, useSyncExternalStore, type ReactNode } from "react";
 import ar from "@/i18n/ar.json";
 import en from "@/i18n/en.json";
+import { setErrorLocale } from "@/lib/client-errors";
 
 type Locale = "ar" | "en";
 
@@ -72,6 +73,10 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }, [locale]);
 
   const dir = locale === "ar" ? "rtl" : "ltr";
+
+  // Keep the error formatter in sync so failures are always shown in the
+  // language the user is currently browsing in (Arabic by default).
+  setErrorLocale(locale);
 
   return (
     <I18nContext.Provider value={{ locale, setLocale, t, dir }}>

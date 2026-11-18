@@ -1,10 +1,11 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireRole } from "@/lib/auth-helpers";
 
 const FINANCE_ROLES = ["ACCOUNTANT", "GENERAL_MANAGER", "COMPANY_MANAGER"] as const;
 
-export async function POST(
+async function POST__raw(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -51,3 +52,5 @@ export async function POST(
     return NextResponse.json({ error: "Failed to reject transaction" }, { status: 500 });
   }
 }
+
+export const POST = withApiErrors(POST__raw);

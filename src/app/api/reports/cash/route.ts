@@ -1,5 +1,8 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { loadCashPosition, reportResponse } from "@/lib/reports";
 
-export async function GET() {
+async function GET__raw() {
   return reportResponse(loadCashPosition);
 }
+
+export const GET = withApiErrors(GET__raw);

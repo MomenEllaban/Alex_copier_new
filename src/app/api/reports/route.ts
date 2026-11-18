@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { loadReportsOverview, reportResponse } from "@/lib/reports";
 
 /**
@@ -7,6 +8,8 @@ import { loadReportsOverview, reportResponse } from "@/lib/reports";
  * their own endpoints under /api/reports/* so each report page only pays for
  * the data it renders.
  */
-export async function GET() {
+async function GET__raw() {
   return reportResponse(loadReportsOverview);
 }
+
+export const GET = withApiErrors(GET__raw);

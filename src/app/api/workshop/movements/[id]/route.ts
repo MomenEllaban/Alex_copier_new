@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAction } from "@/lib/auth-helpers";
@@ -16,7 +17,7 @@ const updateSchema = z.object({
   performedByName: z.string().optional().nullable(),
 });
 
-export async function GET(
+async function GET__raw(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -47,7 +48,7 @@ export async function GET(
   }
 }
 
-export async function PATCH(
+async function PATCH__raw(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -94,7 +95,7 @@ export async function PATCH(
   }
 }
 
-export async function DELETE(
+async function DELETE__raw(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -122,3 +123,7 @@ export async function DELETE(
     return NextResponse.json({ error: "Failed to delete movement" }, { status: 500 });
   }
 }
+
+export const GET = withApiErrors(GET__raw);
+export const PATCH = withApiErrors(PATCH__raw);
+export const DELETE = withApiErrors(DELETE__raw);

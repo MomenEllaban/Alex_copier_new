@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
@@ -5,7 +6,7 @@ import { notifyServiceRequestCreated } from "@/lib/notifications";
 import { traceError } from "@/lib/prisma-errors";
 import { engineerRequestScope } from "@/lib/engineer-scope";
 
-export async function GET() {
+async function GET__raw() {
   try {
     const user = await requirePageAccess("serviceRequests");
     if (!user) {
@@ -52,7 +53,7 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+async function POST__raw(request: Request) {
   try {
     const actor = await requireAction("serviceRequests", "add");
     if (!actor) {
@@ -151,3 +152,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to create service request" }, { status: traceError("[service-requests:POST] create failed", error) });
   }
 }
+
+export const GET = withApiErrors(GET__raw);
+export const POST = withApiErrors(POST__raw);

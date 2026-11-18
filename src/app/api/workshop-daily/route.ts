@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireAction, type ActionKey } from "@/lib/auth-helpers";
@@ -58,7 +59,7 @@ async function guard(action: ActionKey) {
   };
 }
 
-export async function GET(request: Request) {
+async function GET__raw(request: Request) {
   try {
     const { actor, response } = await guard("view");
     if (!actor && response) return response;
@@ -159,7 +160,7 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+async function POST__raw(request: Request) {
   try {
     const { actor, response } = await guard("add");
     if (!actor && response) return response;
@@ -323,3 +324,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to add transaction" }, { status: 500 });
   }
 }
+
+export const GET = withApiErrors(GET__raw);
+export const POST = withApiErrors(POST__raw);

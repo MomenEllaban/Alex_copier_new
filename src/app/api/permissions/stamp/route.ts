@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth-helpers";
 import { getPermissionStamp } from "@/lib/permissions-server";
@@ -10,7 +11,7 @@ import { getPermissionStamp } from "@/lib/permissions-server";
  * queries every poll. This is two: the auth check the app already does, and one
  * small read of the Role table.
  */
-export async function GET() {
+async function GET__raw() {
   try {
     const user = await requireAuth();
     if (!user) {
@@ -27,3 +28,5 @@ export async function GET() {
     return NextResponse.json({ error: "Failed to read stamp" }, { status: 500 });
   }
 }
+
+export const GET = withApiErrors(GET__raw);

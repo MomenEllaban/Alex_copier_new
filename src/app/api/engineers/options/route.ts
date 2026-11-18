@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
@@ -19,7 +20,7 @@ import { ownEngineerId } from "@/lib/engineer-scope";
  * name on this document?" - with two columns, and authorises on any page whose
  * form needs the list rather than on the page that manages engineers.
  */
-export async function GET() {
+async function GET__raw() {
   try {
     const actor = await requireAuth();
     if (!actor) {
@@ -51,3 +52,5 @@ export async function GET() {
     return NextResponse.json({ error: "Failed to fetch engineers" }, { status: 500 });
   }
 }
+
+export const GET = withApiErrors(GET__raw);

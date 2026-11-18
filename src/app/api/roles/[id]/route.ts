@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSuperAdmin, requireAuth } from "@/lib/auth-helpers";
@@ -13,7 +14,7 @@ async function deny() {
 
 type Params = { params: Promise<{ id: string }> };
 
-export async function PATCH(request: Request, { params }: Params) {
+async function PATCH__raw(request: Request, { params }: Params) {
   try {
     if (!(await requireSuperAdmin())) return deny();
 
@@ -63,7 +64,7 @@ export async function PATCH(request: Request, { params }: Params) {
   }
 }
 
-export async function DELETE(_request: Request, { params }: Params) {
+async function DELETE__raw(_request: Request, { params }: Params) {
   try {
     if (!(await requireSuperAdmin())) return deny();
 
@@ -106,3 +107,6 @@ export async function DELETE(_request: Request, { params }: Params) {
     return NextResponse.json({ error: "Failed to delete role", code: "DELETE_FAILED" }, { status: 500 });
   }
 }
+
+export const PATCH = withApiErrors(PATCH__raw);
+export const DELETE = withApiErrors(DELETE__raw);

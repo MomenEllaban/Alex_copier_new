@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
@@ -139,7 +140,7 @@ async function createSimpleReturns(body: Record<string, unknown>, actorId: strin
   return NextResponse.json(full, { status: 201 });
 }
 
-export async function GET() {
+async function GET__raw() {
   try {
     const user = await requirePageAccess("returns");
     if (!user) {
@@ -172,7 +173,7 @@ export async function GET() {
   }
 }
 
-export async function POST(request: Request) {
+async function POST__raw(request: Request) {
   try {
     const actor = await requireAction("returns", "add");
     if (!actor) {
@@ -526,3 +527,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to create return transaction" }, { status: traceError("[returns:POST] create failed", error) });
   }
 }
+
+export const GET = withApiErrors(GET__raw);
+export const POST = withApiErrors(POST__raw);

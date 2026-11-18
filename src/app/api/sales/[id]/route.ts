@@ -1,10 +1,11 @@
+﻿import { errorResponse, withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
 import { recalculatePaymentStatus } from "@/lib/payment-status";
 import { computeCreditSplit, creditUsedNote } from "@/lib/customer-credit";
 import { sanitizePaymentMethod } from "@/lib/payment-method";
-import { traceError } from "@/lib/prisma-errors";
+
 import {
   STOCK_BLOCKED,
   STOCK_CONFIRM_REQUIRED,
@@ -22,7 +23,7 @@ import {
   tradeInCreditTotal,
 } from "@/lib/trade-in-items";
 
-export async function GET(
+async function GET__raw(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -60,7 +61,7 @@ export async function GET(
   }
 }
 
-export async function PUT(
+async function PUT__raw(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -448,11 +449,11 @@ export async function PUT(
     if (error instanceof Error && error.message.startsWith(STOCK_BLOCKED)) {
       return NextResponse.json({ error: "الكمية المتاحة في المخزون لا تكفي لهذه الحركة", code: STOCK_BLOCKED }, { status: 409 });
     }
-    return NextResponse.json({ error: "Failed to update sales order", detail: error instanceof Error ? error.message : undefined }, { status: traceError("[sales:PUT] update failed", error) });
+    return errorResponse(error);
   }
 }
 
-export async function DELETE(
+async function DELETE__raw(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -587,3 +588,11 @@ export async function DELETE(
     return NextResponse.json({ error: "Failed to delete sales order" }, { status: 500 });
   }
 }
+
+export const GET = withApiErrors(GET__raw);
+export const PUT = withApiErrors(PUT__raw);
+export const DELETE = withApiErrors(DELETE__raw);
+
+
+
+

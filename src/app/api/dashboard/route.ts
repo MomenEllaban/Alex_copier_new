@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
@@ -14,7 +15,7 @@ import {
   type MachineStatusCounts,
 } from "@/lib/dashboard";
 
-export async function GET() {
+async function GET__raw() {
   try {
     const user = await requirePageAccess("dashboard");
     if (!user) {
@@ -228,3 +229,5 @@ export async function GET() {
     return NextResponse.json({ error: "Failed to load dashboard" }, { status: 500 });
   }
 }
+
+export const GET = withApiErrors(GET__raw);

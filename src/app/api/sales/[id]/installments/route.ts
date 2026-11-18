@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireAction } from "@/lib/auth-helpers";
@@ -8,7 +9,7 @@ import { recalculatePaymentStatus } from "@/lib/payment-status";
  * Record payment for one or more installments.
  * Body: { installmentIds: string[], paidDate?: string }
  */
-export async function POST(
+async function POST__raw(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -138,3 +139,5 @@ export async function POST(
     );
   }
 }
+
+export const POST = withApiErrors(POST__raw);

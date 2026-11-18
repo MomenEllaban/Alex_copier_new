@@ -13,6 +13,6 @@ export default defineConfig({
     // The CODE-AUDIT suites import every route module, so a single test can
     // spend seconds loading code. Under parallel load that overran vitest's
     // 5s default and failed intermittently even though nothing was wrong.
-    testTimeout: 20_000,
+    testTimeout: 45_000,
   },
 });

@@ -1,9 +1,10 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { requireAuth } from "@/lib/auth-helpers";
 import { markNotificationAsRead } from "@/lib/notifications";
 import { prisma } from "@/lib/prisma";
 
-export async function PATCH(
+async function PATCH__raw(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -47,3 +48,5 @@ export async function PATCH(
     return NextResponse.json({ error: "Failed to update notification" }, { status: 500 });
   }
 }
+
+export const PATCH = withApiErrors(PATCH__raw);

@@ -1,9 +1,10 @@
+﻿import { errorResponse, withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireAction } from "@/lib/auth-helpers";
 import { recalculatePaymentStatus } from "@/lib/payment-status";
 import { computeCreditSplit, creditUsedNote } from "@/lib/customer-credit";
-import { traceError } from "@/lib/prisma-errors";
+
 import {
   STOCK_BLOCKED,
   STOCK_CONFIRM_REQUIRED,
@@ -50,7 +51,7 @@ async function getCompanyAccounts(tx: PrismaTx, companyId: string): Promise<Acco
   };
 }
 
-export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
+async function PUT__raw(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const actor = await requireAction("sales", "edit");
     if (!actor) {
@@ -529,7 +530,12 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     if (error instanceof Error && error.message.startsWith(STOCK_BLOCKED)) {
       return NextResponse.json({ error: "الكمية المتاحة في المخزون لا تكفي لهذه الحركة", code: STOCK_BLOCKED }, { status: 409 });
     }
-    const msg = error instanceof Error ? (error.message || error.name || String(error)) : "Failed to update intercompany sale";
-    return NextResponse.json({ error: msg, detail: error instanceof Error ? error.stack : undefined }, { status: traceError("[sales/intercompany:PUT] update failed", error) });
+    return errorResponse(error);
   }
 }
+
+export const PUT = withApiErrors(PUT__raw);
+
+
+
+

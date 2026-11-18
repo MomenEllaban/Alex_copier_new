@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireAction } from "@/lib/auth-helpers";
@@ -9,7 +10,7 @@ import { traceError } from "@/lib/prisma-errors";
  * Record a payment against a specific sales order (for CREDIT/MIXED orders).
  * Body: { amount: number, paymentDate?: string, notes?: string, companyId?: string }
  */
-export async function POST(
+async function POST__raw(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -145,3 +146,5 @@ export async function POST(
     );
   }
 }
+
+export const POST = withApiErrors(POST__raw);

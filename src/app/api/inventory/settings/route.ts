@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
 import {
@@ -13,7 +14,7 @@ import {
  * role that can read the stock list (workshop managers, maintenance managers).
  * A general manager is never locked out — `canViewPage` short-circuits for them.
  */
-export async function GET(request: Request) {
+async function GET__raw(request: Request) {
   try {
     const actor = await requirePageAccess("inventorySettings");
     if (!actor) {
@@ -40,7 +41,7 @@ export async function GET(request: Request) {
   }
 }
 
-export async function PUT(request: Request) {
+async function PUT__raw(request: Request) {
   try {
     const actor = await requireAction("inventorySettings", "edit");
     if (!actor) {
@@ -75,3 +76,6 @@ export async function PUT(request: Request) {
     );
   }
 }
+
+export const GET = withApiErrors(GET__raw);
+export const PUT = withApiErrors(PUT__raw);

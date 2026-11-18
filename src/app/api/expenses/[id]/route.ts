@@ -1,9 +1,10 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requireAction } from "@/lib/auth-helpers";
 import { traceError } from "@/lib/prisma-errors";
 
-export async function PUT(
+async function PUT__raw(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -57,7 +58,7 @@ export async function PUT(
   }
 }
 
-export async function DELETE(
+async function DELETE__raw(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -79,3 +80,6 @@ export async function DELETE(
     return NextResponse.json({ error: "Failed" }, { status: 500 });
   }
 }
+
+export const PUT = withApiErrors(PUT__raw);
+export const DELETE = withApiErrors(DELETE__raw);

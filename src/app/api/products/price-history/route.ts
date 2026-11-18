@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth-helpers";
@@ -10,7 +11,7 @@ export interface ProductPriceHistory {
   lastPurchaseAt: string | null;
 }
 
-export async function POST(request: Request) {
+async function POST__raw(request: Request) {
   try {
     const user = await requireAuth();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -92,3 +93,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Failed to load price history" }, { status: 500 });
   }
 }
+
+export const POST = withApiErrors(POST__raw);

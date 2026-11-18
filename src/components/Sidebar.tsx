@@ -156,6 +156,7 @@ const navGroups: NavGroup[] = [
       // Gated on the role, not on a page permission: the roles screen is about
       // the system itself, and "settings" is also held by a company manager.
       { key: "navigation.roles", href: "/settings/roles", icon: ShieldCheck, adminOnly: true },
+      { key: "navigation.errorReports", href: "/error-reports", icon: AlertTriangle, adminOnly: true },
     ],
   },
 ];

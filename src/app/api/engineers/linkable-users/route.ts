@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
@@ -7,7 +8,7 @@ import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
  * record they are already linked to (if any). Used by the engineers page
  * to link technician records to real login accounts.
  */
-export async function GET() {
+async function GET__raw() {
   try {
     const actor = await requirePageAccess("engineers");
     if (!actor) {
@@ -38,3 +39,5 @@ export async function GET() {
     return NextResponse.json({ error: "Failed to fetch engineer users" }, { status: 500 });
   }
 }
+
+export const GET = withApiErrors(GET__raw);

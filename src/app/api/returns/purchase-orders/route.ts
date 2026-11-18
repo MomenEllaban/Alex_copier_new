@@ -1,8 +1,9 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess } from "@/lib/auth-helpers";
 
-export async function GET(request: Request) {
+async function GET__raw(request: Request) {
   try {
     const user = await requirePageAccess("returns");
     if (!user) {
@@ -39,3 +40,5 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Failed to fetch purchase orders" }, { status: 500 });
   }
 }
+
+export const GET = withApiErrors(GET__raw);

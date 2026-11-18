@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 import { NextResponse } from "next/server";
 import { requireAuthWithPermissions, requireAuth } from "@/lib/auth-helpers";
 import { getPermissionStamp } from "@/lib/permissions-server";
@@ -16,7 +17,7 @@ import { ACTION_KEYS } from "@/lib/rbac-catalog";
  * no-store throughout: a cached response would hide the very change being
  * delivered.
  */
-export async function GET() {
+async function GET__raw() {
   try {
     const user = await requireAuthWithPermissions();
     if (!user) {
@@ -49,3 +50,5 @@ export async function GET() {
     );
   }
 }
+
+export const GET = withApiErrors(GET__raw);

@@ -1,3 +1,4 @@
+import { withApiErrors } from "@/lib/api-errors";
 ﻿import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction, type ActionKey } from "@/lib/auth-helpers";
@@ -63,7 +64,7 @@ async function engineerScopeCheck(actor: unknown, customerId: string) {
   return null;
 }
 
-export async function GET(
+async function GET__raw(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -106,7 +107,7 @@ function parseOptionalInt(raw: FormDataEntryValue | null): number | null | undef
   return n;
 }
 
-export async function POST(
+async function POST__raw(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
@@ -271,3 +272,6 @@ export async function POST(
     return NextResponse.json({ error: "Failed to create test" }, { status: 500 });
   }
 }
+
+export const GET = withApiErrors(GET__raw);
+export const POST = withApiErrors(POST__raw);
