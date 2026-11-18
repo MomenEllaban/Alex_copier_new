@@ -16,7 +16,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { ACTION_KEYS, isActionKey, type ActionKey } from "@/lib/rbac-catalog";
-import { ROLE_PERMISSIONS, type Page, type Role } from "@/lib/permissions";
+import { ALL_PAGES, ROLE_PERMISSIONS, isFullAccessRole, type Page, type Role } from "@/lib/permissions";
 
 /** How long a resolved role is trusted before it is re-read. */
 export const PERMISSION_CACHE_TTL_MS = 15_000;
@@ -112,15 +112,15 @@ export function getFallbackPermissions(role: string | undefined): RolePermission
   const pages = ROLE_PERMISSIONS[role as Role];
   if (!pages) return null;
   const pageSet = new Set<Page>(pages);
+  const full = isFullAccessRole(role);
   return {
     roleId: "",
     roleKey: role,
-    isSystem: role === "GENERAL_MANAGER",
+    isSystem: full,
     pages: pageSet,
-    // The static table has no action dimension, so only "view" is certain.
-    // Action checks fall back to allowing, preserving today's behaviour;
-    // once a roleId exists the database is authoritative.
-    actions: new Set([...pageSet].map((p) => actionRef(p, "view"))),
+    actions: full
+      ? new Set(ALL_PAGES.flatMap((p) => ACTION_KEYS.map((a) => actionRef(p, a))))
+      : new Set([...pageSet].map((p) => actionRef(p, "view"))),
   };
 }
 
@@ -159,8 +159,8 @@ export async function resolvePermissions(input: {
 
 export function canViewPage(perms: ResolvedPermissions | null, page: Page): boolean {
   if (!perms) return false;
-  // The general manager is never locked out of a page.
-  if (perms.roleKey === "GENERAL_MANAGER") return true;
+  // Full-access roles are never locked out of a page, whatever the matrix says.
+  if (isFullAccessRole(perms.roleKey)) return true;
   return perms.pages.has(page);
 }
 
@@ -170,7 +170,7 @@ export function canPerformAction(
   action: ActionKey
 ): boolean {
   if (!perms) return false;
-  if (perms.roleKey === "GENERAL_MANAGER") return true;
+  if (isFullAccessRole(perms.roleKey)) return true;
   // No action means no page, so a hidden page cannot be acted on.
   if (!perms.pages.has(page)) return false;
 

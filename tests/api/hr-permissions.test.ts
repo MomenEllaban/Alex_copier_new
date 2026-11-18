@@ -138,8 +138,9 @@ describe("HR API — page access is enforced on every endpoint", () => {
     expect(mocks.db.department.findMany).toHaveBeenCalled();
   });
 
-  it("blocks an ACCOUNTANT from employee records even though they hold hrPayroll", async () => {
+  it("lets an ACCOUNTANT into employee records now that accountants have full access", async () => {
     const role: Role = "ACCOUNTANT";
+    mocks.db.employee.findMany.mockResolvedValue([]);
     mocks.requireAuth.mockResolvedValue({ id: "u3", role, companyId: "c1" });
     mocks.requirePageAccess.mockImplementation(async (p: Page) =>
       (ROLE_PERMISSIONS[role] as Page[]).includes(p)
@@ -149,7 +150,7 @@ describe("HR API — page access is enforced on every endpoint", () => {
 
     const res = await employees.GET(GET());
 
-    expect(res.status).toBe(403);
-    expect(mocks.db.employee.findMany).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(mocks.db.employee.findMany).toHaveBeenCalled();
   });
 });

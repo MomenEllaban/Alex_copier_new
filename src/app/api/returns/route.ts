@@ -3,6 +3,141 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
 import { recalculatePaymentStatus } from "@/lib/payment-status";
 import { traceError } from "@/lib/prisma-errors";
+import { postSimpleReturnEffects } from "@/lib/returns-simple";
+
+interface SimpleReturnItem {
+  productId: string;
+  quantity: number;
+  unitPrice: number;
+}
+
+async function createSimpleReturns(body: Record<string, unknown>, actorId: string) {
+  const companyId = typeof body.companyId === "string" ? body.companyId.trim() : "";
+  const type = body.type;
+  const customerId = typeof body.customerId === "string" ? body.customerId.trim() : "";
+  const supplierId = typeof body.supplierId === "string" ? body.supplierId.trim() : "";
+  const reason = typeof body.reason === "string" ? body.reason.trim() || null : null;
+  const items = body.items as SimpleReturnItem[];
+
+  if (!companyId) {
+    return NextResponse.json({ error: "اختيار الشركة مطلوب", code: "COMPANY_REQUIRED" }, { status: 400 });
+  }
+  if (type !== "SALE_RETURN" && type !== "PURCHASE_RETURN") {
+    return NextResponse.json({ error: "نوع المرتجع غير صالح", code: "INVALID_RETURN_TYPE" }, { status: 400 });
+  }
+  if (type === "SALE_RETURN" && !customerId) {
+    return NextResponse.json({ error: "اختيار العميل مطلوب", code: "CUSTOMER_REQUIRED" }, { status: 400 });
+  }
+  if (type === "PURCHASE_RETURN" && !supplierId) {
+    return NextResponse.json({ error: "اختيار المورد مطلوب", code: "SUPPLIER_REQUIRED" }, { status: 400 });
+  }
+  if (!Array.isArray(items) || items.length === 0) {
+    return NextResponse.json({ error: "اختيار منتج واحد على الأقل مطلوب", code: "ITEMS_REQUIRED" }, { status: 400 });
+  }
+
+  const normalized = items.map((item) => ({
+    productId: typeof item?.productId === "string" ? item.productId.trim() : "",
+    quantity: Number(item?.quantity),
+    unitPrice: Number(item?.unitPrice),
+  }));
+
+  if (normalized.some((item) => !item.productId)) {
+    return NextResponse.json({ error: "المنتج مطلوب", code: "PRODUCT_REQUIRED" }, { status: 400 });
+  }
+  if (normalized.some((item) => !Number.isInteger(item.quantity) || item.quantity <= 0)) {
+    return NextResponse.json(
+      { error: "الكمية يجب أن تكون عددًا صحيحًا أكبر من صفر", code: "INVALID_QUANTITY" },
+      { status: 400 }
+    );
+  }
+  if (normalized.some((item) => !Number.isFinite(item.unitPrice) || item.unitPrice < 0)) {
+    return NextResponse.json({ error: "السعر غير صالح", code: "INVALID_PRICE" }, { status: 400 });
+  }
+
+  const [company, party, warehouse, products] = await Promise.all([
+    prisma.company.findUnique({ where: { id: companyId }, select: { id: true } }),
+    type === "SALE_RETURN"
+      ? prisma.customer.findUnique({ where: { id: customerId }, select: { id: true } })
+      : prisma.supplier.findUnique({ where: { id: supplierId }, select: { id: true, companyId: true } }),
+    prisma.warehouse.findFirst({ where: { companyId, isMain: true }, select: { id: true } }),
+    prisma.product.findMany({
+      where: { id: { in: normalized.map((item) => item.productId) }, companyId },
+      select: { id: true },
+    }),
+  ]);
+
+  if (!company) {
+    return NextResponse.json({ error: "الشركة غير موجودة", code: "COMPANY_NOT_FOUND" }, { status: 404 });
+  }
+  if (!party) {
+    return NextResponse.json(
+      { error: type === "SALE_RETURN" ? "العميل غير موجود" : "المورد غير موجود", code: "PARTY_NOT_FOUND" },
+      { status: 404 }
+    );
+  }
+  if (type === "PURCHASE_RETURN" && "companyId" in party && party.companyId && party.companyId !== companyId) {
+    return NextResponse.json({ error: "المورد لا يتبع الشركة المختارة", code: "PARTY_COMPANY_MISMATCH" }, { status: 400 });
+  }
+  if (!warehouse) {
+    return NextResponse.json({ error: "لا يوجد مستودع رئيسي للشركة", code: "NO_WAREHOUSE" }, { status: 400 });
+  }
+  const validProductIds = new Set(products.map((p) => p.id));
+  if (normalized.some((item) => !validProductIds.has(item.productId))) {
+    return NextResponse.json({ error: "أحد المنتجات لا يتبع الشركة المختارة", code: "PRODUCT_NOT_FOUND" }, { status: 404 });
+  }
+
+  const created = await prisma.$transaction(async (tx) => {
+    const rows: { id: string }[] = [];
+    for (const item of normalized) {
+      const total = Number((item.quantity * item.unitPrice).toFixed(2));
+      const row = await tx.returnTransaction.create({
+        data: {
+          companyId,
+          type,
+          customerId: type === "SALE_RETURN" ? customerId : null,
+          supplierId: type === "PURCHASE_RETURN" ? supplierId : null,
+          productId: item.productId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          total,
+          reason,
+          status: "APPROVED",
+          warehouseId: warehouse.id,
+        },
+      });
+      await postSimpleReturnEffects(
+        tx,
+        {
+          id: row.id,
+          companyId,
+          type,
+          customerId: type === "SALE_RETURN" ? customerId : null,
+          supplierId: type === "PURCHASE_RETURN" ? supplierId : null,
+          productId: item.productId,
+          quantity: item.quantity,
+          total,
+          warehouseId: warehouse.id,
+        },
+        actorId
+      );
+      rows.push(row);
+    }
+    return rows;
+  });
+
+  const full = await prisma.returnTransaction.findMany({
+    where: { id: { in: created.map((row) => row.id) } },
+    include: {
+      company: true,
+      customer: true,
+      supplier: true,
+      product: true,
+      warehouse: true,
+    },
+  });
+
+  return NextResponse.json(full, { status: 201 });
+}
 
 export async function GET() {
   try {
@@ -49,6 +184,10 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
+    if (Array.isArray(body.items)) {
+      return await createSimpleReturns(body as Record<string, unknown>, actor.id);
+    }
+
     const { type, salesOrderId, salesOrderItemId, quantity, reason } = body;
 
     if (!type) {
@@ -377,6 +516,12 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof Error && error.message === "INSUFFICIENT_STOCK") {
       return NextResponse.json({ error: "الكمية المتاحة في المخزون لا تكفي لهذا المرتجع — لا يُسمح برصيد سالب", code: "INSUFFICIENT_STOCK" }, { status: 409 });
+    }
+    if (error instanceof Error && error.message === "ACCOUNT_CHART_MISSING") {
+      return NextResponse.json({ error: "حساب الصندوق (1001) غير موجود لهذه الشركة", code: "ACCOUNT_CHART_MISSING" }, { status: 400 });
+    }
+    if (error instanceof Error && error.message === "NO_WAREHOUSE") {
+      return NextResponse.json({ error: "لا يوجد مستودع رئيسي للشركة", code: "NO_WAREHOUSE" }, { status: 400 });
     }
     return NextResponse.json({ error: "Failed to create return transaction" }, { status: traceError("[returns:POST] create failed", error) });
   }

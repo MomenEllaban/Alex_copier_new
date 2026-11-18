@@ -174,18 +174,21 @@ export interface CashPosition {
 
 export async function loadCashPosition(): Promise<CashPosition> {
   // Summed in the database rather than by reading every settlement row.
-  const [collected, pending, expenses] = await Promise.all([
-    prisma.settlement.aggregate({ _sum: { amount: true }, where: { status: "VERIFIED" } }),
-    prisma.settlement.aggregate({ _sum: { amount: true }, where: { status: "INITIAL" } }),
+  // SUBTRACTION rows (e.g. sale returns) reduce cash, so they are netted out.
+  const [collectedAdditions, pendingAdditions, collectedSubtractions, pendingSubtractions, expenses] = await Promise.all([
+    prisma.settlement.aggregate({ _sum: { amount: true }, where: { status: "VERIFIED", direction: "ADDITION" } }),
+    prisma.settlement.aggregate({ _sum: { amount: true }, where: { status: "INITIAL", direction: "ADDITION" } }),
+    prisma.settlement.aggregate({ _sum: { amount: true }, where: { status: "VERIFIED", direction: "SUBTRACTION" } }),
+    prisma.settlement.aggregate({ _sum: { amount: true }, where: { status: "INITIAL", direction: "SUBTRACTION" } }),
     prisma.expense.aggregate({ _sum: { amount: true } }),
   ]);
 
-  const totalCollected = Number(collected._sum.amount ?? 0);
+  const totalCollected = Number(collectedAdditions._sum.amount ?? 0) - Number(collectedSubtractions._sum.amount ?? 0);
   const totalExpenses = Number(expenses._sum.amount ?? 0);
 
   return {
     totalCollected,
-    totalPendingVerification: Number(pending._sum.amount ?? 0),
+    totalPendingVerification: Number(pendingAdditions._sum.amount ?? 0) - Number(pendingSubtractions._sum.amount ?? 0),
     totalExpenses,
     netCash: totalCollected - totalExpenses,
   };

@@ -7,7 +7,7 @@ import {
   type ResolvedPermissions,
 } from "@/lib/permissions-server";
 import type { ActionKey } from "@/lib/rbac-catalog";
-import type { Page } from "@/lib/permissions";
+import { FULL_ACCESS_ROLES, type Page } from "@/lib/permissions";
 
 /** The shape every guard hands back to a route handler. */
 export interface AuthedUser {
@@ -133,9 +133,9 @@ export async function requireRole(...roles: string[]): Promise<AuthedUser | null
   return user;
 }
 
-/** The general manager, by role key. Used by the RBAC admin endpoints. */
+/** Full-access roles, by role key. Used by the RBAC and user admin endpoints. */
 export async function requireSuperAdmin(): Promise<AuthedUser | null> {
-  return requireRole("GENERAL_MANAGER");
+  return requireRole(...FULL_ACCESS_ROLES);
 }
 
 export { canPerformAction, canViewPage };

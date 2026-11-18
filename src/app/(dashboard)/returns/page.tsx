@@ -26,40 +26,29 @@ interface Supplier { id: string; name: string; }
 interface Product { id: string; name: string; pricingTiers?: Record<string, number | null> | null; }
 interface Warehouse { id: string; name: string; companyId: string; }
 
-interface SalesOrderItem {
+interface ReturnOption {
   id: string;
+  name: string;
+  companyName?: string | null;
+  phone?: string | null;
+  sku?: string | null;
+  stock?: number;
+  purchasePrice?: number | null;
+  wholesalePrice?: number | null;
+  retailPrice?: number | null;
+}
+
+interface ReturnOptions {
+  customers: ReturnOption[];
+  suppliers: ReturnOption[];
+  products: ReturnOption[];
+}
+
+interface ReturnLine {
+  key: string;
   productId: string;
-  quantity: number;
-  unitPrice: number;
-  discount: number;
-  product?: Product | null;
-}
-
-interface SalesOrder {
-  id: string;
-  orderNumber?: string;
-  customerId: string;
-  total: number;
-  orderDate: string;
-  customer?: Customer | null;
-  items: SalesOrderItem[];
-}
-
-interface PurchaseOrderItem {
-  id: string;
-  productId: string;
-  quantity: number;
-  unitPrice: number;
-  product?: Product | null;
-}
-
-interface PurchaseOrder {
-  id: string;
-  supplierId: string;
-  total: number;
-  orderDate: string;
-  supplier?: Supplier | null;
-  items: PurchaseOrderItem[];
+  quantity: string;
+  unitPrice: string;
 }
 
 interface ReturnRecord {
@@ -126,45 +115,20 @@ export default function ReturnsPage() {
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 10;
 
-  const [salesOrders, setSalesOrders] = useState<SalesOrder[]>([]);
-  const [salesOrdersLoading, setSalesOrdersLoading] = useState(false);
-  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
-  const [purchaseOrdersLoading, setPurchaseOrdersLoading] = useState(false);
+  const [options, setOptions] = useState<ReturnOptions>({ customers: [], suppliers: [], products: [] });
+  const [optionsLoading, setOptionsLoading] = useState(false);
 
   const [form, setForm] = useState({
     companyId: "",
     type: "SALE_RETURN" as "SALE_RETURN" | "PURCHASE_RETURN",
-    salesOrderId: "",
-    salesOrderItemId: "",
-    purchaseOrderId: "",
-    purchaseOrderItemId: "",
-    quantity: "1",
+    customerId: "",
+    supplierId: "",
     reason: "",
   });
 
-  // The selected order/item are derived from the id in the form and the loaded
-  // order list, so they are computed during render instead of being mirrored
-  // into state from an effect.
-  const selectedOrder = useMemo(
-    () => salesOrders.find((o) => o.id === form.salesOrderId) ?? null,
-    [salesOrders, form.salesOrderId]
-  );
-
-  const selectedItem = useMemo(
-    () => selectedOrder?.items.find((i) => i.id === form.salesOrderItemId) ?? null,
-    [selectedOrder, form.salesOrderItemId]
-  );
-
-  const selectedPurchaseOrder = useMemo(
-    () => purchaseOrders.find((o) => o.id === form.purchaseOrderId) ?? null,
-    [purchaseOrders, form.purchaseOrderId]
-  );
-
-  const selectedPurchaseItem = useMemo(
-    () =>
-      selectedPurchaseOrder?.items.find((i) => i.id === form.purchaseOrderItemId) ?? null,
-    [selectedPurchaseOrder, form.purchaseOrderItemId]
-  );
+  const [lines, setLines] = useState<ReturnLine[]>([
+    { key: "line-1", productId: "", quantity: "1", unitPrice: "" },
+  ]);
 
   const [viewingReturn, setViewingReturn] = useState<ReturnRecord | null>(null);
   const [editingReturn, setEditingReturn] = useState<ReturnRecord | null>(null);
@@ -191,74 +155,47 @@ export default function ReturnsPage() {
 
   useAutoAddForm(() => setShowForm(true));
 
-  const fetchSalesOrders = async (companyId: string) => {
-    setSalesOrdersLoading(true);
+  const fetchOptions = async (companyId: string) => {
+    if (!companyId) {
+      setOptions({ customers: [], suppliers: [], products: [] });
+      return;
+    }
+    setOptionsLoading(true);
     try {
-      const res = await fetch(`/api/returns/sales-orders?companyId=${companyId}`);
+      const res = await fetch(`/api/returns/options?companyId=${encodeURIComponent(companyId)}`);
       const data = await res.json();
-      setSalesOrders(Array.isArray(data) ? data : []);
+      setOptions({
+        customers: Array.isArray(data?.customers) ? data.customers : [],
+        suppliers: Array.isArray(data?.suppliers) ? data.suppliers : [],
+        products: Array.isArray(data?.products) ? data.products : [],
+      });
     } catch {
-      setSalesOrders([]);
+      setOptions({ customers: [], suppliers: [], products: [] });
     } finally {
-      setSalesOrdersLoading(false);
+      setOptionsLoading(false);
     }
   };
 
-  const fetchPurchaseOrders = async (companyId: string) => {
-    setPurchaseOrdersLoading(true);
-    try {
-      const res = await fetch(`/api/returns/purchase-orders?companyId=${companyId}`);
-      const data = await res.json();
-      setPurchaseOrders(Array.isArray(data) ? data : []);
-    } catch {
-      setPurchaseOrders([]);
-    } finally {
-      setPurchaseOrdersLoading(false);
-    }
-  };
-
-  // Changing company or return type invalidates both order selections, so the
-  // form is reset here at the source of the change rather than in an effect
-  // that mirrors the new values back into state.
   const handleTypeChange = (type: "SALE_RETURN" | "PURCHASE_RETURN") => {
-    setForm((prev) => ({ ...prev, type, salesOrderId: "", salesOrderItemId: "", purchaseOrderId: "", purchaseOrderItemId: "" }));
-    // The list to populate now depends on the company already selected, so the
-    // switch refetches for the current company instead of only clearing.
-    if (form.companyId) {
-      if (type === "SALE_RETURN") {
-        void fetchSalesOrders(form.companyId);
-      } else {
-        void fetchPurchaseOrders(form.companyId);
-      }
-    }
-    if (type === "SALE_RETURN") {
-      setPurchaseOrders([]);
-    } else {
-      setSalesOrders([]);
-    }
+    setForm((prev) => ({ ...prev, type, customerId: "", supplierId: "" }));
   };
 
   const handleCompanyChange = (companyId: string) => {
-    setForm((prev) => ({ ...prev, companyId, salesOrderId: "", salesOrderItemId: "", purchaseOrderId: "", purchaseOrderItemId: "" }));
-    if (form.type === "SALE_RETURN") {
-      if (companyId) fetchSalesOrders(companyId);
-      else setSalesOrders([]);
-      setPurchaseOrders([]);
-    } else {
-      if (companyId) fetchPurchaseOrders(companyId);
-      else setPurchaseOrders([]);
-      setSalesOrders([]);
-    }
+    setForm((prev) => ({ ...prev, companyId, customerId: "", supplierId: "" }));
+    void fetchOptions(companyId);
   };
 
-  // Picking an order clears the stale line-item id, since item ids are only
-  // unique within their order.
-  const handleSalesOrderChange = (id: string) => {
-    setForm((prev) => ({ ...prev, salesOrderId: id, salesOrderItemId: "" }));
+  const updateLine = (key: string, patch: Partial<ReturnLine>) => {
+    setLines((prev) => prev.map((line) => (line.key === key ? { ...line, ...patch } : line)));
   };
 
-  const handlePurchaseOrderChange = (id: string) => {
-    setForm((prev) => ({ ...prev, purchaseOrderId: id, purchaseOrderItemId: "" }));
+  const handleProductChange = (key: string, productId: string) => {
+    const product = options.products.find((p) => p.id === productId);
+    const suggested =
+      form.type === "SALE_RETURN"
+        ? product?.retailPrice ?? product?.wholesalePrice ?? 0
+        : product?.purchasePrice ?? product?.wholesalePrice ?? 0;
+    updateLine(key, { productId, unitPrice: String(suggested ?? 0) });
   };
 
   const filteredReturns = useMemo(() => {
@@ -316,67 +253,51 @@ export default function ReturnsPage() {
     return { saleReturns, purchaseReturns, totalValue };
   }, [returns]);
 
-  const availableQuantity = useMemo(() => {
-    if (form.type === "SALE_RETURN") {
-      if (!selectedOrder || !selectedItem) return 0;
-      const existingReturns = returns.filter(
-        (r) => r.salesOrderId === selectedOrder.id && r.salesOrderItemId === selectedItem.id && r.status !== "REJECTED"
-      );
-      const totalReturned = existingReturns.reduce((sum, r) => sum + r.quantity, 0);
-      return selectedItem.quantity - totalReturned;
-    }
-    if (!selectedPurchaseOrder || !selectedPurchaseItem) return 0;
-    const existingReturns = returns.filter(
-      (r) => r.purchaseOrderId === selectedPurchaseOrder.id && r.purchaseOrderItemId === selectedPurchaseItem.id && r.status !== "REJECTED"
-    );
-    const totalReturned = existingReturns.reduce((sum, r) => sum + r.quantity, 0);
-    return selectedPurchaseItem.quantity - totalReturned;
-  }, [form.type, selectedOrder, selectedItem, selectedPurchaseOrder, selectedPurchaseItem, returns]);
+  const formTotal = lines.reduce((sum, line) => sum + Number(line.quantity || 0) * Number(line.unitPrice || 0), 0);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (form.type === "SALE_RETURN") {
-      if (!form.companyId || !form.salesOrderId || !form.salesOrderItemId) {
-        toastError("يرجى اختيار الشركة وفاتورة البيع والمنتج");
-        return;
-      }
-    } else {
-      if (!form.companyId || !form.purchaseOrderId || !form.purchaseOrderItemId) {
-        toastError("يرجى اختيار الشركة وفاتورة الشراء والمنتج");
-        return;
-      }
+    const partyId = form.type === "SALE_RETURN" ? form.customerId : form.supplierId;
+    if (!form.companyId || !partyId) {
+      toastError(form.type === "SALE_RETURN" ? "يرجى اختيار الشركة والعميل" : "يرجى اختيار الشركة والمورد");
+      return;
     }
-
-    const qty = Number(form.quantity);
-    if (!Number.isInteger(qty) || qty <= 0) {
+    if (lines.length === 0 || lines.some((line) => !line.productId)) {
+      toastError("يرجى اختيار منتج لكل سطر من المرتجع");
+      return;
+    }
+    if (lines.some((line) => !Number.isInteger(Number(line.quantity)) || Number(line.quantity) <= 0)) {
       toastError("الكمية يجب أن تكون عددًا صحيحًا أكبر من صفر");
       return;
     }
-
-    if (qty > availableQuantity) {
-      toastError(`الكمية المتاحة للمرتجع هي ${availableQuantity}`);
+    if (lines.some((line) => !Number.isFinite(Number(line.unitPrice)) || Number(line.unitPrice) < 0)) {
+      toastError("السعر غير صالح");
       return;
+    }
+    if (form.type === "PURCHASE_RETURN") {
+      for (const line of lines) {
+        const product = options.products.find((p) => p.id === line.productId);
+        if (product && Number(line.quantity) > (product.stock ?? 0)) {
+          toastError(`الكمية المتاحة للمنتج ${product.name} هي ${product.stock ?? 0}`);
+          return;
+        }
+      }
     }
 
     setSaving(true);
     try {
-      const payload =
-        form.type === "SALE_RETURN"
-          ? {
-              type: form.type,
-              salesOrderId: form.salesOrderId,
-              salesOrderItemId: form.salesOrderItemId,
-              quantity: qty,
-              reason: form.reason,
-            }
-          : {
-              type: form.type,
-              purchaseOrderId: form.purchaseOrderId,
-              purchaseOrderItemId: form.purchaseOrderItemId,
-              quantity: qty,
-              reason: form.reason,
-            };
+      const payload = {
+        companyId: form.companyId,
+        type: form.type,
+        ...(form.type === "SALE_RETURN" ? { customerId: form.customerId } : { supplierId: form.supplierId }),
+        reason: form.reason,
+        items: lines.map((line) => ({
+          productId: line.productId,
+          quantity: Number(line.quantity),
+          unitPrice: Number(line.unitPrice),
+        })),
+      };
       const res = await fetch("/api/returns", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -439,9 +360,9 @@ export default function ReturnsPage() {
   };
 
   const resetForm = () => {
-    setForm({ companyId: "", type: "SALE_RETURN", salesOrderId: "", salesOrderItemId: "", purchaseOrderId: "", purchaseOrderItemId: "", quantity: "1", reason: "" });
-    setSalesOrders([]);
-    setPurchaseOrders([]);
+    setForm({ companyId: "", type: "SALE_RETURN", customerId: "", supplierId: "", reason: "" });
+    setOptions({ customers: [], suppliers: [], products: [] });
+    setLines([{ key: `line-${Date.now()}`, productId: "", quantity: "1", unitPrice: "" }]);
   };
 
   const openCreate = () => {
@@ -585,14 +506,6 @@ export default function ReturnsPage() {
         <form onSubmit={handleCreate} className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-gray-700">{t("common.type")}</label>
-              <select className={inputClass} value={form.type} onChange={(e) => handleTypeChange(e.target.value as "SALE_RETURN" | "PURCHASE_RETURN")}>
-                <option value="SALE_RETURN">{RETURN_TYPE_LABELS.SALE_RETURN}</option>
-                <option value="PURCHASE_RETURN">{RETURN_TYPE_LABELS.PURCHASE_RETURN}</option>
-              </select>
-            </div>
-
-            <div className="space-y-1.5">
               <label className="block text-sm font-medium text-gray-700">{t("common.company")}</label>
               <select className={inputClass} value={form.companyId} onChange={(e) => handleCompanyChange(e.target.value)} required>
                 <option value="">{t("common.selectOption")}</option>
@@ -601,134 +514,111 @@ export default function ReturnsPage() {
                 ))}
               </select>
             </div>
+
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium text-gray-700">{t("common.type")}</label>
+              <select className={inputClass} value={form.type} onChange={(e) => handleTypeChange(e.target.value as "SALE_RETURN" | "PURCHASE_RETURN")}>
+                <option value="SALE_RETURN">{RETURN_TYPE_LABELS.SALE_RETURN}</option>
+                <option value="PURCHASE_RETURN">{RETURN_TYPE_LABELS.PURCHASE_RETURN}</option>
+              </select>
+            </div>
           </div>
 
-          {form.type === "SALE_RETURN" && form.companyId && (
+          {form.companyId && (
             <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-gray-700">{t("returns.selectSalesOrder")}</label>
-              {salesOrdersLoading ? (
+              <label className="block text-sm font-medium text-gray-700">
+                {form.type === "SALE_RETURN" ? "العميل" : "المورد"}
+              </label>
+              {optionsLoading ? (
                 <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-500">
                   <PrinterLoader size="sm" label={t("common.loading")} />
                 </div>
               ) : (
-                <SearchableSelect value={form.salesOrderId} onChange={(v) => handleSalesOrderChange(v)} options={salesOrders.map((order) => ({ value: order.id, label: `${order.id.slice(0, 8)} — ${order.customer?.name || ""} — ${new Date(order.orderDate).toLocaleDateString("en-GB")} ${new Date(order.orderDate).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}` }))} placeholder={t("common.selectOption")} required />
+                <SearchableSelect
+                  key={`${form.companyId}-${form.type}`}
+                  value={form.type === "SALE_RETURN" ? form.customerId : form.supplierId}
+                  onChange={(value) =>
+                    setForm((prev) =>
+                      prev.type === "SALE_RETURN" ? { ...prev, customerId: value } : { ...prev, supplierId: value }
+                    )
+                  }
+                  options={(form.type === "SALE_RETURN" ? options.customers : options.suppliers).map((party) => ({
+                    value: party.id,
+                    label: `${party.name}${party.companyName ? ` — ${party.companyName}` : ""}`,
+                  }))}
+                  placeholder={t("common.selectOption")}
+                  required
+                />
               )}
             </div>
           )}
 
-          {selectedOrder && (
-            <div className="space-y-1.5">
+          {form.companyId && !optionsLoading && (
+            <p className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+              {form.type === "SALE_RETURN"
+                ? "سيتم إضافة الكمية للمخزون، وخصم المبلغ من حساب الشركة، وتقليل دين العميل."
+                : "سيتم خصم الكمية من المخزون، وإضافة المبلغ لحساب الشركة، وتقليل المبلغ المستحق للمورد."}
+            </p>
+          )}
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
               <label className="block text-sm font-medium text-gray-700">{t("returns.selectProduct")}</label>
-              <SearchableSelect
-                value={form.salesOrderItemId}
-                onChange={(v) => setForm((prev) => ({ ...prev, salesOrderItemId: v }))}
-                options={selectedOrder.items.map((item) => {
-                  const existingReturns = returns.filter(
-                    (r) => r.salesOrderId === selectedOrder.id && r.salesOrderItemId === item.id && r.status !== "REJECTED"
-                  );
-                  const totalReturned = existingReturns.reduce((sum, r) => sum + r.quantity, 0);
-                  const available = item.quantity - totalReturned;
-                  return { value: item.id, label: `${item.product?.name || item.productId} — ${item.unitPrice.toLocaleString()} — متبقي ${available}` };
-                })}
-                disabledValues={selectedOrder.items.filter((item) => {
-                  const existingReturns = returns.filter(
-                    (r) => r.salesOrderId === selectedOrder.id && r.salesOrderItemId === item.id && r.status !== "REJECTED"
-                  );
-                  const totalReturned = existingReturns.reduce((sum, r) => sum + r.quantity, 0);
-                  return item.quantity - totalReturned <= 0;
-                }).map((item) => item.id)}
-                placeholder={t("common.selectOption")}
-                required
-              />
+              <button
+                type="button"
+                onClick={() =>
+                  setLines((prev) => [
+                    ...prev,
+                    { key: `line-${Date.now()}-${prev.length}`, productId: "", quantity: "1", unitPrice: "" },
+                  ])
+                }
+                className="inline-flex items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100"
+              >
+                <Plus size={14} />
+                إضافة منتج
+              </button>
             </div>
-          )}
 
-          {selectedItem && (
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-              <h4 className="text-sm font-semibold text-blue-800 mb-2">{t("returns.saleDetails")}</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                <div><span className="text-gray-500">{t("common.product")}:</span> <span className="font-medium">{selectedItem.product?.name}</span></div>
-                <div><span className="text-gray-500">{t("returns.unitPrice")}:</span> <span className="font-medium">{selectedItem.unitPrice.toLocaleString()}</span></div>
-                <div><span className="text-gray-500">{t("returns.quantity")}:</span> <span className="font-medium">{selectedItem.quantity}</span></div>
-                <div><span className="text-gray-500">{t("returns.availableForReturn")}:</span> <span className="font-bold text-blue-700">{availableQuantity}</span></div>
-              </div>
-            </div>
-          )}
-
-          {form.type === "PURCHASE_RETURN" && form.companyId && (
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-gray-700">{t("returns.selectPurchaseOrder")}</label>
-              {purchaseOrdersLoading ? (
-                <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm text-gray-500">
-                  <PrinterLoader size="sm" label={t("common.loading")} />
+            {lines.map((line, index) => (
+              <div key={line.key} className="grid gap-3 rounded-lg border border-gray-200 bg-gray-50 p-3 md:grid-cols-[2fr_1fr_1fr_auto] md:items-end">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-gray-600">المنتج {index + 1}</label>
+                  <SearchableSelect
+                    value={line.productId}
+                    onChange={(value) => handleProductChange(line.key, value)}
+                    options={options.products.map((p) => ({
+                      value: p.id,
+                      label: `${p.name}${p.sku ? ` — ${p.sku}` : ""} — متوفر ${p.stock ?? 0}`,
+                    }))}
+                    disabledValues={lines.filter((other) => other.key !== line.key && other.productId).map((other) => other.productId)}
+                    placeholder={t("common.selectOption")}
+                    required
+                  />
                 </div>
-              ) : (
-                <SearchableSelect value={form.purchaseOrderId} onChange={(v) => handlePurchaseOrderChange(v)} options={purchaseOrders.map((order) => ({ value: order.id, label: `${order.id.slice(0, 8)} — ${order.supplier?.name || ""} — ${new Date(order.orderDate).toLocaleDateString("en-GB")} ${new Date(order.orderDate).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })}` }))} placeholder={t("common.selectOption")} required />
-              )}
-            </div>
-          )}
-
-          {selectedPurchaseOrder && (
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-gray-700">{t("returns.selectProduct")}</label>
-              <SearchableSelect
-                value={form.purchaseOrderItemId}
-                onChange={(v) => setForm((prev) => ({ ...prev, purchaseOrderItemId: v }))}
-                options={selectedPurchaseOrder.items.map((item) => {
-                  const existingReturns = returns.filter(
-                    (r) => r.purchaseOrderId === selectedPurchaseOrder.id && r.purchaseOrderItemId === item.id && r.status !== "REJECTED"
-                  );
-                  const totalReturned = existingReturns.reduce((sum, r) => sum + r.quantity, 0);
-                  const available = item.quantity - totalReturned;
-                  return { value: item.id, label: `${item.product?.name || item.productId} — ${item.unitPrice.toLocaleString()} — متبقي ${available}` };
-                })}
-                disabledValues={selectedPurchaseOrder.items.filter((item) => {
-                  const existingReturns = returns.filter(
-                    (r) => r.purchaseOrderId === selectedPurchaseOrder.id && r.purchaseOrderItemId === item.id && r.status !== "REJECTED"
-                  );
-                  const totalReturned = existingReturns.reduce((sum, r) => sum + r.quantity, 0);
-                  return item.quantity - totalReturned <= 0;
-                }).map((item) => item.id)}
-                placeholder={t("common.selectOption")}
-                required
-              />
-            </div>
-          )}
-
-          {selectedPurchaseItem && (
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-              <h4 className="text-sm font-semibold text-blue-800 mb-2">{t("returns.purchaseDetails")}</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                <div><span className="text-gray-500">{t("common.product")}:</span> <span className="font-medium">{selectedPurchaseItem.product?.name}</span></div>
-                <div><span className="text-gray-500">{t("returns.unitPrice")}:</span> <span className="font-medium">{selectedPurchaseItem.unitPrice.toLocaleString()}</span></div>
-                <div><span className="text-gray-500">{t("returns.quantity")}:</span> <span className="font-medium">{selectedPurchaseItem.quantity}</span></div>
-                <div><span className="text-gray-500">{t("returns.availableForReturn")}:</span> <span className="font-bold text-blue-700">{availableQuantity}</span></div>
-              </div>
-            </div>
-          )}
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium text-gray-700">{t("returns.quantity")}</label>
-              <input
-                type="number"
-                min={1}
-                max={availableQuantity || undefined}
-                className={inputClass}
-                value={form.quantity}
-                onChange={(e) => setForm((prev) => ({ ...prev, quantity: e.target.value }))}
-                required
-              />
-            </div>
-
-            {(selectedItem || selectedPurchaseItem) && (
-              <div className="space-y-1.5">
-                <label className="block text-sm font-medium text-gray-700">{t("returns.total")}</label>
-                <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm font-bold text-slate-900">
-                  {(Number(form.quantity) * (selectedItem?.unitPrice ?? selectedPurchaseItem?.unitPrice ?? 0)).toLocaleString()}
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-gray-600">{t("returns.quantity")}</label>
+                  <input type="number" min={1} className={inputClass} value={line.quantity} onChange={(e) => updateLine(line.key, { quantity: e.target.value })} required />
                 </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-medium text-gray-600">{t("returns.unitPrice")}</label>
+                  <input type="number" min={0} step="0.01" className={inputClass} value={line.unitPrice} onChange={(e) => updateLine(line.key, { unitPrice: e.target.value })} placeholder="0.00" required />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLines((prev) => prev.filter((row) => row.key !== line.key))}
+                  disabled={lines.length === 1}
+                  className="inline-flex h-[42px] w-[42px] items-center justify-center rounded-lg border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+                  title={t("common.delete")}
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
-            )}
+            ))}
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+            <span className="text-sm font-medium text-gray-600">{t("returns.total")}</span>
+            <span className="text-lg font-bold text-slate-900">{formTotal.toLocaleString()}</span>
           </div>
 
           <div className="space-y-1.5">

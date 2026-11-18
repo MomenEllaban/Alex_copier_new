@@ -126,10 +126,16 @@ describe("report routes — envelope", () => {
   it("sums settlements in the database instead of reading every row", async () => {
     await cash();
     expect(mocks.prisma.settlement.aggregate).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { status: "VERIFIED" } }),
+      expect.objectContaining({ where: { status: "VERIFIED", direction: "ADDITION" } }),
     );
     expect(mocks.prisma.settlement.aggregate).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { status: "INITIAL" } }),
+      expect.objectContaining({ where: { status: "INITIAL", direction: "ADDITION" } }),
+    );
+    expect(mocks.prisma.settlement.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { status: "VERIFIED", direction: "SUBTRACTION" } }),
+    );
+    expect(mocks.prisma.settlement.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { status: "INITIAL", direction: "SUBTRACTION" } }),
     );
   });
 });

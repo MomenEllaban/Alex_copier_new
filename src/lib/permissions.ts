@@ -45,53 +45,36 @@ export type Page =
   | "hrReports"
   | "hrSelfService";
 
+/** Every page in the system. Shared by all full-access roles so they cannot drift. */
+export const ALL_PAGES: Page[] = [
+  "dashboard", "machines", "customers", "engineers",
+  "serviceRequests", "contracts", "purchases", "sales",
+  "inventory", "inventorySettings", "warehouses", "products", "workshop", "finance", "companies",
+  "settlements", "reports", "settings", "suppliers", "investors", "returns", "tradeIns", "workshopDaily",
+  "copierTests",
+  "hrDashboard", "hrEmployees", "hrAttendance", "hrLeaves", "hrPayroll", "hrSettings", "hrReports", "hrSelfService",
+];
+
+/** Roles with every page and every action, enforced even if the matrix says otherwise. */
+export const FULL_ACCESS_ROLES: Role[] = [
+  "GENERAL_MANAGER",
+  "COMPANY_MANAGER",
+  "ACCOUNTANT",
+  "MAINTENANCE_MANAGER",
+  "WORKSHOP_MANAGER",
+  "HR_MANAGER",
+];
+
+export function isFullAccessRole(role: string | null | undefined): boolean {
+  return !!role && (FULL_ACCESS_ROLES as string[]).includes(role);
+}
+
 export const ROLE_PERMISSIONS: Record<Role, Page[]> = {
-  // المدير العام — يشوف كل حاجة (ادمن)
-  GENERAL_MANAGER: [
-    "dashboard", "machines", "customers", "engineers",
-    "serviceRequests", "contracts", "purchases", "sales",
-    "inventory", "inventorySettings", "warehouses", "products", "workshop", "finance", "companies",
-    "settlements", "reports", "settings", "suppliers", "investors", "returns", "tradeIns", "workshopDaily",
-    "copierTests",
-    "hrDashboard", "hrEmployees", "hrAttendance", "hrLeaves", "hrPayroll", "hrSettings", "hrReports", "hrSelfService",
-  ],
-
-  // مدير الشركة — إدارة شاملة لشركته
-  COMPANY_MANAGER: [
-    "dashboard", "machines", "customers", "engineers",
-    "serviceRequests", "contracts", "purchases", "sales",
-    "inventory", "inventorySettings", "warehouses", "products", "workshop", "finance", "settlements",
-    "reports", "suppliers", "returns", "tradeIns", "workshopDaily",
-    "copierTests",
-    // 1.7: These two were unreachable for a company manager even though the
-    // API let every signed-in user read them. Granted so the sidebar and the
-    // API now agree.
-    "companies", "investors",
-    "hrDashboard", "hrEmployees", "hrAttendance", "hrLeaves", "hrPayroll", "hrSettings", "hrReports", "hrSelfService",
-  ],
-
-  // المحاسب — المالية والفواتير والتقارير + الرواتب + الموردين والعملاء
-  ACCOUNTANT: [
-    "dashboard", "purchases", "sales", "finance",
-    "settlements", "reports", "companies", "returns", "workshopDaily",
-    "products", "inventory", "suppliers", "customers",
-    "hrPayroll", "hrReports", "hrSelfService",
-  ],
-
-  // مدير الصيانة — طلبات الصيانة والمهندسين والورشة
-  MAINTENANCE_MANAGER: [
-    "dashboard", "serviceRequests", "engineers",
-    "contracts", "workshop", "inventory", "warehouses", "products", "machines",
-    "copierTests",
-    "hrSelfService",
-  ],
-
-  // مدير الورشة — الورشة والمخزون والمهندسون
-  WORKSHOP_MANAGER: [
-    "dashboard", "workshop", "inventory", "warehouses", "products", "engineers", "machines", "workshopDaily",
-    "copierTests",
-    "hrSelfService",
-  ],
+  GENERAL_MANAGER: ALL_PAGES,
+  COMPANY_MANAGER: ALL_PAGES,
+  ACCOUNTANT: ALL_PAGES,
+  MAINTENANCE_MANAGER: ALL_PAGES,
+  WORKSHOP_MANAGER: ALL_PAGES,
 
   // المهندس — طلبات الصيانة المعينة عليه + عملاؤه المسندون إليه فقط
   ENGINEER: [
@@ -110,11 +93,7 @@ export const ROLE_PERMISSIONS: Record<Role, Page[]> = {
     "hrSelfService",
   ],
 
-  // مدير الموارد البشرية — كل شاشات HR
-  HR_MANAGER: [
-    "dashboard",
-    "hrDashboard", "hrEmployees", "hrAttendance", "hrLeaves", "hrPayroll", "hrSettings", "hrReports", "hrSelfService",
-  ],
+  HR_MANAGER: ALL_PAGES,
 
   // موظف — الخدمة الذاتية فقط
   EMPLOYEE: [
@@ -180,26 +159,26 @@ export function roleLabel(
  */
 export const ROLE_DESCRIPTIONS_AR: Record<Role, string> = {
   GENERAL_MANAGER: "صلاحية كاملة على كل الصفحات والإجراءات. محمي ولا يمكن تعديله.",
-  COMPANY_MANAGER: "إدارة شاملة للشركة، بدون إعدادات النظام الحساسة.",
-  ACCOUNTANT: "المحاسبة والفواتير والتقارير المالية.",
-  MAINTENANCE_MANAGER: "إدارة الصيانة وطلبات الخدمة والمهندسين.",
-  WORKSHOP_MANAGER: "إدارة الورشة والمخزون والفنيين.",
+  COMPANY_MANAGER: "صلاحية كاملة على كل الصفحات والإجراءات.",
+  ACCOUNTANT: "صلاحية كاملة على كل الصفحات والإجراءات.",
+  MAINTENANCE_MANAGER: "صلاحية كاملة على كل الصفحات والإجراءات.",
+  WORKSHOP_MANAGER: "صلاحية كاملة على كل الصفحات والإجراءات.",
   ENGINEER: "متابعة مهامه وعملائه فقط.",
   SALES_EMPLOYEE: "المبيعات والعملاء والعقود.",
-  HR_MANAGER: "إدارة الموارد البشرية.",
+  HR_MANAGER: "صلاحية كاملة على كل الصفحات والإجراءات.",
   EMPLOYEE: "الخدمة الذاتية فقط.",
 };
 
 export const ROLE_DESCRIPTIONS_EN: Record<Role, string> = {
   GENERAL_MANAGER:
     "Full access to every page and action. Protected, and cannot be edited.",
-  COMPANY_MANAGER: "Company-wide management, without the sensitive system settings.",
-  ACCOUNTANT: "Accounting, invoicing and financial reports.",
-  MAINTENANCE_MANAGER: "Manages maintenance, service requests and engineers.",
-  WORKSHOP_MANAGER: "Manages the workshop, its stock and its technicians.",
+  COMPANY_MANAGER: "Full access to every page and action.",
+  ACCOUNTANT: "Full access to every page and action.",
+  MAINTENANCE_MANAGER: "Full access to every page and action.",
+  WORKSHOP_MANAGER: "Full access to every page and action.",
   ENGINEER: "Sees only their own tasks and their own customers.",
   SALES_EMPLOYEE: "Sales, customers and contracts.",
-  HR_MANAGER: "Manages human resources.",
+  HR_MANAGER: "Full access to every page and action.",
   EMPLOYEE: "Self-service only.",
 };
 

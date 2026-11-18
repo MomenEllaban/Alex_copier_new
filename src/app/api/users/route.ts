@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { hash } from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, requireRole } from "@/lib/auth-helpers";
+import { requireAuth, requireSuperAdmin } from "@/lib/auth-helpers";
 import { ROLES } from "@/lib/permissions";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function GET() {
   try {
-    const admin = await requireRole("GENERAL_MANAGER");
+    const admin = await requireSuperAdmin();
     if (!admin) {
       const authed = await requireAuth();
       return NextResponse.json(
@@ -36,7 +36,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const admin = await requireRole("GENERAL_MANAGER");
+    const admin = await requireSuperAdmin();
     if (!admin) {
       const authed = await requireAuth();
       return NextResponse.json(

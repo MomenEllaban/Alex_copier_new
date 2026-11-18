@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import RolesPermissionsPage from "@/components/roles/RolesPermissionsPage";
 import PrinterLoader from "@/components/PrinterLoader";
+import { isFullAccessRole } from "@/lib/permissions";
 
 /**
  * The roles screen is about the system itself rather than a business page, so
@@ -18,7 +19,7 @@ export default function RolesPage() {
   const router = useRouter();
   const role = (session?.user as { role?: string } | undefined)?.role;
 
-  const isAdmin = role === "GENERAL_MANAGER";
+  const isAdmin = isFullAccessRole(role);
 
   useEffect(() => {
     if (status === "authenticated" && !isAdmin) router.replace("/unauthorized");

@@ -19,7 +19,7 @@ import { requireAnyPage, requirePageAccess, requireAction } from "@/lib/auth-hel
 import { invalidatePermissionCache } from "@/lib/permissions-server";
 
 /** A Role row granting `canView` pages, with only a "view" action on each. */
-function roleRow(pages: string[], roleKey = "ACCOUNTANT") {
+function roleRow(pages: string[], roleKey = "EMPLOYEE") {
   return {
     id: "r1",
     key: roleKey,
@@ -33,11 +33,11 @@ describe("requireAnyPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     invalidatePermissionCache();
-    mocks.auth.mockResolvedValue({ user: { id: "u1", role: "ACCOUNTANT" } });
+    mocks.auth.mockResolvedValue({ user: { id: "u1", role: "EMPLOYEE" } });
     mocks.prisma.user.findUnique.mockResolvedValue({
       id: "u1",
       isActive: true,
-      role: "ACCOUNTANT",
+      role: "EMPLOYEE",
       roleId: "r1",
       companyId: null,
     });
@@ -64,7 +64,7 @@ describe("requireAnyPage", () => {
     mocks.prisma.user.findUnique.mockResolvedValue({
       id: "u1",
       isActive: false,
-      role: "ACCOUNTANT",
+      role: "EMPLOYEE",
       roleId: "r1",
     });
 
@@ -102,16 +102,16 @@ describe("requireAction", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     invalidatePermissionCache();
-    mocks.auth.mockResolvedValue({ user: { id: "u1", role: "ACCOUNTANT" } });
+    mocks.auth.mockResolvedValue({ user: { id: "u1", role: "EMPLOYEE" } });
     mocks.prisma.user.findUnique.mockResolvedValue({
       id: "u1",
       isActive: true,
-      role: "ACCOUNTANT",
+      role: "EMPLOYEE",
       roleId: "r1",
     });
     mocks.prisma.role.findUnique.mockResolvedValue({
       id: "r1",
-      key: "ACCOUNTANT",
+      key: "EMPLOYEE",
       isSystem: false,
       pages: [{ page: { key: "customers" } }],
       actionPermissions: [{ action: { key: "view", page: { key: "customers" } } }],
@@ -141,5 +141,25 @@ describe("requireAction", () => {
     });
 
     await expect(requireAction("finance", "delete")).resolves.toMatchObject({ id: "u1" });
+  });
+});
+
+describe("full-access roles", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    invalidatePermissionCache();
+    mocks.auth.mockResolvedValue({ user: { id: "u1", role: "ACCOUNTANT" } });
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      id: "u1",
+      isActive: true,
+      role: "ACCOUNTANT",
+      roleId: "r1",
+    });
+    mocks.prisma.role.findUnique.mockResolvedValue(roleRow([], "ACCOUNTANT"));
+  });
+
+  it("grants every page and action even when the database matrix is empty", async () => {
+    await expect(requirePageAccess("settings")).resolves.toMatchObject({ id: "u1" });
+    await expect(requireAction("settings", "delete")).resolves.toMatchObject({ id: "u1" });
   });
 });

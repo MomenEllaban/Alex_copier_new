@@ -7,7 +7,7 @@ import { useI18n } from "@/i18n/context";
 import { signOut } from "next-auth/react";
 import { usePermissions } from "@/components/PermissionsProvider";
 import { useSidebar } from "@/components/SidebarContext";
-import type { Page } from "@/lib/permissions";
+import { isFullAccessRole, type Page } from "@/lib/permissions";
 import {
   LayoutDashboard,
   Printer,
@@ -170,7 +170,7 @@ export default function Sidebar() {
   const router = useRouter();
   const { t } = useI18n();
   const { can, canAct, ready, roleKey } = usePermissions();
-  const isGeneralManager = roleKey === "GENERAL_MANAGER";
+  const isGeneralManager = isFullAccessRole(roleKey);
 
   useEffect(() => {
     const mediaQuery = window.matchMedia("(min-width: 1024px)");

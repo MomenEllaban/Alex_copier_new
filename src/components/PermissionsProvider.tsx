@@ -13,7 +13,7 @@ import {
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import type { ActionKey } from "@/lib/rbac-catalog";
-import type { Page } from "@/lib/permissions";
+import { isFullAccessRole, type Page } from "@/lib/permissions";
 
 interface PermissionState {
   roleKey: string;
@@ -143,13 +143,13 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
   }, [status, load, router]);
 
   const value = useMemo<PermissionsContextValue>(() => {
-    const isGeneralManager = state.roleKey === "GENERAL_MANAGER";
+    const fullAccess = isFullAccessRole(state.roleKey);
     return {
       ...state,
       ready,
-      can: (page) => isGeneralManager || state.pages.has(page),
+      can: (page) => fullAccess || state.pages.has(page),
       canAct: (page, action) => {
-        if (isGeneralManager) return true;
+        if (fullAccess) return true;
         // A control inside a hidden page is unreachable anyway.
         if (!state.pages.has(page)) return false;
         return state.actions.has(`${page}:${action}`);

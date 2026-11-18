@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, requirePageAccess, requireAction } from "@/lib/auth-helpers";
 import { recalculatePaymentStatus } from "@/lib/payment-status";
+import {
+  isSimpleReturn,
+  postSimpleReturnEffects,
+  reverseSimpleReturnEffects,
+} from "@/lib/returns-simple";
 
 export async function GET(
   _request: Request,
@@ -63,6 +68,8 @@ export async function PUT(
       return NextResponse.json({ error: "Return not found" }, { status: 404 });
     }
 
+    let approvedWarehouseId: string | null = null;
+
     if (status && status !== existing.status) {
       if (!["PENDING", "APPROVED", "REJECTED", "COMPLETED"].includes(status)) {
         return NextResponse.json({ error: "حالة غير صالحة" }, { status: 400 });
@@ -70,6 +77,11 @@ export async function PUT(
 
       if (status === "REJECTED" && existing.status === "APPROVED") {
         await prisma.$transaction(async (tx) => {
+          if (isSimpleReturn(existing)) {
+            await reverseSimpleReturnEffects(tx, existing);
+            return;
+          }
+
           if (existing.warehouseId) {
             // Sale returns added stock on approval -> removing them takes it back out.
             // Purchase returns removed stock on approval -> rejecting restores it.
@@ -143,7 +155,17 @@ export async function PUT(
           ? { id: existing.warehouseId }
           : await prisma.warehouse.findFirst({ where: { companyId: existing.companyId, isMain: true }, select: { id: true } });
 
-        if (warehouse && existing.type === "SALE_RETURN") {
+        if (isSimpleReturn(existing)) {
+          if (!warehouse) throw new Error("NO_WAREHOUSE");
+          approvedWarehouseId = warehouse.id;
+          await prisma.$transaction(async (tx) => {
+            await postSimpleReturnEffects(
+              tx,
+              { ...existing, warehouseId: warehouse.id },
+              actor.id
+            );
+          });
+        } else if (warehouse && existing.type === "SALE_RETURN") {
           await prisma.$transaction(async (tx) => {
             await tx.warehouseInventory.upsert({
               where: { warehouseId_productId: { warehouseId: warehouse.id, productId: existing.productId } },
@@ -231,6 +253,7 @@ export async function PUT(
       data: {
         ...(status && { status }),
         ...(reason !== undefined && { reason }),
+        ...(approvedWarehouseId && { warehouseId: approvedWarehouseId }),
       },
       include: {
         company: true,
@@ -251,6 +274,12 @@ export async function PUT(
   } catch (error: unknown) {
     if (error instanceof Error && error.message === "INSUFFICIENT_STOCK") {
       return NextResponse.json({ error: "الكمية المتاحة لا تكفي لهذه العملية — لا يُسمح برصيد سالب", code: "INSUFFICIENT_STOCK" }, { status: 409 });
+    }
+    if (error instanceof Error && error.message === "NO_WAREHOUSE") {
+      return NextResponse.json({ error: "لا يوجد مستودع رئيسي للشركة", code: "NO_WAREHOUSE" }, { status: 400 });
+    }
+    if (error instanceof Error && error.message === "ACCOUNT_CHART_MISSING") {
+      return NextResponse.json({ error: "حساب الصندوق (1001) غير موجود لهذه الشركة", code: "ACCOUNT_CHART_MISSING" }, { status: 400 });
     }
     if (error && typeof error === "object" && "code" in error && error.code === "P2025") {
       return NextResponse.json({ error: "Return not found" }, { status: 404 });
@@ -278,6 +307,11 @@ export async function DELETE(
 
     if (existing.status === "APPROVED" || existing.status === "COMPLETED") {
       await prisma.$transaction(async (tx) => {
+        if (isSimpleReturn(existing)) {
+          await reverseSimpleReturnEffects(tx, existing);
+          return;
+        }
+
         if (existing.warehouseId) {
           // Sale returns added stock -> removing takes it out; purchase returns removed
           // stock -> deleting restores it.

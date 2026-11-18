@@ -18,22 +18,28 @@ import "dotenv/config";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { ACTION_KEYS, type ActionKey } from "../src/lib/rbac-catalog";
-import { ROLE_LABELS_AR, ROLE_PERMISSIONS, ROLES, type Role } from "../src/lib/permissions";
+import {
+  FULL_ACCESS_ROLES,
+  ROLE_LABELS_AR,
+  ROLE_PERMISSIONS,
+  ROLES,
+  type Role,
+} from "../src/lib/permissions";
 
 const RESET = process.argv.includes("--reset");
 
 /** Roles whose permissions the general manager must never be able to reduce. */
-const SYSTEM_ROLES: Role[] = ["GENERAL_MANAGER"];
+const SYSTEM_ROLES: Role[] = FULL_ACCESS_ROLES;
 
 const ROLE_DESCRIPTIONS: Record<Role, string> = {
   GENERAL_MANAGER: "صلاحية كاملة على كل الصفحات والإجراءات. محمي ولا يمكن تعديله.",
-  COMPANY_MANAGER: "إدارة شاملة للشركة، بدون إعدادات النظام الحساسة.",
-  ACCOUNTANT: "المحاسبة والفواتير والتقارير المالية.",
-  MAINTENANCE_MANAGER: "إدارة الصيانة وطلبات الخدمة والمهندسين.",
-  WORKSHOP_MANAGER: "إدارة الورشة والمخزون والفنيين.",
+  COMPANY_MANAGER: "صلاحية كاملة على كل الصفحات والإجراءات.",
+  ACCOUNTANT: "صلاحية كاملة على كل الصفحات والإجراءات.",
+  MAINTENANCE_MANAGER: "صلاحية كاملة على كل الصفحات والإجراءات.",
+  WORKSHOP_MANAGER: "صلاحية كاملة على كل الصفحات والإجراءات.",
   ENGINEER: "متابعة مهامه وعملائه فقط.",
   SALES_EMPLOYEE: "المبيعات والعملاء والعقود.",
-  HR_MANAGER: "إدارة الموارد البشرية.",
+  HR_MANAGER: "صلاحية كاملة على كل الصفحات والإجراءات.",
   EMPLOYEE: "الخدمة الذاتية فقط.",
 };
 
@@ -61,38 +67,12 @@ interface ActionProfile {
 type Pageish = (typeof ROLE_PERMISSIONS)[Role][number];
 
 const ACTION_PROFILES: Record<Role, ActionProfile> = {
-  // Full access is handled separately and is not reducible.
+  // Full-access roles are never reducible, in code or in the matrix.
   GENERAL_MANAGER: { anywhere: [...ACTION_KEYS] },
-
-  // "شبه كامل" — everything except the sensitive system settings page and the
-  // destructive book reset.
-  COMPANY_MANAGER: {
-    anywhere: ["view", "add", "edit", "delete", "import", "export", "print", "approve", "assign", "share", "close", "scrap"],
-    readOnly: ["settings"],
-    never: ["reset"],
-  },
-
-  // Accounting: full financial paperwork, but no deletions.
-  ACCOUNTANT: {
-    anywhere: ["view", "add", "edit", "export", "print", "approve", "import"],
-    // Closing the workshop day is the handover of the cashbox, so the
-    // accountant may close it — on that page only.
-    alsoOn: { workshopDaily: ["close"] },
-    never: ["delete", "scrap", "reset", "assign"],
-  },
-
-  // Maintenance: everything on the maintenance pages, read-only elsewhere.
-  MAINTENANCE_MANAGER: {
-    anywhere: ["view", "export", "print"],
-    fullOn: ["serviceRequests", "engineers", "copierTests", "workshop", "workshopDaily", "machines", "contracts"],
-  },
-
-  // Workshop: full on the workshop floor, never on money.
-  WORKSHOP_MANAGER: {
-    anywhere: ["view", "export", "print"],
-    fullOn: ["workshop", "workshopDaily", "engineers", "machines", "inventory", "warehouses", "products", "copierTests"],
-    never: ["reset", "approve"],
-  },
+  COMPANY_MANAGER: { anywhere: [...ACTION_KEYS] },
+  ACCOUNTANT: { anywhere: [...ACTION_KEYS] },
+  MAINTENANCE_MANAGER: { anywhere: [...ACTION_KEYS] },
+  WORKSHOP_MANAGER: { anywhere: [...ACTION_KEYS] },
 
   // Engineer: read his work, update task state, never delete.
   ENGINEER: {
@@ -106,10 +86,7 @@ const ACTION_PROFILES: Record<Role, ActionProfile> = {
     never: ["delete", "edit", "approve", "assign", "import", "close", "scrap", "reset", "share"],
   },
 
-  HR_MANAGER: {
-    anywhere: ["view", "add", "edit", "delete", "export", "print", "approve", "import", "assign"],
-    never: ["reset", "scrap", "close"],
-  },
+  HR_MANAGER: { anywhere: [...ACTION_KEYS] },
 
   EMPLOYEE: {
     anywhere: ["view"],

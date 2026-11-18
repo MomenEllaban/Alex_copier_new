@@ -38,7 +38,7 @@ function makeRequest(payload: object) {
 }
 
 const manager = { role: "GENERAL_MANAGER" };
-const workshopManager = { role: "WORKSHOP_MANAGER" };
+const employee = { role: "EMPLOYEE" };
 
 describe("POST /api/customers/import", () => {
   beforeEach(() => {
@@ -56,7 +56,7 @@ describe("POST /api/customers/import", () => {
   });
 
   it("returns 403 for roles without customers page access", async () => {
-    mocks.requireAuth.mockResolvedValue(workshopManager);
+    mocks.requireAuth.mockResolvedValue(employee);
     const res = await POST(makeRequest({ csv: "name\nx" }));
     expect(res.status).toBe(403);
     expect(mocks.prisma.customer.createMany).not.toHaveBeenCalled();

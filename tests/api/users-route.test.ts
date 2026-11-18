@@ -44,6 +44,7 @@ vi.mock("@/lib/auth-helpers", () => ({
   requireAction: vi.fn(),
   requireAnyAction: vi.fn(),
   requireRole: mocks.requireRole,
+  requireSuperAdmin: mocks.requireRole,
 }));
 vi.mock("bcryptjs", () => ({
   hash: vi.fn(async (password: string) => `hashed:${password}`),

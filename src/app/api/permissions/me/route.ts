@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireAuthWithPermissions, requireAuth } from "@/lib/auth-helpers";
 import { getPermissionStamp } from "@/lib/permissions-server";
+import { ALL_PAGES, isFullAccessRole } from "@/lib/permissions";
+import { ACTION_KEYS } from "@/lib/rbac-catalog";
 
 /**
  * The signed-in user's resolved permissions, plus a fingerprint of the whole
@@ -30,8 +32,12 @@ export async function GET() {
     return NextResponse.json(
       {
         role: { key: user.permissions.roleKey, isSystem: user.permissions.isSystem },
-        pages: [...user.permissions.pages],
-        actions: [...user.permissions.actions],
+        pages: isFullAccessRole(user.permissions.roleKey)
+          ? ALL_PAGES
+          : [...user.permissions.pages],
+        actions: isFullAccessRole(user.permissions.roleKey)
+          ? ALL_PAGES.flatMap((p) => ACTION_KEYS.map((a) => `${p}:${a}`))
+          : [...user.permissions.actions],
       },
       { headers: { "Cache-Control": "no-store", "X-Permissions-Stamp": stamp } }
     );
